@@ -1,0 +1,22 @@
+# Cursor AI Operational Rules
+
+## 1. The Prime Directive
+
+You MUST read and strictly adhere to `ai-architecture-context.md` located in the root directory. It is the absolute source of truth for this project.
+
+## 2. Expo SDK 56 (CRITICAL)
+
+**Expo HAS CHANGED.** Ensure all React Native and Expo Router code complies with SDK 56 (`https://docs.expo.dev/versions/v56.0.0/`). Do not use deprecated APIs.
+
+## 3. Hard Guardrails (Zero Exceptions)
+
+- **Package Manager:** Use `pnpm` exclusively. Never output `npm` or `yarn` commands.
+- **Backend Architecture:** There is NO custom backend server. The database (Supabase/PostgreSQL) IS the backend. All business logic lives in Postgres.
+- **Language:** All code, identifiers, comments, and commit messages must be written in English.
+- **State Management:** TanStack Query is used for server state.
+
+## 4. Database & Workflow Enforcement
+
+- **Migrations:** All schema changes must be provided as Supabase migrations.
+- **Type Generation:** Whenever you generate a migration, explicitly remind the user to run: `npx supabase gen types typescript --local > src/types/database.ts`.
+- **Security:** Row Level Security (RLS) is mandatory. Never disable RLS to make a query work.
