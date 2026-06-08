@@ -3,10 +3,16 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "clsx": "^2.1.1",
     "expo": "~56.0.9",
     "expo-status-bar": "~56.0.4",
+    "nativewind": "5.0.0-preview.4",
     "react": "19.2.3",
-    "react-native": "0.85.3"
+    "react-native": "0.85.3",
+    "react-native-css": "3.0.7",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",

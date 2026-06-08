@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Padel — Geo-Matchmaking Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background:
+      radial-gradient(120% 90% at 50% 18%, #3b3c41 0%, #2a2b2f 46%, #1d1e21 100%);
+    font-family: 'Hanken Grotesk', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 40px 0;
+  }
+  #root { display: flex; align-items: center; justify-content: center; }
+  /* hide scrollbars inside app for cleaner mockup */
+  .pd-scroll::-webkit-scrollbar { width: 0; height: 0; }
+  .pd-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+  .pd-tap { -webkit-tap-highlight-color: transparent; }
+  @keyframes pd-fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pd-pop { 0% { transform: scale(0.8); opacity: 0; } 60% { transform: scale(1.06); } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes pd-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  @keyframes pd-slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  @keyframes pd-blur-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pd-score-flip { 0% { transform: translateY(-60%); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+  @keyframes pd-sonar { 0% { width: 40px; height: 40px; opacity: 0.5; } 100% { width: 180px; height: 180px; opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="shared.jsx"></script>
+<script type="text/babel" src="data.jsx"></script>
+<script type="text/babel" src="screen-map.jsx"></script>
+<script type="text/babel" src="screen-discover.jsx"></script>
+<script type="text/babel" src="screen-detail.jsx"></script>
+<script type="text/babel" src="screen-brackets.jsx"></script>
+<script type="text/babel" src="screen-matches.jsx"></script>
+<script type="text/babel" src="screen-profile.jsx"></script>
+<script type="text/babel" src="screen-create.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>

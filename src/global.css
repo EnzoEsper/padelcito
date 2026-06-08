@@ -1,0 +1,53 @@
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+@import "tailwindcss/utilities.css";
+
+@layer theme {
+  @theme {
+    /* === Void Eclipse — colors === */
+    --color-background: #0b0b0b;
+    --color-surface-1: #141417;
+    --color-surface-2: #1b1c21;
+    --color-surface-3: #232429;
+    --color-primary: #2b396d;
+    --color-primary-hi: #5e70b8;
+    --color-neutral: #e4e4e4;
+    --color-success: #5be0a6;
+    --color-warning: #e0b15b;
+
+    /* === Typography — font families === */
+    --font-grotesk: "Hanken Grotesk", sans-serif;
+    --font-mono: "Space Mono", monospace;
+
+    /* === Border-radius scale === */
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+    --radius-2xl: 22px;
+    --radius-full: 9999px;
+
+    /* === Spacing scale (8 px base grid) === */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-2xl: 48px;
+    --spacing-3xl: 64px;
+  }
+}
+
+/* Platform-specific system font fallbacks */
+@media android {
+  :root {
+    --font-mono: monospace;
+    --font-sans: normal;
+  }
+}
+
+@media ios {
+  :root {
+    --font-sans: system-ui;
+  }
+}
