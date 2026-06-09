@@ -8,6 +8,7 @@ export default [
       ".expo/**",
       "dist/**",
       "supabase/**",
+      "docs/**",
       "src/types/database.ts",
     ],
   },
