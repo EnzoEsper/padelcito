@@ -44,6 +44,7 @@ export type ScrollViewProps = React.ComponentProps<typeof RNScrollView> & {
   contentContainerClassName?: string;
 };
 export const ScrollView = (props: ScrollViewProps) => {
+  // @ts-expect-error TS2590: ScrollView props create a union type too complex for StyledConfiguration inference
   return useCssElement(RNScrollView, props, {
     className: "style",
     contentContainerClassName: "contentContainerStyle",
@@ -74,12 +75,12 @@ TextInput.displayName = "CSS(TextInput)";
 function RawTouchableHighlight(
   props: React.ComponentProps<typeof RNTouchableHighlight>
 ) {
-  const { underlayColor, ...style } = StyleSheet.flatten(props.style) ?? {};
+  const { underlayColor, style, ...rest } = props;
   return (
     <RNTouchableHighlight
-      underlayColor={underlayColor as string | undefined}
-      {...props}
-      style={style}
+      underlayColor={underlayColor}
+      {...rest}
+      style={StyleSheet.flatten(style) ?? {}}
     />
   );
 }
