@@ -1,0 +1,34 @@
+# Inherit everything from .gitignore
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+.env
+.env*.local
+*.tsbuildinfo
+/ios
+/android
+
+# Cursor / AI tooling — contain symlinks that the EAS tarball archiver
+# cannot resolve (they point outside the project tree).
+.agents/
+.claude/
+.cursor/
+
+# Design references and documentation — not part of the app bundle.
+docs/
+*.md

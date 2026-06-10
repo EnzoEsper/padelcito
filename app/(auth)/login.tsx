@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
   Platform,
@@ -13,6 +14,7 @@ import { z } from 'zod';
 
 import { View, Text, Pressable, TextInput, ScrollView } from '@/tw';
 import { useOtpForm, type AuthStage } from '@/features/auth/use-otp-form';
+import { useGoogleSignIn } from '@/features/auth/use-google-sign-in';
 
 // ─── Validation schemas ──────────────────────────────────────────────────────
 
@@ -93,6 +95,67 @@ function PrimaryButton({
         ].join(' ')}
       >
         {isLoading ? loadingLabel : label}
+      </Text>
+    </Pressable>
+  );
+}
+
+// ─── OR divider ───────────────────────────────────────────────────────────────
+
+function OrDivider() {
+  return (
+    <View className="flex-row items-center gap-3 my-6">
+      <View className="flex-1 h-px bg-neutral/10" />
+      <Text className="font-mono text-[11px] tracking-[0.13em] uppercase text-neutral/38">
+        OR
+      </Text>
+      <View className="flex-1 h-px bg-neutral/10" />
+    </View>
+  );
+}
+
+// ─── Google sign-in button ────────────────────────────────────────────────────
+
+type GoogleButtonProps = {
+  onPress: () => Promise<void>;
+  isLoading: boolean;
+  disabled?: boolean;
+};
+
+function GoogleButton({
+  onPress,
+  isLoading,
+  disabled = false,
+}: GoogleButtonProps) {
+  const isDisabled = isLoading || disabled;
+
+  return (
+    <Pressable
+      onPress={() => void onPress()}
+      disabled={isDisabled}
+      android_ripple={{ color: 'rgba(228,228,228,0.06)' }}
+      className={[
+        'h-14 rounded-lg border border-neutral/10 bg-surface-2',
+        'flex-row items-center justify-center gap-3',
+        isDisabled ? 'opacity-50' : '',
+      ].join(' ')}
+    >
+      {isLoading ? (
+        <ActivityIndicator color="#E4E4E4" size="small" />
+      ) : (
+        <View className="w-6 h-6 rounded-full bg-surface-3 items-center justify-center">
+          <Text className="font-mono text-xs text-neutral/60 leading-none">
+            G
+          </Text>
+        </View>
+      )}
+      <Text
+        className={[
+          'font-mono text-[11px] tracking-[0.13em] uppercase',
+          isLoading ? 'text-neutral/38' : 'text-neutral',
+        ].join(' ')}
+      >
+        {isLoading ? 'SIGNING IN...' : 'CONTINUE WITH GOOGLE'}
       </Text>
     </Pressable>
   );
@@ -372,6 +435,13 @@ export default function LoginScreen() {
     backToRequest,
   } = useOtpForm();
 
+  const {
+    isLoading: googleIsLoading,
+    googleError,
+    isNativeAvailable,
+    handleGoogleSignIn,
+  } = useGoogleSignIn();
+
   // Animation values are stored in a stable ref object so they never
   // appear as stale closures in the useEffect dependency array.
   const anims = useRef({
@@ -532,11 +602,33 @@ export default function LoginScreen() {
             </Animated.View>
           </View>
 
-          {/* ── Supabase API error ───────────────────────────────────────── */}
+          {/* ── OTP API error ────────────────────────────────────────────── */}
           {apiError !== null && (
             <View className="mt-4">
               <ApiErrorBanner message={apiError} />
             </View>
+          )}
+
+          {/* ── Google sign-in (request stage only) ──────────────────────── */}
+          {stage === 'request' && (
+            <>
+              <OrDivider />
+              <GoogleButton
+                onPress={handleGoogleSignIn}
+                isLoading={googleIsLoading}
+                disabled={isLoading || !isNativeAvailable}
+              />
+              {!isNativeAvailable && (
+                <Text className="font-mono text-[10px] tracking-widest uppercase text-neutral/38 text-center mt-3">
+                  Requires an EAS development client
+                </Text>
+              )}
+              {googleError !== null && (
+                <View className="mt-4">
+                  <ApiErrorBanner message={googleError} />
+                </View>
+              )}
+            </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
