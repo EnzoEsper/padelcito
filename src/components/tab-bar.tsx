@@ -1,115 +1,56 @@
 import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs';
 
 // Design tokens (Void Eclipse)
 const C = {
   background: '#0B0B0B',
-  surface1: '#141417',
   primary: '#2B396D',
   primaryHi: '#5E70B8',
   neutral: '#E4E4E4',
   faint: 'rgba(228,228,228,0.38)',
-  hair: 'rgba(228,228,228,0.10)',
   hair2: 'rgba(228,228,228,0.055)',
-  glow: 'rgba(94,112,184,0.45)',
 } as const;
-
-// ── Icon primitives ──────────────────────────────────────────────────────────
-
-interface IconProps {
-  size?: number;
-  color?: string;
-  strokeWidth?: number;
-}
-
-function CompassIcon({ size = 24, color = C.neutral, strokeWidth = 1.7 }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth}>
-      <Circle cx="12" cy="12" r="9" strokeLinecap="round" />
-      <Path d="M15.5 8.5l-2 5-5 2 2-5 5-2z" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
-function TrophyIcon({ size = 24, color = C.neutral, strokeWidth = 1.7 }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round">
-      <Path d="M7 4h10v3a5 5 0 01-10 0V4z" />
-      <Path d="M7 5H4v1a3 3 0 003 3M17 5h3v1a3 3 0 01-3 3M9.5 12.5L9 17h6l-.5-4.5M8 20h8" />
-    </Svg>
-  );
-}
-
-function PlusIcon({ size = 26, color = C.neutral, strokeWidth = 2 }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round">
-      <Path d="M12 5v14M5 12h14" />
-    </Svg>
-  );
-}
-
-function CalendarIcon({ size = 24, color = C.neutral, strokeWidth = 1.7 }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth}>
-      <Path d="M3.5 5A1.5 1.5 0 015 3.5h14A1.5 1.5 0 0120.5 5v14a1.5 1.5 0 01-1.5 1.5H5A1.5 1.5 0 013.5 19V5z" />
-      <Path d="M3.5 9.5h17M8 3v4M16 3v4" strokeLinecap="round" />
-    </Svg>
-  );
-}
-
-function UserIcon({ size = 24, color = C.neutral, strokeWidth = 1.7 }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth}>
-      <Circle cx="12" cy="8.5" r="3.8" />
-      <Path d="M5 20a7 7 0 0114 0" strokeLinecap="round" />
-    </Svg>
-  );
-}
 
 // ── Tab configuration ─────────────────────────────────────────────────────────
 
 type TabConfig = {
   name: string;
   label: string;
-  Icon: React.FC<IconProps>;
+  icon: keyof typeof Ionicons.glyphMap;
+  iconActive: keyof typeof Ionicons.glyphMap;
 };
 
 const TABS: TabConfig[] = [
-  { name: 'discover', label: 'Discover', Icon: CompassIcon },
-  { name: 'circuits', label: 'Circuits', Icon: TrophyIcon },
-  { name: 'matches', label: 'Matches', Icon: CalendarIcon },
-  { name: 'profile', label: 'You', Icon: UserIcon },
+  { name: 'discover', label: 'Discover', icon: 'compass-outline', iconActive: 'compass' },
+  { name: 'circuits', label: 'Circuits', icon: 'trophy-outline', iconActive: 'trophy' },
+  { name: 'matches', label: 'Matches', icon: 'calendar-outline', iconActive: 'calendar' },
+  { name: 'profile', label: 'You', icon: 'person-outline', iconActive: 'person' },
 ];
 
 // ── Custom Tab Bar ────────────────────────────────────────────────────────────
 
-export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+export function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-
   const activeRouteName = state.routes[state.index]?.name ?? '';
 
   function handleTabPress(routeName: string) {
+    const target = state.routes.find((r) => r.name === routeName)?.key ?? '';
     const event = navigation.emit({
       type: 'tabPress',
-      target: state.routes.find((r) => r.name === routeName)?.key ?? '',
+      target,
       canPreventDefault: true,
     });
-
     if (!event.defaultPrevented) {
       navigation.navigate(routeName);
     }
   }
 
-  function handleCreatePress() {
-    // Future: open create match modal
-  }
-
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom + 8 }]}>
-      {/* Gradient fade above the bar */}
+      {/* Gradient fade above bar */}
       <LinearGradient
         colors={['transparent', C.background]}
         style={styles.gradient}
@@ -122,42 +63,35 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
       {/* Tab row */}
       <View style={styles.row}>
         {/* First two tabs */}
-        {TABS.slice(0, 2).map((tab) => {
-          const isActive = activeRouteName === tab.name;
-          return (
-            <TabItem
-              key={tab.name}
-              tab={tab}
-              isActive={isActive}
-              onPress={() => handleTabPress(tab.name)}
-            />
-          );
-        })}
+        {TABS.slice(0, 2).map((tab) => (
+          <TabItem
+            key={tab.name}
+            tab={tab}
+            isActive={activeRouteName === tab.name}
+            onPress={() => handleTabPress(tab.name)}
+          />
+        ))}
 
         {/* Center FAB (+) */}
         <View style={styles.fabWrapper}>
           <Pressable
-            onPress={handleCreatePress}
             style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
             accessibilityLabel="Create"
             accessibilityRole="button"
           >
-            <PlusIcon size={26} color={C.neutral} strokeWidth={2} />
+            <Ionicons name="add" size={28} color={C.neutral} />
           </Pressable>
         </View>
 
         {/* Last two tabs */}
-        {TABS.slice(2).map((tab) => {
-          const isActive = activeRouteName === tab.name;
-          return (
-            <TabItem
-              key={tab.name}
-              tab={tab}
-              isActive={isActive}
-              onPress={() => handleTabPress(tab.name)}
-            />
-          );
-        })}
+        {TABS.slice(2).map((tab) => (
+          <TabItem
+            key={tab.name}
+            tab={tab}
+            isActive={activeRouteName === tab.name}
+            onPress={() => handleTabPress(tab.name)}
+          />
+        ))}
       </View>
     </View>
   );
@@ -172,10 +106,6 @@ interface TabItemProps {
 }
 
 function TabItem({ tab, isActive, onPress }: TabItemProps) {
-  const iconColor = isActive ? C.primaryHi : C.faint;
-  const labelColor = isActive ? C.neutral : C.faint;
-  const strokeWidth = isActive ? 2 : 1.7;
-
   return (
     <Pressable
       onPress={onPress}
@@ -184,14 +114,12 @@ function TabItem({ tab, isActive, onPress }: TabItemProps) {
       accessibilityRole="tab"
       accessibilityState={{ selected: isActive }}
     >
-      <tab.Icon size={24} color={iconColor} strokeWidth={strokeWidth} />
-      <Text
-        style={[
-          styles.label,
-          { color: labelColor, fontWeight: isActive ? '700' : '500' },
-        ]}
-        numberOfLines={1}
-      >
+      <Ionicons
+        name={isActive ? tab.iconActive : tab.icon}
+        size={24}
+        color={isActive ? C.primaryHi : C.faint}
+      />
+      <Text style={[styles.label, { color: isActive ? C.neutral : C.faint, fontWeight: isActive ? '700' : '500' }]}>
         {tab.label}
       </Text>
     </Pressable>

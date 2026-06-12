@@ -1,7 +1,8 @@
 import { View, Text, ScrollView, Pressable } from '@/tw';
 import { StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
+import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '@/lib/supabase';
 import {
   useProfile,
@@ -32,7 +33,6 @@ const C = {
   },
 } as const;
 
-// Avatar tone map (same as design reference)
 const AV_TONES: [string, string][] = [
   ['#2B396D', '#E4E4E4'],
   ['#3A4A86', '#E4E4E4'],
@@ -51,7 +51,6 @@ function Avatar({ name, size = 64 }: { name: string; size?: number }) {
     .slice(0, 2)
     .join('')
     .toUpperCase();
-
   const toneIdx =
     ((name.charCodeAt(0) ?? 0) + (name.charCodeAt(1) ?? 0)) % AV_TONES.length;
   const [bg, fg] = AV_TONES[toneIdx] ?? AV_TONES[0];
@@ -60,12 +59,7 @@ function Avatar({ name, size = 64 }: { name: string; size?: number }) {
     <View
       style={[
         styles.avatar,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: bg,
-        },
+        { width: size, height: size, borderRadius: size / 2, backgroundColor: bg },
       ]}
     >
       <Text style={[styles.avatarText, { color: fg, fontSize: size * 0.36 }]}>
@@ -79,13 +73,12 @@ function SkillBadge({ level }: { level: 'A' | 'B' | 'C' | 'D' }) {
   const s = C.skill[level];
   return (
     <View style={[styles.skillBadge, { backgroundColor: s.bg }]}>
-      <Text style={[styles.skillBadgeText, { color: s.fg }]}>
-        {SKILL_LABEL[level]}
-      </Text>
+      <Text style={[styles.skillBadgeText, { color: s.fg }]}>{SKILL_LABEL[level]}</Text>
     </View>
   );
 }
 
+// Trust ring uses react-native-svg — the only SVG component in this screen
 function TrustRing({ value, max = 5, size = 92 }: { value: number; max?: number; size?: number }) {
   const r = (size - 12) / 2;
   const circ = 2 * Math.PI * r;
@@ -95,39 +88,19 @@ function TrustRing({ value, max = 5, size = 92 }: { value: number; max?: number;
 
   return (
     <View style={{ width: size, height: size }}>
-      {/* Rotated -90deg: start arc from top */}
-      <Svg
-        width={size}
-        height={size}
-        style={{ transform: [{ rotate: '-90deg' }] }}
-      >
-        {/* Track */}
+      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+        <Circle cx={cx} cy={cy} r={r} fill="none" stroke={C.surface3} strokeWidth={6} />
         <Circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke={C.surface3}
-          strokeWidth={6}
-        />
-        {/* Progress arc */}
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke={C.primaryHi}
-          strokeWidth={6}
+          cx={cx} cy={cy} r={r}
+          fill="none" stroke={C.primaryHi} strokeWidth={6}
           strokeLinecap="round"
           strokeDasharray={circ}
           strokeDashoffset={circ * (1 - pct)}
         />
       </Svg>
-
-      {/* Center label — overlaid absolutely */}
       <View style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]}>
         <View style={styles.ringCenter}>
-          <Text style={styles.ringValue}>{value.toFixed(1)}</Text>
+          <Text style={styles.ringValue}>{value > 0 ? value.toFixed(1) : '—'}</Text>
           <Text style={styles.ringLabel}>TRUST</Text>
         </View>
       </View>
@@ -143,17 +116,9 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
-function ChevronRight() {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.ghost} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M9 6l6 6-6 6" />
-    </Svg>
-  );
-}
-
 interface PreferenceRowProps {
   label: string;
-  value: string;
+  value?: string;
   isFirst?: boolean;
   onPress?: () => void;
   labelColor?: string;
@@ -170,8 +135,10 @@ function PreferenceRow({ label, value, isFirst = false, onPress, labelColor }: P
         {label}
       </Text>
       <View style={styles.prefRight}>
-        <Text style={styles.prefValue}>{value}</Text>
-        <ChevronRight />
+        {value !== undefined && value.length > 0 && (
+          <Text style={styles.prefValue}>{value}</Text>
+        )}
+        <Ionicons name="chevron-forward" size={16} color={C.ghost} />
       </View>
     </Pressable>
   );
@@ -195,9 +162,7 @@ function StatCard({
         <Text style={styles.statValue}>{value}</Text>
         {sub !== undefined && <Text style={styles.statSub}>{sub}</Text>}
         {showFlame && (
-          <Svg width={17} height={17} viewBox="0 0 24 24" fill={C.primaryHi} stroke="none">
-            <Path d="M12 3s5 3.5 5 9a5 5 0 01-10 0c0-2 1-3 1-3s.5 2 2 2c0-3 2-5 2-8z" />
-          </Svg>
+          <Ionicons name="flame" size={17} color={C.primaryHi} style={{ marginLeft: 1 }} />
         )}
       </View>
     </View>
@@ -209,22 +174,19 @@ function StatCard({
 function ProfileSkeleton() {
   return (
     <View className="gap-4 px-5 pt-4">
-      {/* Identity card skeleton */}
       <View style={styles.identityCard}>
-        <View style={[styles.skeletonCircle, { width: 64, height: 64 }]} />
+        <View style={[styles.skeletonPill, { width: 64, height: 64, borderRadius: 32 }]} />
         <View className="flex-1 gap-2">
-          <View style={[styles.skeletonRect, { width: 140, height: 14 }]} />
-          <View style={[styles.skeletonRect, { width: 100, height: 11 }]} />
+          <View style={[styles.skeletonPill, { width: 140, height: 14 }]} />
+          <View style={[styles.skeletonPill, { width: 100, height: 11 }]} />
         </View>
-        <View style={[styles.skeletonCircle, { width: 92, height: 92 }]} />
+        <View style={[styles.skeletonPill, { width: 92, height: 92, borderRadius: 46 }]} />
       </View>
-
-      {/* Stats skeleton */}
       <View className="flex-row gap-2.5">
         {[0, 1, 2].map((i) => (
           <View key={i} style={[styles.statCard, { flex: 1 }]}>
-            <View style={[styles.skeletonRect, { width: 40, height: 10, marginBottom: 8 }]} />
-            <View style={[styles.skeletonRect, { width: 30, height: 20 }]} />
+            <View style={[styles.skeletonPill, { width: 40, height: 10, marginBottom: 8 }]} />
+            <View style={[styles.skeletonPill, { width: 30, height: 20 }]} />
           </View>
         ))}
       </View>
@@ -232,7 +194,7 @@ function ProfileSkeleton() {
   );
 }
 
-// ── Sign-out helper ───────────────────────────────────────────────────────────
+// ── Sign-out ──────────────────────────────────────────────────────────────────
 
 function useSignOut() {
   return function confirmSignOut() {
@@ -243,7 +205,7 @@ function useSignOut() {
         style: 'destructive',
         onPress: async () => {
           await supabase.auth.signOut();
-          // Root layout's onAuthStateChange handles the redirect automatically.
+          // Root layout's onAuthStateChange fires → session = null → redirect to login.
         },
       },
     ]);
@@ -263,29 +225,25 @@ export default function ProfileScreen() {
   const ratingCount = profile?.rating_count ?? 0;
   const displayName = profile?.display_name ?? 'Player';
   const username = profile?.username ?? '';
-  const bio = profile?.bio ?? '—';
+  const bio = profile?.bio;
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="pb-8"
-    >
+    <ScrollView className="flex-1 bg-background" contentContainerClassName="pb-8">
       {/* Header */}
-      <View style={{ paddingTop: insets.top + 16 }} className="px-5 pb-4 flex-row justify-between items-start">
+      <View
+        style={{ paddingTop: insets.top + 16 }}
+        className="px-5 pb-4 flex-row justify-between items-start"
+      >
         <View>
           <Text style={styles.screenLabel}>PROFILE</Text>
           <Text style={styles.screenTitle}>You</Text>
         </View>
-        {/* Settings button — placeholder for future settings screen */}
         <Pressable
           className="active:opacity-70"
           style={styles.settingsBtn}
           accessibilityLabel="Settings"
         >
-          <Svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke={C.neutral} strokeWidth={1.7} strokeLinecap="round">
-            <Path d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
-            <Path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-          </Svg>
+          <Ionicons name="settings-outline" size={19} color={C.neutral} />
         </Pressable>
       </View>
 
@@ -300,7 +258,9 @@ export default function ProfileScreen() {
               <Text style={styles.identityName}>{displayName}</Text>
               <View style={styles.identityBadgeRow}>
                 <SkillBadge level={badge} />
-                <Text style={styles.username}>@{username}</Text>
+                {username.length > 0 && (
+                  <Text style={styles.username}>@{username}</Text>
+                )}
               </View>
             </View>
             <TrustRing value={rating} size={92} />
@@ -316,7 +276,7 @@ export default function ProfileScreen() {
           {/* Preferences */}
           <SectionLabel>PREFERENCES</SectionLabel>
           <View style={[styles.prefCard, { marginHorizontal: 20, marginBottom: 16 }]}>
-            <PreferenceRow label="Bio" value={bio} isFirst />
+            <PreferenceRow label="Bio" value={bio ?? undefined} isFirst />
             <PreferenceRow label="Skill Level" value={SKILL_LABEL[badge]} />
             <PreferenceRow label="Location" value="Set location" />
           </View>
@@ -326,7 +286,6 @@ export default function ProfileScreen() {
           <View style={[styles.prefCard, { marginHorizontal: 20 }]}>
             <PreferenceRow
               label="Sign Out"
-              value=""
               isFirst
               onPress={signOut}
               labelColor={C.warning}
@@ -365,8 +324,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  // Identity card
   identityCard: {
     backgroundColor: C.surface1,
     borderWidth: 1,
@@ -377,8 +334,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 18,
   },
-
-  // Avatar
   avatar: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -388,8 +343,6 @@ const styles = StyleSheet.create({
     fontFamily: 'HankenGrotesk-Bold',
     letterSpacing: 0.3,
   },
-
-  // Skill badge
   skillBadge: {
     borderRadius: 7,
     paddingHorizontal: 8,
@@ -402,8 +355,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
-
-  // Identity layout
   identityName: {
     fontFamily: 'HankenGrotesk-Bold',
     fontSize: 19,
@@ -421,8 +372,6 @@ const styles = StyleSheet.create({
     color: C.faint,
     letterSpacing: 0.5,
   },
-
-  // Trust ring
   ringCenter: {
     flex: 1,
     alignItems: 'center',
@@ -443,8 +392,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 3,
   },
-
-  // Stats
   statsRow: {
     flexDirection: 'row',
     gap: 10,
@@ -484,8 +431,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: C.dim,
   },
-
-  // Section label
   sectionLabel: {
     fontFamily: 'Space Mono',
     fontSize: 11.5,
@@ -494,8 +439,6 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     fontWeight: '700',
   },
-
-  // Preference card & rows
   prefCard: {
     backgroundColor: C.surface1,
     borderWidth: 1,
@@ -529,14 +472,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: C.dim,
   },
-
-  // Skeleton pieces
-  skeletonRect: {
+  skeletonPill: {
     backgroundColor: C.surface3,
     borderRadius: 4,
-  },
-  skeletonCircle: {
-    backgroundColor: C.surface3,
-    borderRadius: 999,
   },
 });
