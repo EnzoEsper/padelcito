@@ -122,7 +122,7 @@ function PreferenceRow({ label, value, isFirst = false, onPress, labelColor }: P
         {value !== undefined && value.length > 0 && (
           <Text style={styles.prefValue}>{value}</Text>
         )}
-        <Ionicons name="chevron-forward" size={16} color={C.ghost} />
+        <Ionicons name="chevron-forward" size={16} color={C.faint} />
       </View>
     </Pressable>
   );
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Space Mono',
     fontSize: 10.5,
     letterSpacing: 1.5,
-    color: C.faint,
+    color: C.dim,
     textTransform: 'uppercase',
     marginBottom: 4,
   },
@@ -333,9 +333,8 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   skillBadgeText: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono-Bold',
     fontSize: 10,
-    fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
@@ -353,7 +352,7 @@ const styles = StyleSheet.create({
   username: {
     fontFamily: 'Space Mono',
     fontSize: 11,
-    color: C.faint,
+    color: C.dim,
     letterSpacing: 0.5,
   },
   // Trust ring — View-based (no arc until react-native-svg is confirmed in build)
@@ -366,16 +365,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ringValue: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono-Bold',
     fontSize: 22,
-    fontWeight: '700',
     color: C.neutral,
     lineHeight: 26,
   },
   ringLabel: {
     fontFamily: 'Space Mono',
     fontSize: 8.5,
-    color: C.faint,
+    color: C.dim,
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginTop: 3,
@@ -398,7 +396,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontFamily: 'Space Mono',
     fontSize: 9.5,
-    color: C.faint,
+    color: C.dim,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: 8,
@@ -420,12 +418,11 @@ const styles = StyleSheet.create({
     color: C.dim,
   },
   sectionLabel: {
-    fontFamily: 'Space Mono',
+    fontFamily: 'SpaceMono-Bold',
     fontSize: 11.5,
-    color: C.faint,
+    color: C.dim,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    fontWeight: '700',
   },
   prefCard: {
     backgroundColor: C.surface1,

@@ -185,7 +185,11 @@ Two typefaces handle all text. **Hanken Grotesk** is the proportional voice for 
 
 - **Primary (`#2B396D` — Abyss Blue):** The action color. Apply it to filled CTA button backgrounds, active navigation indicators, selected filter chips, tournament bracket accent lines on decided matches, and skill-level A badges. Use as a 30 % opacity overlay on any tappable surface during the pressed state. Do not apply it as a text color on any background — it fails WCAG AA contrast at all sizes.
 
-- **Neutral (`#E4E4E4` — Silver Mist):** The sole text and icon color. Use at full opacity for primary text, card titles, score labels, and button labels. Use at opacity levels for hierarchy: `dim` (60 %) for secondary metadata, `faint` (38 %) for tertiary labels and inactive icons, `ghost` (20 %) for placeholder outlines, `hair` (10 %) for card border hairlines, `hair2` (5.5 %) for inner row dividers.
+- **Neutral (`#E4E4E4` — Silver Mist):** The sole text and icon color. Use at full opacity for primary text, card titles, score labels, and button labels. Use at opacity levels for hierarchy, with WCAG 2.1 contrast ratios against Background (`#0B0B0B`) noted:
+  - `dim` (60 %) → blended ~`#8D8D8D` → **5.9:1** ✓ WCAG AA for all text sizes. Use for secondary metadata: stat labels, section headers, usernames, ring labels, screen-title caps.
+  - `faint` (38 %) → blended ~`#5D5D5D` → **3.0:1** — fails WCAG AA for normal text (< 4.5:1). Acceptable only for purely **decorative, non-informational** elements (inactive icon strokes, skill-D badge text). This is an intentional design exception; see the note on `score-pill-live` below.
+  - `ghost` (20 %) → blended ~`#360` → **1.6:1** — fails all WCAG text thresholds. Use only for **decorative placeholder outlines** (empty avatar rings, dashed spot indicators) that are never the sole conveyance of information.
+  - `hair` (10 %) for card border hairlines; `hair2` (5.5 %) for inner row dividers.
 
 ### Derived surfaces — elevation through layering
 
@@ -316,5 +320,7 @@ Four tiers, each using `label-caps` (Space Mono) text:
 - Use Background (`#0B0B0B`) as the `backgroundColor` for cards — use Surface-1.
 - Hard-code `px` font sizes in component code — reference the `typography` tokens.
 - Introduce any color other than the nine defined tokens and their opacity variants.
+- Use `faint` (38 %) as a text color for any label that conveys information — use `dim` (60 %) or higher. `faint` is reserved for decorative non-text elements only (see Neutral opacity tier table above).
+- Combine `fontFamily: 'Space Mono'` with `fontWeight: '700'` in React Native — custom font bold variants must be referenced by their registered name (`'SpaceMono-Bold'`), as React Native does not synthesize bold from a single font file.
 
 > **Note on `score-pill-live` contrast:** The live game-score pill (`primary-hi` fill, `background` text, ~4.2:1 contrast ratio) falls marginally short of the WCAG AA 4.5:1 threshold for normal text. This is an intentional design decision: the pill is a transient UI accent — not a persistent readable label — and it pairs with a high-contrast score value immediately adjacent. Agents implementing this component must accept the linter's contrast warning for this token pair.
