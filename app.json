@@ -24,7 +24,16 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-secure-store", "expo-router"],
+    "plugins": [
+      "expo-secure-store",
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Padelcito usa tu ubicación para encontrar partidos de padel cercanos."
+        }
+      ]
+    ],
     "extra": {
       "router": {},
       "eas": {
