@@ -1,8 +1,12 @@
-import { Stack } from 'expo-router';
+import { Tabs } from 'expo-router';
+import { TabBar } from '@/components/tab-bar';
 
-// TODO(Step 1.3): Replace with the tab-based navigation layout.
 export default function AppLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#0B0B0B' } }} />
+    <Tabs
+      initialRouteName="discover"
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <TabBar {...props} />}
+    />
   );
 }

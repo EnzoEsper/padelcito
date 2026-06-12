@@ -190,7 +190,7 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
         //    so the redirect effect sees profileComplete=true on its next
         //    evaluation and does not bounce the user back to onboarding.
         markProfileComplete();
-        router.replace('/(app)');
+        router.replace('/(app)/discover');
       })(),
     [handleSubmit, coords, router, markProfileComplete],
   );

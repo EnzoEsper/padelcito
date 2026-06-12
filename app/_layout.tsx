@@ -3,16 +3,44 @@ import '../src/global.css';
 import { useEffect, useState, useCallback } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import {
+  HankenGrotesk_400Regular,
+  HankenGrotesk_500Medium,
+  HankenGrotesk_700Bold,
+  HankenGrotesk_800ExtraBold,
+} from '@expo-google-fonts/hanken-grotesk';
+import {
+  SpaceMono_400Regular,
+  SpaceMono_700Bold,
+} from '@expo-google-fonts/space-mono';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { subscribeToAuthChanges } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { OnboardingContext } from '@/lib/onboarding-context';
 
-// TODO(Step 1.3): Load Hanken Grotesk + Space Mono fonts here via expo-font
-// before rendering children, so typography tokens resolve correctly on all platforms.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 10,
+      retry: 1,
+    },
+  },
+});
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    'Hanken Grotesk': HankenGrotesk_400Regular,
+    'HankenGrotesk-Medium': HankenGrotesk_500Medium,
+    'HankenGrotesk-Bold': HankenGrotesk_700Bold,
+    'HankenGrotesk-ExtraBold': HankenGrotesk_800ExtraBold,
+    'Space Mono': SpaceMono_400Regular,
+    'SpaceMono-Bold': SpaceMono_700Bold,
+  });
+
   const [session, setSession] = useState<Session | null>(null);
   const [isReady, setIsReady] = useState(false);
   // null = still checking; false = no username; true = profile complete
@@ -88,7 +116,7 @@ export default function RootLayout() {
     if (profileComplete === false && !inOnboarding) {
       router.replace('/(onboarding)/profile');
     } else if (profileComplete === true && (inAuthGroup || inOnboarding)) {
-      router.replace('/(app)');
+      router.replace('/(app)/discover');
     }
   }, [session, isReady, profileComplete, segments, router]);
 
@@ -99,10 +127,14 @@ export default function RootLayout() {
     setProfileComplete(true);
   }, []);
 
+  if (!fontsLoaded) return null;
+
   return (
-    <OnboardingContext.Provider value={{ markProfileComplete }}>
-      <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }} />
-    </OnboardingContext.Provider>
+    <QueryClientProvider client={queryClient}>
+      <OnboardingContext.Provider value={{ markProfileComplete }}>
+        <StatusBar style="light" />
+        <Stack screenOptions={{ headerShown: false }} />
+      </OnboardingContext.Provider>
+    </QueryClientProvider>
   );
 }
