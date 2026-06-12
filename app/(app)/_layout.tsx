@@ -4,7 +4,7 @@ import { TabBar } from '@/components/tab-bar';
 export default function AppLayout() {
   return (
     <Tabs
-      initialRouteName="discover"
+      initialRouteName="profile"
       screenOptions={{ headerShown: false }}
       tabBar={(props) => <TabBar {...props} />}
     />

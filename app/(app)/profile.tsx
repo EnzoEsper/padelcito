@@ -2,7 +2,6 @@ import { View, Text, ScrollView, Pressable } from '@/tw';
 import { StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle } from 'react-native-svg';
 import { supabase } from '@/lib/supabase';
 import {
   useProfile,
@@ -16,7 +15,6 @@ const C = {
   background: '#0B0B0B',
   surface1: '#141417',
   surface3: '#232429',
-  primary: '#2B396D',
   primaryHi: '#5E70B8',
   neutral: '#E4E4E4',
   dim: 'rgba(228,228,228,0.60)',
@@ -78,32 +76,18 @@ function SkillBadge({ level }: { level: 'A' | 'B' | 'C' | 'D' }) {
   );
 }
 
-// Trust ring uses react-native-svg — the only SVG component in this screen
-function TrustRing({ value, max = 5, size = 92 }: { value: number; max?: number; size?: number }) {
-  const r = (size - 12) / 2;
-  const circ = 2 * Math.PI * r;
-  const pct = Math.min(value / max, 1);
-  const cx = size / 2;
-  const cy = size / 2;
-
+/**
+ * Trust ring — pure View implementation.
+ * The SVG arc version is ready in git but requires react-native-svg to be
+ * included in the native build. Once confirmed working, swap this component
+ * back for the arc variant.
+ */
+function TrustRing({ value }: { value: number }) {
+  const hasRating = value > 0;
   return (
-    <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-        <Circle cx={cx} cy={cy} r={r} fill="none" stroke={C.surface3} strokeWidth={6} />
-        <Circle
-          cx={cx} cy={cy} r={r}
-          fill="none" stroke={C.primaryHi} strokeWidth={6}
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={circ * (1 - pct)}
-        />
-      </Svg>
-      <View style={[StyleSheet.absoluteFillObject, { pointerEvents: 'none' }]}>
-        <View style={styles.ringCenter}>
-          <Text style={styles.ringValue}>{value > 0 ? value.toFixed(1) : '—'}</Text>
-          <Text style={styles.ringLabel}>TRUST</Text>
-        </View>
-      </View>
+    <View style={[styles.trustRing, { borderColor: hasRating ? C.primaryHi : C.surface3 }]}>
+      <Text style={styles.ringValue}>{hasRating ? value.toFixed(1) : '—'}</Text>
+      <Text style={styles.ringLabel}>TRUST</Text>
     </View>
   );
 }
@@ -263,7 +247,7 @@ export default function ProfileScreen() {
                 )}
               </View>
             </View>
-            <TrustRing value={rating} size={92} />
+            <TrustRing value={rating} />
           </View>
 
           {/* Stats row */}
@@ -372,8 +356,12 @@ const styles = StyleSheet.create({
     color: C.faint,
     letterSpacing: 0.5,
   },
-  ringCenter: {
-    flex: 1,
+  // Trust ring — View-based (no arc until react-native-svg is confirmed in build)
+  trustRing: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    borderWidth: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },

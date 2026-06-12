@@ -116,7 +116,7 @@ export default function RootLayout() {
     if (profileComplete === false && !inOnboarding) {
       router.replace('/(onboarding)/profile');
     } else if (profileComplete === true && (inAuthGroup || inOnboarding)) {
-      router.replace('/(app)/discover');
+      router.replace('/(app)/profile');
     }
   }, [session, isReady, profileComplete, segments, router]);
 
