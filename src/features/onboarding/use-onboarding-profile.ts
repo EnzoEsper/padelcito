@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { useOnboardingContext } from '@/lib/onboarding-context';
 
 // ─── Skill level enum ────────────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ export type UseOnboardingProfileReturn = {
 
 export function useOnboardingProfile(): UseOnboardingProfileReturn {
   const router = useRouter();
+  const { markProfileComplete } = useOnboardingContext();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { fetchLocation, coords, isLocating, locationError } = useLocationPicker();
 
@@ -184,11 +186,13 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
           return;
         }
 
-        // 5. Route to the main app — the root layout guard will pick up the
-        //    updated profile on next render and keep the user in /(app).
+        // 5. Synchronously flip the root layout's guard state before navigating
+        //    so the redirect effect sees profileComplete=true on its next
+        //    evaluation and does not bounce the user back to onboarding.
+        markProfileComplete();
         router.replace('/(app)');
       })(),
-    [handleSubmit, coords, router],
+    [handleSubmit, coords, router, markProfileComplete],
   );
 
   return {

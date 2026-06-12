@@ -7,6 +7,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { subscribeToAuthChanges } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { OnboardingContext } from '@/lib/onboarding-context';
 
 // TODO(Step 1.3): Load Hanken Grotesk + Space Mono fonts here via expo-font
 // before rendering children, so typography tokens resolve correctly on all platforms.
@@ -91,10 +92,17 @@ export default function RootLayout() {
     }
   }, [session, isReady, profileComplete, segments, router]);
 
+  // Synchronously marks the profile as complete. Called by the onboarding
+  // screen immediately after the DB writes succeed, before router.replace,
+  // so the redirect guard sees the correct state on the very next evaluation.
+  const markProfileComplete = useCallback(() => {
+    setProfileComplete(true);
+  }, []);
+
   return (
-    <>
+    <OnboardingContext.Provider value={{ markProfileComplete }}>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }} />
-    </>
+    </OnboardingContext.Provider>
   );
 }
