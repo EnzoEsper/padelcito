@@ -75,6 +75,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
         {/* Center FAB (+) */}
         <View style={styles.fabWrapper}>
           <Pressable
+            onPress={() => handleTabPress('create-match')}
             style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
             accessibilityLabel="Create"
             accessibilityRole="button"

@@ -376,6 +376,7 @@ export type Database = {
       }
       match_participants: {
         Row: {
+          attempt_count: number
           id: string
           left_at: string | null
           match_id: string
@@ -388,6 +389,7 @@ export type Database = {
           was_removed_by_host: boolean
         }
         Insert: {
+          attempt_count?: number
           id?: string
           left_at?: string | null
           match_id: string
@@ -400,6 +402,7 @@ export type Database = {
           was_removed_by_host?: boolean
         }
         Update: {
+          attempt_count?: number
           id?: string
           left_at?: string | null
           match_id?: string
@@ -1345,6 +1348,7 @@ export type Database = {
         | "rejected"
         | "withdrawn"
         | "removed"
+        | "cancelled"
       payment_status:
         | "not_required"
         | "pending_proof"
@@ -1512,6 +1516,7 @@ export const Constants = {
         "rejected",
         "withdrawn",
         "removed",
+        "cancelled",
       ],
       payment_status: [
         "not_required",

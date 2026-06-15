@@ -112,11 +112,13 @@ export default function RootLayout() {
     // Hydrate session from secure storage on first mount.
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
+      supabase.realtime.setAuth(data.session?.access_token ?? null);
       setIsReady(true);
     });
 
     const subscription = subscribeToAuthChanges((_event, newSession) => {
       setSession(newSession);
+      supabase.realtime.setAuth(newSession?.access_token ?? null);
     });
 
     return () => subscription.unsubscribe();
