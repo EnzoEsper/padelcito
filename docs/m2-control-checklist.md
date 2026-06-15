@@ -28,3 +28,28 @@ This document is the handoff point for M2 Core Matchmaking MVP sessions.
 - Accept the request and confirm the requester sees an accepted state.
 - Open WhatsApp contacts after acceptance.
 - Test pending cancellation, accepted withdrawal, and host removal.
+
+## Local Supabase and Realtime
+
+Always start the local stack from the repo with the pinned CLI so Realtime image versions stay aligned with the migrated `realtime` schema:
+
+```bash
+npx supabase stop
+npx supabase start
+```
+
+Do not mix an old global `supabase` binary with a newer stack (or vice versa). A stale Realtime container can report `SUBSCRIBED` while failing to register `postgres_changes` subscriptions.
+
+After starting, confirm Realtime is on a current image:
+
+```bash
+docker inspect supabase_realtime_padelcito --format '{{.Config.Image}}'
+```
+
+While the app is on a match-detail screen, `realtime.subscription` should have rows and Postgres logs should not show `ON CONFLICT` errors for `realtime.subscription` inserts.
+
+Two-device realtime smoke test:
+
+- Host on match-detail; requester sends join → host "Pending Requests" updates within ~1s.
+- Host accepts/rejects → requester footer state updates live.
+- Same on the Matches screen (host inbox).

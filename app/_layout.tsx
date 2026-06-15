@@ -17,7 +17,7 @@ import {
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { subscribeToAuthChanges } from '@/lib/auth';
+import { applyRealtimeAuth, subscribeToAuthChanges } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { OnboardingContext } from '@/lib/onboarding-context';
 
@@ -110,15 +110,15 @@ export default function RootLayout() {
 
   useEffect(() => {
     // Hydrate session from secure storage on first mount.
-    void supabase.auth.getSession().then(({ data }) => {
+    void supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
-      supabase.realtime.setAuth(data.session?.access_token ?? null);
+      await applyRealtimeAuth(data.session?.access_token ?? null);
       setIsReady(true);
     });
 
     const subscription = subscribeToAuthChanges((_event, newSession) => {
       setSession(newSession);
-      supabase.realtime.setAuth(newSession?.access_token ?? null);
+      void applyRealtimeAuth(newSession?.access_token ?? null);
     });
 
     return () => subscription.unsubscribe();
