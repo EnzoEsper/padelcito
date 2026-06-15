@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScrollView, View, Text, Pressable } from '@/tw';
 import { useDiscoverMatches, type MatchSummary } from '@/features/matches/use-matches';
+import { useDiscoverMatchesRealtime } from '@/features/matches/use-match-realtime';
 
 type SkillFilter = 'All' | 'A' | 'B' | 'C';
 type ViewMode = 'list' | 'map';
@@ -333,6 +334,7 @@ function MatchCard({ match, onPress }: { match: MatchSummary; onPress: () => voi
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  useDiscoverMatchesRealtime();
   const { data: matches, isPending, isRefetching, refetch, error } = useDiscoverMatches();
   const [skillFilter, setSkillFilter] = useState<SkillFilter>('All');
   const [viewMode, setViewMode] = useState<ViewMode>('list');

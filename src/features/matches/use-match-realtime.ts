@@ -142,3 +142,58 @@ export function useMyMatchesRealtime(userId: string | null): void {
     };
   }, [userId, accessToken, queryClient]);
 }
+
+export function useDiscoverMatchesRealtime(): void {
+  const queryClient = useQueryClient();
+  const accessToken = useAccessToken();
+
+  useEffect(() => {
+    if (accessToken === null) {
+      return;
+    }
+
+    let cancelled = false;
+    let channel: RealtimeChannel | null = null;
+    const channelName = "discover:matches";
+
+    const debouncedInvalidate = createDebouncedInvalidator(() => {
+      void queryClient.invalidateQueries({ queryKey: matchKeys.discover });
+    }, 300);
+
+    void (async () => {
+      await applyRealtimeAuth(accessToken);
+      if (cancelled) return;
+
+      channel = supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "matches",
+          },
+          () => debouncedInvalidate(),
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "match_participants",
+          },
+          () => debouncedInvalidate(),
+        )
+        .subscribe((status, err) => {
+          logChannelStatus(channelName, status, err);
+        });
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channel !== null) {
+        void supabase.removeChannel(channel);
+      }
+    };
+  }, [accessToken, queryClient]);
+}
