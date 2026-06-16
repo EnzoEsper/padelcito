@@ -4,6 +4,7 @@ import {
   PADEL_SPORT_SLUG,
   UnsupportedSportError,
 } from '@/lib/padel-sport';
+import { roundCoordsForKey, type Coords } from '@/lib/location';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 
@@ -16,7 +17,7 @@ type SportRow = Database['public']['Tables']['sports']['Row'];
 type PublicProfileRow = Database['public']['Views']['public_profiles']['Row'];
 type ContactRow = Database['public']['Functions']['match_contact_details']['Returns'][number];
 
-export type Coords = { lat: number; lng: number };
+export type { Coords };
 
 export type CreateMatchInput = {
   title: string;
@@ -36,6 +37,7 @@ export type MatchSummary = MatchRow & {
   currentUserParticipant: ParticipantRow | null;
   acceptedVisibleCount: number;
   isHostedByCurrentUser: boolean;
+  distanceM?: number;
 };
 
 export type MatchDetail = MatchSummary & {
@@ -60,7 +62,9 @@ export type MyMatchesData = {
 
 export const matchKeys = {
   all: ['matches'] as const,
-  discover: ['matches', 'discover', PADEL_SPORT_SLUG] as const,
+  discoverPrefix: ['matches', 'discover', PADEL_SPORT_SLUG] as const,
+  discover: (coords: Coords, radiusKm: number) =>
+    [...matchKeys.discoverPrefix, roundCoordsForKey(coords), radiusKm] as const,
   mine: ['matches', 'mine', PADEL_SPORT_SLUG] as const,
   detail: (matchId: string) => ['matches', matchId] as const,
   contacts: (matchId: string) => ['matches', matchId, 'contacts'] as const,
@@ -163,27 +167,53 @@ async function hydrateSummaries(matches: MatchRow[], userId: string): Promise<Ma
   );
 }
 
-export function useDiscoverMatches() {
+export function useDiscoverMatches(coords: Coords | null, radiusKm: number) {
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: matchKeys.discover,
-    queryFn: async () => {
+    queryKey:
+      coords !== null
+        ? matchKeys.discover(coords, radiusKm)
+        : matchKeys.discoverPrefix,
+    enabled: coords !== null,
+    queryFn: async (): Promise<MatchSummary[]> => {
+      if (coords === null) return [];
+
       const [userId, padelSport] = await Promise.all([
         getCurrentUserId(),
         ensurePadelSport(queryClient),
       ]);
-      const { data, error } = await supabase
+
+      const { data: nearby, error: nearbyError } = await supabase.rpc('nearby_matches', {
+        p_lat: coords.lat,
+        p_lng: coords.lng,
+        p_radius_m: Math.round(radiusKm * 1000),
+        p_sport_id: padelSport.id,
+      });
+
+      if (nearbyError !== null) throw nearbyError;
+      if (nearby === null || nearby.length === 0) return [];
+
+      const distanceById = new Map(nearby.map((row) => [row.id, row.distance_m]));
+      const matchIds = nearby.map((row) => row.id);
+      const orderIndex = new Map(matchIds.map((id, index) => [id, index]));
+
+      const { data: matches, error: matchError } = await supabase
         .from('matches')
         .select('*')
-        .eq('sport_id', padelSport.id)
-        .eq('is_public', true)
-        .eq('status', 'open')
-        .gt('starts_at', new Date().toISOString())
-        .order('starts_at', { ascending: true });
+        .in('id', matchIds);
 
-      if (error !== null) throw error;
-      return hydrateSummaries(data ?? [], userId);
+      if (matchError !== null) throw matchError;
+
+      const sorted = (matches ?? []).sort(
+        (left, right) => (orderIndex.get(left.id) ?? 0) - (orderIndex.get(right.id) ?? 0),
+      );
+
+      const summaries = await hydrateSummaries(sorted, userId);
+      return summaries.map((summary) => ({
+        ...summary,
+        distanceM: distanceById.get(summary.id) ?? 0,
+      }));
     },
   });
 }
@@ -356,7 +386,7 @@ export function useCreateMatch() {
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: matchKeys.discover }),
+        queryClient.invalidateQueries({ queryKey: matchKeys.discoverPrefix }),
         queryClient.invalidateQueries({ queryKey: matchKeys.mine }),
       ]);
     },
@@ -398,7 +428,7 @@ export function useRequestToJoin(matchId: string) {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: matchKeys.detail(matchId) }),
-        queryClient.invalidateQueries({ queryKey: matchKeys.discover }),
+        queryClient.invalidateQueries({ queryKey: matchKeys.discoverPrefix }),
         queryClient.invalidateQueries({ queryKey: matchKeys.mine }),
       ]);
     },
@@ -426,7 +456,7 @@ export function useUpdateParticipantStatus(matchId: string) {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: matchKeys.detail(matchId) }),
-        queryClient.invalidateQueries({ queryKey: matchKeys.discover }),
+        queryClient.invalidateQueries({ queryKey: matchKeys.discoverPrefix }),
         queryClient.invalidateQueries({ queryKey: matchKeys.mine }),
       ]);
     },
@@ -448,7 +478,7 @@ export function useCancelPendingRequest(matchId: string) {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: matchKeys.detail(matchId) }),
-        queryClient.invalidateQueries({ queryKey: matchKeys.discover }),
+        queryClient.invalidateQueries({ queryKey: matchKeys.discoverPrefix }),
         queryClient.invalidateQueries({ queryKey: matchKeys.mine }),
       ]);
     },

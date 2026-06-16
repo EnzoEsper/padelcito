@@ -4,7 +4,6 @@ import { useForm, type Control, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useRouter } from 'expo-router';
-import * as Location from 'expo-location';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { ensurePadelSport } from '@/lib/padel-sport';
@@ -40,48 +39,6 @@ export const profileSchema = z.object({
 
 export type ProfileFormData = z.infer<typeof profileSchema>;
 
-// ─── Location picker hook ─────────────────────────────────────────────────────
-
-export type Coords = { lat: number; lng: number };
-
-export type UseLocationPickerReturn = {
-  fetchLocation: () => Promise<void>;
-  coords: Coords | null;
-  isLocating: boolean;
-  locationError: string | null;
-};
-
-export function useLocationPicker(): UseLocationPickerReturn {
-  const [coords, setCoords] = useState<Coords | null>(null);
-  const [isLocating, setIsLocating] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
-
-  const fetchLocation = useCallback(async (): Promise<void> => {
-    setIsLocating(true);
-    setLocationError(null);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== Location.PermissionStatus.GRANTED) {
-        setLocationError(
-          'Location access was denied. You can set your home location later in Settings.',
-        );
-        return;
-      }
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    } catch (err) {
-      logger.error('useLocationPicker: fetchLocation threw', err);
-      setLocationError('Could not get your location. Please try again.');
-    } finally {
-      setIsLocating(false);
-    }
-  }, []);
-
-  return { fetchLocation, coords, isLocating, locationError };
-}
-
 // ─── Main onboarding hook ─────────────────────────────────────────────────────
 
 export type UseOnboardingProfileReturn = {
@@ -90,10 +47,6 @@ export type UseOnboardingProfileReturn = {
   isSubmitting: boolean;
   submitError: string | null;
   bioValue: string;
-  coords: Coords | null;
-  isLocating: boolean;
-  locationError: string | null;
-  fetchLocation: () => Promise<void>;
   onSubmit: () => void;
 };
 
@@ -102,7 +55,6 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
   const queryClient = useQueryClient();
   const { markProfileComplete } = useOnboardingContext();
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const { fetchLocation, coords, isLocating, locationError } = useLocationPicker();
 
   const {
     control,
@@ -140,12 +92,6 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
           username: data.username.trim(),
           bio: data.bio.trim() || null,
           whatsapp_phone: data.whatsapp_phone.trim() || null,
-          // home_location is typed as `unknown` in generated types; WKT is the
-          // correct PostgREST format for a geography(point,4326) column.
-          home_location:
-            coords !== null
-              ? (`POINT(${coords.lng} ${coords.lat})` as unknown)
-              : undefined,
         });
 
         if (profileError !== null) {
@@ -192,7 +138,7 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
         markProfileComplete();
         router.replace('/(app)/discover');
       })(),
-    [handleSubmit, coords, router, markProfileComplete, queryClient],
+    [handleSubmit, router, markProfileComplete, queryClient],
   );
 
   return {
@@ -201,10 +147,6 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
     isSubmitting,
     submitError,
     bioValue,
-    coords,
-    isLocating,
-    locationError,
-    fetchLocation,
     onSubmit,
   };
 }

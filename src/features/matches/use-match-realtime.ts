@@ -157,7 +157,7 @@ export function useDiscoverMatchesRealtime(): void {
     const channelName = "discover:matches";
 
     const debouncedInvalidate = createDebouncedInvalidator(() => {
-      void queryClient.invalidateQueries({ queryKey: matchKeys.discover });
+      void queryClient.invalidateQueries({ queryKey: matchKeys.discoverPrefix });
     }, 300);
 
     void (async () => {

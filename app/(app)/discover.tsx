@@ -7,6 +7,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ScrollView, View, Text, Pressable } from '@/tw';
 import { useDiscoverMatches, type MatchSummary } from '@/features/matches/use-matches';
 import { useDiscoverMatchesRealtime } from '@/features/matches/use-match-realtime';
+import {
+  useDiscoverLocation,
+  type LocationAccessStatus,
+} from '@/features/discover/use-discover-location';
 
 type SkillFilter = 'All' | 'A' | 'B' | 'C';
 type ViewMode = 'list' | 'map';
@@ -85,10 +89,59 @@ function skillBadge(match: MatchSummary): 'A' | 'B' | 'C' | 'D' {
   }
 }
 
-function derivedDistance(matchId: string): number {
-  const seed = Number.parseInt(matchId.slice(0, 2), 16);
-  const normalized = Number.isNaN(seed) ? 0.35 : seed / 255;
-  return Math.round((0.6 + normalized * 3.2) * 10) / 10;
+function formatDistanceKm(distanceM: number | undefined): string {
+  if (distanceM === undefined) return '—';
+  const km = distanceM / 1000;
+  return `${km < 10 ? km.toFixed(1) : Math.round(km).toString()}KM`;
+}
+
+function headerLocationLabel(
+  status: LocationAccessStatus,
+  placeLabel: string | null,
+): string {
+  if (status === 'ready' && placeLabel !== null) return placeLabel;
+  if (status === 'locating' || status === 'idle') return 'Locating…';
+  return 'Location unavailable';
+}
+
+function LocationGate({
+  status,
+  message,
+  onRetry,
+  onOpenSettings,
+}: {
+  status: LocationAccessStatus;
+  message: string | null;
+  onRetry: () => void;
+  onOpenSettings: () => void;
+}) {
+  if (status === 'idle' || status === 'locating') {
+    return (
+      <View style={styles.centerState}>
+        <ActivityIndicator color={C.mist} />
+        <Text style={styles.gateTitle}>Finding your location…</Text>
+        <Text style={styles.gateText}>
+          We need your location to show nearby padel matches.
+        </Text>
+      </View>
+    );
+  }
+
+  const showSettings = status === 'blocked' || status === 'services_disabled';
+  const actionLabel = showSettings ? 'Open Settings' : status === 'denied' ? 'Enable Location' : 'Try Again';
+
+  return (
+    <View style={styles.errorCard}>
+      <Text style={styles.errorText}>
+        {message ?? 'Location is required to discover nearby matches.'}
+      </Text>
+      <Pressable
+        onPress={() => void (showSettings ? onOpenSettings() : onRetry())}
+      >
+        <Text style={styles.errorAction}>{actionLabel}</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 function playerInitials(name: string): string {
@@ -259,7 +312,6 @@ function MatchCard({ match, onPress }: { match: MatchSummary; onPress: () => voi
   const openSpots = Math.max(match.capacity - filled, 0);
   const level = skillBadge(match);
   const full = filled >= match.capacity;
-  const distance = derivedDistance(match.id);
   const avatarNames = [hostName, match.sport?.name ?? 'Player', match.venue_name ?? 'Match'];
   const accentColors =
     level === 'A'
@@ -298,7 +350,7 @@ function MatchCard({ match, onPress }: { match: MatchSummary; onPress: () => voi
         </View>
         <View style={styles.distancePill}>
           <Ionicons name="location-outline" size={12} color={C.blueHi} />
-          <Text style={styles.distanceText}>{distance.toFixed(1)}KM</Text>
+          <Text style={styles.distanceText}>{formatDistanceKm(match.distanceM)}</Text>
         </View>
       </View>
 
@@ -334,15 +386,31 @@ function MatchCard({ match, onPress }: { match: MatchSummary; onPress: () => voi
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const {
+    status: locationStatus,
+    coords,
+    placeLabel,
+    errorMessage,
+    saveWarning,
+    retry: retryLocation,
+    openSettings,
+  } = useDiscoverLocation();
+  const locationReady = locationStatus === 'ready' && coords !== null;
+  const radius = 10;
+
   useDiscoverMatchesRealtime();
-  const { data: matches, isPending, isRefetching, refetch, error } = useDiscoverMatches();
+  const { data: matches, isPending, isRefetching, refetch, error } = useDiscoverMatches(
+    locationReady ? coords : null,
+    radius,
+  );
   const [skillFilter, setSkillFilter] = useState<SkillFilter>('All');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const radius = 10;
   const filteredMatches = useMemo(() => {
     const source = matches ?? [];
     return source.filter((match) => skillFilter === 'All' || skillBadge(match) === skillFilter);
   }, [matches, skillFilter]);
+
+  const locationLabel = headerLocationLabel(locationStatus, placeLabel);
 
   return (
     <ScrollView
@@ -353,7 +421,7 @@ export default function DiscoverScreen() {
         <View>
           <View style={styles.locationRow}>
             <Ionicons name="location-outline" size={13} color={C.blueHi} />
-            <Text style={styles.locationText}>Palermo · Buenos Aires</Text>
+            <Text style={styles.locationText}>{locationLabel}</Text>
           </View>
           <Text style={styles.title}>Discover</Text>
         </View>
@@ -363,58 +431,75 @@ export default function DiscoverScreen() {
         </View>
       </View>
 
-      <RadiusCard radius={radius} />
-      <FilterChips value={skillFilter} onChange={setSkillFilter} />
-
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>
-          {filteredMatches.length} Open Nearby
-        </Text>
-        <View style={styles.sectionRight}>
-          {isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
-          <ViewToggle value={viewMode} onChange={setViewMode} />
-        </View>
-      </View>
-
-      {isPending ? (
-        <View style={styles.centerState}>
-          <ActivityIndicator color={C.mist} />
-        </View>
-      ) : error !== null ? (
-        <View style={styles.errorCard}>
-          <Text style={styles.errorText}>
-            Could not load matches.
-          </Text>
-          <Pressable onPress={() => void refetch()}>
-            <Text style={styles.errorAction}>
-              Try again
-            </Text>
-          </Pressable>
-        </View>
-      ) : viewMode === 'map' ? (
-        <View style={styles.emptyCard}>
-          <Ionicons name="map-outline" size={26} color={C.faint} />
-          <Text style={styles.emptyTitle}>Map arrives in M4</Text>
-          <Text style={styles.emptyText}>Use list view for the M2 matchmaking flow.</Text>
-        </View>
-      ) : filteredMatches.length > 0 ? (
-        filteredMatches.map((match) => (
-          <MatchCard
-            key={match.id}
-            match={match}
-            onPress={() => router.push(`/(app)/match-detail?id=${match.id}`)}
-          />
-        ))
+      {!locationReady ? (
+        <LocationGate
+          status={locationStatus}
+          message={errorMessage}
+          onRetry={() => void retryLocation()}
+          onOpenSettings={() => void openSettings()}
+        />
       ) : (
-        <View style={styles.emptyCard}>
-          <Ionicons name="search-outline" size={26} color={C.faint} />
-          <Text style={styles.emptyTitle}>
-            No matches in range
-          </Text>
-          <Text style={styles.emptyText}>
-            Widen your radius or switch skill level.
-          </Text>
-        </View>
+        <>
+          {saveWarning !== null ? (
+            <View style={styles.saveWarningCard}>
+              <Text style={styles.saveWarningText}>{saveWarning}</Text>
+            </View>
+          ) : null}
+
+          <RadiusCard radius={radius} />
+          <FilterChips value={skillFilter} onChange={setSkillFilter} />
+
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              {filteredMatches.length} Open Nearby
+            </Text>
+            <View style={styles.sectionRight}>
+              {isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
+              <ViewToggle value={viewMode} onChange={setViewMode} />
+            </View>
+          </View>
+
+          {isPending ? (
+            <View style={styles.centerState}>
+              <ActivityIndicator color={C.mist} />
+            </View>
+          ) : error !== null ? (
+            <View style={styles.errorCard}>
+              <Text style={styles.errorText}>
+                Could not load matches.
+              </Text>
+              <Pressable onPress={() => void refetch()}>
+                <Text style={styles.errorAction}>
+                  Try again
+                </Text>
+              </Pressable>
+            </View>
+          ) : viewMode === 'map' ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="map-outline" size={26} color={C.faint} />
+              <Text style={styles.emptyTitle}>Map arrives in M4</Text>
+              <Text style={styles.emptyText}>Use list view for the M2 matchmaking flow.</Text>
+            </View>
+          ) : filteredMatches.length > 0 ? (
+            filteredMatches.map((match) => (
+              <MatchCard
+                key={match.id}
+                match={match}
+                onPress={() => router.push(`/(app)/match-detail?id=${match.id}`)}
+              />
+            ))
+          ) : (
+            <View style={styles.emptyCard}>
+              <Ionicons name="search-outline" size={26} color={C.faint} />
+              <Text style={styles.emptyTitle}>
+                No matches in range
+              </Text>
+              <Text style={styles.emptyText}>
+                Widen your radius or switch skill level.
+              </Text>
+            </View>
+          )}
+        </>
       )}
     </ScrollView>
   );
@@ -801,6 +886,37 @@ const styles = StyleSheet.create({
   centerState: {
     alignItems: 'center',
     paddingVertical: 40,
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  gateTitle: {
+    fontFamily: 'HankenGrotesk-Bold',
+    fontSize: 15,
+    color: C.dim,
+    marginTop: 8,
+  },
+  gateText: {
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 13,
+    lineHeight: 19,
+    color: C.faint,
+    textAlign: 'center',
+  },
+  saveWarningCard: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    backgroundColor: 'rgba(224,177,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(224,177,91,0.22)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  saveWarningText: {
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 13,
+    lineHeight: 18,
+    color: C.warning,
   },
   errorCard: {
     marginHorizontal: 20,

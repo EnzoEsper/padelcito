@@ -14,7 +14,6 @@ import {
   SKILL_LEVELS,
   type SkillLevel,
   type ProfileFormData,
-  type Coords,
 } from '@/features/onboarding/use-onboarding-profile';
 import type { Control, FieldErrors } from 'react-hook-form';
 
@@ -185,91 +184,6 @@ function WhatsAppField({ control, error }: WhatsAppFieldProps) {
   );
 }
 
-// ─── Location card ────────────────────────────────────────────────────────────
-
-type LocationCardProps = {
-  coords: Coords | null;
-  isLocating: boolean;
-  locationError: string | null;
-  onFetch: () => Promise<void>;
-};
-
-function LocationCard({ coords, isLocating, locationError, onFetch }: LocationCardProps) {
-  const formatCoord = (value: number, posLabel: string, negLabel: string) => {
-    const label = value >= 0 ? posLabel : negLabel;
-    return `${Math.abs(value).toFixed(4)}° ${label}`;
-  };
-
-  return (
-    <View className="mb-6">
-      <SectionLabel>Home Location — Optional</SectionLabel>
-      <View
-        style={styles.locationCard}
-        className="bg-surface-1"
-      >
-        {isLocating ? (
-          <View className="flex-row items-center gap-3 px-4 py-4">
-            <ActivityIndicator color="#E4E4E4" size="small" />
-            <Text className="font-mono text-[11px] tracking-[0.13em] uppercase text-neutral/60">
-              Fetching your location...
-            </Text>
-          </View>
-        ) : coords !== null ? (
-          <View className="flex-row items-center justify-between px-4 py-4">
-            <View className="flex-row items-center gap-3 flex-1">
-              <Text className="text-primary-hi text-base">◎</Text>
-              <Text className="font-mono text-[11px] tracking-[0.13em] text-neutral/60 shrink">
-                {formatCoord(coords.lat, 'N', 'S')}{'  '}
-                {formatCoord(coords.lng, 'E', 'W')}
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => void onFetch()}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text className="font-mono text-[11px] tracking-[0.13em] uppercase text-neutral/38">
-                Change
-              </Text>
-            </Pressable>
-          </View>
-        ) : locationError !== null ? (
-          <View className="px-4 py-4 gap-3">
-            <Text className="font-grotesk text-sm text-warning leading-5">
-              {locationError}
-            </Text>
-            <Pressable
-              onPress={() => void onFetch()}
-              className="flex-row items-center gap-2"
-            >
-              <Text className="font-mono text-[11px] tracking-[0.13em] uppercase text-neutral/60">
-                Try Again
-              </Text>
-              <Text className="text-neutral/60 text-sm">→</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable
-            onPress={() => void onFetch()}
-            className="flex-row items-center justify-between px-4 py-4"
-            android_ripple={{ color: 'rgba(228,228,228,0.04)' }}
-          >
-            <View className="flex-row items-center gap-3">
-              <Text className="text-neutral/38 text-base">◎</Text>
-              <Text className="font-mono text-[11px] tracking-[0.13em] uppercase text-neutral/60">
-                Get My Location
-              </Text>
-            </View>
-            <Text className="text-neutral/38 text-sm">→</Text>
-          </Pressable>
-        )}
-      </View>
-      <Text className="font-grotesk text-sm text-neutral/38 mt-2 leading-5">
-        Used to find matches near you. Never shared directly.
-      </Text>
-    </View>
-  );
-}
-
 // ─── Skill chip ───────────────────────────────────────────────────────────────
 
 type ChipMeta = {
@@ -394,10 +308,6 @@ export default function ProfileSetupScreen() {
     isSubmitting,
     submitError,
     bioValue,
-    coords,
-    isLocating,
-    locationError,
-    fetchLocation,
     onSubmit,
   } = useOnboardingProfile();
 
@@ -441,14 +351,6 @@ export default function ProfileSetupScreen() {
 
           {/* ── WhatsApp ─────────────────────────────────────────────────── */}
           <WhatsAppField control={control} error={errors.whatsapp_phone?.message} />
-
-          {/* ── Home location ───────────────────────────────────────────── */}
-          <LocationCard
-            coords={coords}
-            isLocating={isLocating}
-            locationError={locationError}
-            onFetch={fetchLocation}
-          />
 
           {/* ── Padel skill level ────────────────────────────────────────── */}
           <SkillChips control={control} error={errors.skill_level?.message} />
@@ -512,12 +414,6 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 14,
     minHeight: 96,
-  },
-  locationCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(228,228,228,0.10)',
-    overflow: 'hidden',
   },
   chip: {
     paddingHorizontal: 16,
