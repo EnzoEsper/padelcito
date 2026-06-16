@@ -7,7 +7,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, View, Text, Pressable, TextInput } from '@/tw';
 import {
   useCreateMatch,
-  useSports,
   type Coords,
 } from '@/features/matches/use-matches';
 import type { Database } from '@/types/database';
@@ -45,7 +44,6 @@ function parseStartsAt(dateText: string, timeText: string): string | null {
 export default function CreateMatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { data: sports } = useSports();
   const createMatch = useCreateMatch();
   const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -61,8 +59,6 @@ export default function CreateMatchScreen() {
   const [coords, setCoords] = useState<Coords | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
-
-  const sportId = sports?.[0]?.id ?? null;
 
   async function fetchLocation(): Promise<void> {
     setLocationError(null);
@@ -94,10 +90,6 @@ export default function CreateMatchScreen() {
       Alert.alert('Missing title', 'Use at least 3 characters for the match title.');
       return;
     }
-    if (sportId === null) {
-      Alert.alert('Missing sport', 'No active sport was found.');
-      return;
-    }
     if (startsAt === null) {
       Alert.alert('Invalid date', 'Use a future date and time, for example 2026-06-14 and 19:30.');
       return;
@@ -123,7 +115,6 @@ export default function CreateMatchScreen() {
         startsAt,
         durationMinutes: parsedDuration,
         capacity: parsedCapacity,
-        sportId,
         coords,
         skillMin,
         skillMax,

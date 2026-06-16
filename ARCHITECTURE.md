@@ -54,6 +54,8 @@ auth.users ──1:1── profiles ──N:M── sports (via profile_sports)
 
 `sports` is a seeded reference catalog. Every match, listing, tournament, and circuit references a `sport_id`. Per-sport defaults (team size, scoring rules) live in `default_scoring_config jsonb`, so adding a sport is an `INSERT`, never a migration.
 
+**Current release scope (Padelcito MVP):** the app manages **padel matches only**. Client code resolves the padel sport via slug (`padel`) through `src/lib/padel-sport.ts`. Non-padel sports are seeded in the catalog but marked `is_active = false` (see migration `deactivate_non_padel_sports`); re-enabling a sport requires setting `is_active = true` and building explicit multi-sport client flows.
+
 ### WhatsApp contact reveal without leaking phone numbers
 
 `profiles.whatsapp_phone` (E.164, CHECK-validated) is **unreachable through RLS for other users** — the `profiles` SELECT policy only allows your own row. Everyone else reads public fields through the `public_profiles` view (a column-projection security boundary). The **only** path to another user's phone is the `match_contact_details(match_id)` SECURITY DEFINER RPC, which:
@@ -93,7 +95,7 @@ A single `tournaments` table serves both worlds, switched by `is_local`:
 
 ### Geospatial discovery
 
-All location columns are `geography(Point, 4326)` with GIST indexes. Discovery RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`) take `(lat, lng, radius_m)` — the radius is **dynamically configurable per call** (and `profiles.search_radius_m` stores each user's preferred default). They are SECURITY INVOKER, so RLS still filters rows; `ST_DWithin` on geography uses the spatial index and returns meters.
+All location columns are `geography(Point, 4326)` with GIST indexes. Discovery RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`) take `(lat, lng, radius_m)` — the radius is **dynamically configurable per call** (and `profiles.search_radius_m` stores each user's preferred default). They are SECURITY INVOKER, so RLS still filters rows; `ST_DWithin` on geography uses the spatial index and returns meters. For the padel MVP, always pass `p_sport_id` from the padel sport lookup.
 
 ### Realtime replication — explicit table list
 
@@ -110,6 +112,7 @@ All five use `REPLICA IDENTITY FULL` so UPDATE events carry previous state (need
 ### RLS architecture
 
 - **Every table** has RLS enabled and explicit policies; `tournament_standings` intentionally has _no_ write policies (trigger-only writes).
+- **Data API grants:** With Supabase `auto_expose_new_tables = false` (default since 2026-05-30), tables also need explicit `GRANT`s to `anon` / `authenticated`. RLS filters rows; grants control whether PostgREST can access the table at all. See migration `grant_data_api_access`.
 - All cross-table checks route through `SECURITY DEFINER` helper functions (`is_match_host`, `is_match_member`, `is_tournament_organizer`, `is_stage_visible`, `can_report_score`, …) — this breaks mutual-recursion between policies and keeps each policy a one-liner.
 - `auth.uid()` is always wrapped as `(select auth.uid())` so the planner evaluates it once per statement (InitPlan), not per row.
 - **anon:** read-only on public surfaces (sports catalog, public matches, open listings, published tournaments, brackets, standings — live scores are watchable without an account). Zero writes.

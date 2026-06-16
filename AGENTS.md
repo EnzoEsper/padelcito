@@ -17,5 +17,6 @@ The immutable baseline for this project is `ai-architecture-context.md`. **You m
 ## 🏗️ Architectural Reminders
 
 - **Data Fetching:** Use TanStack Query.
+- **Padel-only MVP:** Client flows manage padel matches only — use `PADEL_SPORT_SLUG` / `fetchPadelSport()` from `src/lib/padel-sport.ts`.
 - **Security:** RLS is mandatory on every table. Cross-table checks go through `SECURITY DEFINER` helper functions.
 - **TypeScript:** Strict mode is on. No `any`. No non-null assertions (`!`).

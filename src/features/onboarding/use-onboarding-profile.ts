@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useForm, type Control, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,6 +7,7 @@ import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { ensurePadelSport } from '@/lib/padel-sport';
 import { useOnboardingContext } from '@/lib/onboarding-context';
 
 // ─── Skill level enum ────────────────────────────────────────────────────────
@@ -97,6 +99,7 @@ export type UseOnboardingProfileReturn = {
 
 export function useOnboardingProfile(): UseOnboardingProfileReturn {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { markProfileComplete } = useOnboardingContext();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { fetchLocation, coords, isLocating, locationError } = useLocationPicker();
@@ -156,13 +159,10 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
         }
 
         // 3. Resolve the Padel sport FK
-        const { data: sport, error: sportError } = await supabase
-          .from('sports')
-          .select('id')
-          .ilike('name', 'padel')
-          .single();
-
-        if (sportError !== null || sport === null) {
+        let padelSport;
+        try {
+          padelSport = await ensurePadelSport(queryClient);
+        } catch (sportError) {
           logger.error('padel sport lookup failed', sportError);
           setSubmitError('Padel sport not found in our system. Please contact support.');
           return;
@@ -174,7 +174,7 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
           .upsert(
             {
               profile_id: userId,
-              sport_id: sport.id,
+              sport_id: padelSport.id,
               skill_level: data.skill_level,
             },
             { onConflict: 'profile_id,sport_id' },
@@ -192,7 +192,7 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
         markProfileComplete();
         router.replace('/(app)/discover');
       })(),
-    [handleSubmit, coords, router, markProfileComplete],
+    [handleSubmit, coords, router, markProfileComplete, queryClient],
   );
 
   return {

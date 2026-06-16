@@ -1,4 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  ensurePadelSport,
+  PADEL_SPORT_SLUG,
+  UnsupportedSportError,
+} from '@/lib/padel-sport';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 
@@ -20,7 +25,6 @@ export type CreateMatchInput = {
   startsAt: string;
   durationMinutes: number;
   capacity: number;
-  sportId: string;
   coords: Coords;
   skillMin: SkillLevel | null;
   skillMax: SkillLevel | null;
@@ -56,8 +60,8 @@ export type MyMatchesData = {
 
 export const matchKeys = {
   all: ['matches'] as const,
-  discover: ['matches', 'discover'] as const,
-  mine: ['matches', 'mine'] as const,
+  discover: ['matches', 'discover', PADEL_SPORT_SLUG] as const,
+  mine: ['matches', 'mine', PADEL_SPORT_SLUG] as const,
   detail: (matchId: string) => ['matches', matchId] as const,
   contacts: (matchId: string) => ['matches', matchId, 'contacts'] as const,
 };
@@ -159,30 +163,20 @@ async function hydrateSummaries(matches: MatchRow[], userId: string): Promise<Ma
   );
 }
 
-export function useSports() {
-  return useQuery({
-    queryKey: ['sports'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sports')
-        .select('*')
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-
-      if (error !== null) throw error;
-      return data ?? [];
-    },
-  });
-}
-
 export function useDiscoverMatches() {
+  const queryClient = useQueryClient();
+
   return useQuery({
     queryKey: matchKeys.discover,
     queryFn: async () => {
-      const userId = await getCurrentUserId();
+      const [userId, padelSport] = await Promise.all([
+        getCurrentUserId(),
+        ensurePadelSport(queryClient),
+      ]);
       const { data, error } = await supabase
         .from('matches')
         .select('*')
+        .eq('sport_id', padelSport.id)
         .eq('is_public', true)
         .in('status', ['open', 'full'])
         .gt('starts_at', new Date().toISOString())
@@ -195,6 +189,8 @@ export function useDiscoverMatches() {
 }
 
 export function useMatchDetail(matchId: string | null) {
+  const queryClient = useQueryClient();
+
   return useQuery({
     queryKey: matchKeys.detail(matchId ?? ''),
     enabled: matchId !== null && matchId.length > 0,
@@ -203,7 +199,10 @@ export function useMatchDetail(matchId: string | null) {
         throw new Error('Missing match id');
       }
 
-      const userId = await getCurrentUserId();
+      const [userId, padelSport] = await Promise.all([
+        getCurrentUserId(),
+        ensurePadelSport(queryClient),
+      ]);
       const { data: match, error } = await supabase
         .from('matches')
         .select('*')
@@ -211,6 +210,10 @@ export function useMatchDetail(matchId: string | null) {
         .single();
 
       if (error !== null) throw error;
+
+      if (match.sport_id !== padelSport.id) {
+        throw new UnsupportedSportError();
+      }
 
       const [sportsById, visibleParticipants] = await Promise.all([
         fetchSportsByIds([match.sport_id]),
@@ -235,16 +238,22 @@ export function useMatchDetail(matchId: string | null) {
 }
 
 export function useMyMatches() {
+  const queryClient = useQueryClient();
+
   return useQuery({
     queryKey: matchKeys.mine,
     queryFn: async (): Promise<MyMatchesData> => {
-      const userId = await getCurrentUserId();
+      const [userId, padelSport] = await Promise.all([
+        getCurrentUserId(),
+        ensurePadelSport(queryClient),
+      ]);
 
       const [hostedResult, participantResult] = await Promise.all([
         supabase
           .from('matches')
           .select('*')
           .eq('host_id', userId)
+          .eq('sport_id', padelSport.id)
           .order('starts_at', { ascending: true }),
         supabase
           .from('match_participants')
@@ -262,7 +271,11 @@ export function useMyMatches() {
 
       const participantMatches =
         participantMatchIds.length > 0
-          ? await supabase.from('matches').select('*').in('id', unique(participantMatchIds))
+          ? await supabase
+              .from('matches')
+              .select('*')
+              .in('id', unique(participantMatchIds))
+              .eq('sport_id', padelSport.id)
           : { data: [] as MatchRow[], error: null };
 
       if (participantMatches.error !== null) throw participantMatches.error;
@@ -314,10 +327,13 @@ export function useCreateMatch() {
 
   return useMutation({
     mutationFn: async (input: CreateMatchInput) => {
-      const userId = await getCurrentUserId();
+      const [userId, padelSport] = await Promise.all([
+        getCurrentUserId(),
+        ensurePadelSport(queryClient),
+      ]);
       const insert: MatchInsert = {
         host_id: userId,
-        sport_id: input.sportId,
+        sport_id: padelSport.id,
         title: input.title.trim(),
         description: input.description,
         venue_name: input.venueName,

@@ -20,3 +20,4 @@ You MUST read and strictly adhere to `ai-architecture-context.md` located in the
 - **Migrations:** All schema changes must be provided as Supabase migrations.
 - **Type Generation:** Whenever you generate a migration, explicitly remind the user to run: `npx supabase gen types typescript --local > src/types/database.ts`.
 - **Security:** Row Level Security (RLS) is mandatory. Never disable RLS to make a query work.
+- **Padel-only MVP:** Match, listing, and tournament client flows must use `PADEL_SPORT_SLUG` / `fetchPadelSport()` from `src/lib/padel-sport.ts`. Do not use generic sport pickers or select `sports[0]` from the catalog.

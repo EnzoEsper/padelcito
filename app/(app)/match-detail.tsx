@@ -14,6 +14,7 @@ import {
   type MatchDetail,
 } from '@/features/matches/use-matches';
 import { useMatchRealtime } from '@/features/matches/use-match-realtime';
+import { UnsupportedSportError } from '@/lib/padel-sport';
 import type { Database } from '@/types/database';
 
 type SkillBadgeLevel = 'A' | 'B' | 'C' | 'D';
@@ -400,6 +401,18 @@ export default function MatchDetailScreen() {
     );
   }
 
+  if (error instanceof UnsupportedSportError) {
+    return (
+      <View style={[styles.errorRoot, { paddingTop: insets.top + 24 }]}>
+        <Text style={styles.errorTitle}>This match is not available.</Text>
+        <Text style={styles.errorSubtitle}>Padelcito only supports padel matches.</Text>
+        <Pressable onPress={() => router.back()} style={styles.retryButton}>
+          <Text style={styles.retryText}>Go back</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   if (error !== null || match === undefined) {
     return (
       <View style={[styles.errorRoot, { paddingTop: insets.top + 24 }]}>
@@ -622,6 +635,12 @@ const styles = StyleSheet.create({
     fontFamily: 'HankenGrotesk-Bold',
     fontSize: 18,
     color: C.warning,
+    marginBottom: 8,
+  },
+  errorSubtitle: {
+    fontFamily: 'HankenGrotesk-Medium',
+    fontSize: 14,
+    color: C.dim,
     marginBottom: 16,
   },
   retryButton: {

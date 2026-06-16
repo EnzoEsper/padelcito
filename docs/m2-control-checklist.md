@@ -4,8 +4,8 @@ This document is the handoff point for M2 Core Matchmaking MVP sessions.
 
 ## Scope
 
-- Create public pickup matches with sport, venue, map pin, datetime, capacity, duration, and skill range.
-- Browse the match feed as a list, without map UI.
+- Create public **padel** pickup matches (sport slug `padel`) with venue, map pin, datetime, capacity, duration, and skill range.
+- Browse the padel match feed as a list, without map UI.
 - Open match details and request to join with a message.
 - Let hosts accept, reject, or remove participants.
 - Reveal WhatsApp contact links only through `match_contact_details()` after acceptance.
@@ -18,10 +18,12 @@ This document is the handoff point for M2 Core Matchmaking MVP sessions.
 - `match_participants.status` is the request state machine.
 - `match_contact_details(p_match_id)` is the only allowed path to other players' WhatsApp numbers.
 - `public_profiles` is safe for other users; direct `profiles.whatsapp_phone` reads are not.
+- Padel sport is resolved via `PADEL_SPORT_SLUG` in `src/lib/padel-sport.ts`; match queries filter by padel `sport_id`.
 
 ## Verification Checklist
 
 - Create a match from a completed profile.
+- Confirm the created match `sport_id` references padel (slug `padel` in the `sports` table).
 - Confirm it appears in Discover.
 - Request to join from a second account.
 - Confirm the host sees the pending request in Matches.

@@ -8,7 +8,7 @@
 
 ## 1. Project Identity
 
-- **Product:** Multi-sport matchmaking + tournament platform (matches, trust ratings, open listings, official tournaments & circuits, on-the-fly local tournaments with live scoring).
+- **Product:** Padel matchmaking app (Padelcito) — find and host padel pickup matches, trust ratings, and (roadmap) open listings, tournaments & circuits. The database schema supports multiple sports; **MVP client flows manage padel only**. Always resolve the sport via `PADEL_SPORT_SLUG` (`src/lib/padel-sport.ts`); never pick the first row from the sports catalog or build generic sport pickers until multi-sport is explicitly in scope.
 - **Backend:** Supabase — PostgreSQL 15+, PostGIS, Row Level Security, Realtime, Storage, Auth. There is **no custom backend server**; the database IS the backend. Business rules live in SQL (triggers, RPCs, RLS), not in client code.
 - **Frontend:** React Native with **Expo** (managed workflow, expo-router), TypeScript strict.
 - **Language:** ALL code, identifiers, comments, commit messages, and docs are written in **English**. No exceptions.
@@ -25,6 +25,7 @@
 - **Naming:** `snake_case` for all tables/columns/functions/policies; tables plural (`matches`); enums singular (`match_status`); triggers `trg_*`; indexes `idx_*`; RLS helpers `is_*` / `has_*` / `can_*`.
 - **Types:** `uuid` PKs with `gen_random_uuid()`; `timestamptz` (never `timestamp`); `smallint` for small ranges; `jsonb` for volatile config (scoring rules, points config, listing details); `extensions.geography(point, 4326)` for coordinates; `text` with `CHECK` length constraints (never `varchar(n)`).
 - **Every new table MUST ship in the same migration with:** `enable row level security` + explicit policies for `anon` and `authenticated`, B-tree indexes on every FK, GIST on every geography column, and correct `on delete` behavior (cascade for ownership, set null for history, restrict for catalogs).
+- **Data API grants:** Supabase defaults `auto_expose_new_tables` to `false` (see `supabase/config.toml`). RLS alone is not enough — every new `public` table also needs explicit `GRANT`s to `anon` / `authenticated` (or be covered by a project-wide grants migration). Without table-level grants, PostgREST returns `42501 permission denied` before RLS runs.
 - **RLS rules:** wrap auth as `(select auth.uid())`; cross-table checks go through `SECURITY DEFINER` helper functions with `set search_path = public` — never inline subqueries that can recurse.
 - **Sensitive columns:** `profiles.whatsapp_phone` is readable only via the `match_contact_details()` RPC. Never add it to a view, policy, or query result for other users. Other users read profiles ONLY through the `public_profiles` view.
 - **Standings are trigger-maintained:** never write to `tournament_standings` from client code.
@@ -34,7 +35,7 @@
 ## 4. Supabase Client Patterns
 
 - Single client instance in `src/lib/supabase.ts`, typed with `Database` from generated types; session storage via `expo-secure-store` adapter. Only the **anon key** in the app — `service_role` never ships to a client.
-- **Spatial queries:** always through RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`). Never download rows and filter distance client-side.
+- **Spatial queries:** always through RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`). Never download rows and filter distance client-side. Pass `p_sport_id` from `fetchPadelSport()` for padel-scoped discovery.
 - **Bracket operations:** always through RPCs (`generate_single_elimination_bracket`, `generate_round_robin`). Never construct brackets client-side.
 - **Realtime:** subscribe only to the published tables (`matches`, `match_participants`, `tournament_matches`, `tournament_standings`, `messages`). Channel naming: `match:{id}`, `tournament:{id}`, `conversation:{id}`. Always `removeChannel` on unmount. Do not poll a table that has Realtime.
 - **Storage:** avatars → `avatars/{user_id}/...` (public); payment receipts → `receipts/{registration_id}/...` (private). Respect these path conventions — bucket policies depend on them.
