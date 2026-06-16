@@ -178,7 +178,7 @@ export function useDiscoverMatches() {
         .select('*')
         .eq('sport_id', padelSport.id)
         .eq('is_public', true)
-        .in('status', ['open', 'full'])
+        .eq('status', 'open')
         .gt('starts_at', new Date().toISOString())
         .order('starts_at', { ascending: true });
 
