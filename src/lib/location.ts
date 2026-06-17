@@ -46,3 +46,30 @@ export function roundCoordsForKey(coords: Coords): Coords {
     lng: Math.round(coords.lng * 1000) / 1000,
   };
 }
+
+export type ParseCoordsResult =
+  | { ok: true; coords: Coords }
+  | { ok: false; message: string };
+
+/** Parse "lat, lng" or "lat lng" from clipboard text. */
+export function parseCoordsFromText(text: string): ParseCoordsResult {
+  const normalized = text.trim().replace(/[;,]/g, ' ').replace(/\s+/g, ' ');
+  const parts = normalized.split(' ').filter((part) => part.length > 0);
+
+  if (parts.length < 2) {
+    return { ok: false, message: 'Paste coordinates as "latitude, longitude".' };
+  }
+
+  const lat = Number.parseFloat(parts[0]);
+  const lng = Number.parseFloat(parts[1]);
+
+  if (Number.isNaN(lat) || Number.isNaN(lng)) {
+    return { ok: false, message: 'Could not read latitude and longitude from clipboard.' };
+  }
+
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return { ok: false, message: 'Coordinates are out of range.' };
+  }
+
+  return { ok: true, coords: { lat, lng } };
+}

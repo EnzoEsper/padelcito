@@ -32,7 +32,8 @@
         {
           "locationWhenInUsePermission": "Padelcito usa tu ubicación para encontrar partidos de padel cercanos."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "router": {},

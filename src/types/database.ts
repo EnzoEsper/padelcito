@@ -440,15 +440,30 @@ export type Database = {
       }
       matches: {
         Row: {
+          age_max: number | null
+          age_min: number | null
           capacity: number
+          category_max: number
+          category_min: number
+          court_count: number
+          court_format: Database["public"]["Enums"]["court_format"]
+          court_structure: Database["public"]["Enums"]["court_structure"]
+          court_surface: Database["public"]["Enums"]["court_surface"] | null
+          court_type: Database["public"]["Enums"]["court_type"]
           created_at: string
           description: string | null
+          difficulty: Database["public"]["Enums"]["match_difficulty"] | null
           duration_minutes: number
+          gender_preference:
+            | Database["public"]["Enums"]["match_gender_preference"]
+            | null
           host_id: string
           id: string
           is_public: boolean
           late_withdrawal_threshold: string
           location: unknown
+          positions_sought: string[]
+          price_per_player: number | null
           skill_max: Database["public"]["Enums"]["skill_level"] | null
           skill_min: Database["public"]["Enums"]["skill_level"] | null
           sport_id: string
@@ -459,15 +474,30 @@ export type Database = {
           venue_name: string | null
         }
         Insert: {
+          age_max?: number | null
+          age_min?: number | null
           capacity: number
+          category_max?: number
+          category_min?: number
+          court_count?: number
+          court_format?: Database["public"]["Enums"]["court_format"]
+          court_structure?: Database["public"]["Enums"]["court_structure"]
+          court_surface?: Database["public"]["Enums"]["court_surface"] | null
+          court_type?: Database["public"]["Enums"]["court_type"]
           created_at?: string
           description?: string | null
+          difficulty?: Database["public"]["Enums"]["match_difficulty"] | null
           duration_minutes?: number
+          gender_preference?:
+            | Database["public"]["Enums"]["match_gender_preference"]
+            | null
           host_id: string
           id?: string
           is_public?: boolean
           late_withdrawal_threshold?: string
           location: unknown
+          positions_sought?: string[]
+          price_per_player?: number | null
           skill_max?: Database["public"]["Enums"]["skill_level"] | null
           skill_min?: Database["public"]["Enums"]["skill_level"] | null
           sport_id: string
@@ -478,15 +508,30 @@ export type Database = {
           venue_name?: string | null
         }
         Update: {
+          age_max?: number | null
+          age_min?: number | null
           capacity?: number
+          category_max?: number
+          category_min?: number
+          court_count?: number
+          court_format?: Database["public"]["Enums"]["court_format"]
+          court_structure?: Database["public"]["Enums"]["court_structure"]
+          court_surface?: Database["public"]["Enums"]["court_surface"] | null
+          court_type?: Database["public"]["Enums"]["court_type"]
           created_at?: string
           description?: string | null
+          difficulty?: Database["public"]["Enums"]["match_difficulty"] | null
           duration_minutes?: number
+          gender_preference?:
+            | Database["public"]["Enums"]["match_gender_preference"]
+            | null
           host_id?: string
           id?: string
           is_public?: boolean
           late_withdrawal_threshold?: string
           location?: unknown
+          positions_sought?: string[]
+          price_per_player?: number | null
           skill_max?: Database["public"]["Enums"]["skill_level"] | null
           skill_min?: Database["public"]["Enums"]["skill_level"] | null
           sport_id?: string
@@ -1339,8 +1384,14 @@ export type Database = {
     }
     Enums: {
       conversation_type: "match" | "direct" | "tournament"
+      court_format: "singles" | "doubles"
+      court_structure: "glass" | "panoramic" | "concrete"
+      court_surface: "grass" | "concrete"
+      court_type: "indoor" | "outdoor" | "semi_indoor"
       listing_status: "open" | "closed" | "archived"
       listing_type: "training_partner" | "team_search" | "coaching_offer"
+      match_difficulty: "friendly" | "competitive"
+      match_gender_preference: "open" | "mixed" | "male" | "female"
       match_status: "open" | "full" | "in_progress" | "completed" | "cancelled"
       participant_status:
         | "pending"
@@ -1507,8 +1558,14 @@ export const Constants = {
   public: {
     Enums: {
       conversation_type: ["match", "direct", "tournament"],
+      court_format: ["singles", "doubles"],
+      court_structure: ["glass", "panoramic", "concrete"],
+      court_surface: ["grass", "concrete"],
+      court_type: ["indoor", "outdoor", "semi_indoor"],
       listing_status: ["open", "closed", "archived"],
       listing_type: ["training_partner", "team_search", "coaching_offer"],
+      match_difficulty: ["friendly", "competitive"],
+      match_gender_preference: ["open", "mixed", "male", "female"],
       match_status: ["open", "full", "in_progress", "completed", "cancelled"],
       participant_status: [
         "pending",

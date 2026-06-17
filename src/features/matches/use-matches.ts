@@ -29,6 +29,19 @@ export type CreateMatchInput = {
   coords: Coords;
   skillMin: SkillLevel | null;
   skillMax: SkillLevel | null;
+  courtCount: number;
+  courtFormat: Database['public']['Enums']['court_format'];
+  courtType: Database['public']['Enums']['court_type'];
+  courtStructure: Database['public']['Enums']['court_structure'];
+  courtSurface: Database['public']['Enums']['court_surface'] | null;
+  categoryMax: number;
+  categoryMin: number;
+  pricePerPlayer: number | null;
+  positionsSought: string[];
+  genderPreference: Database['public']['Enums']['match_gender_preference'] | null;
+  ageMin: number | null;
+  ageMax: number | null;
+  difficulty: Database['public']['Enums']['match_difficulty'] | null;
 };
 
 export type MatchSummary = MatchRow & {
@@ -373,6 +386,19 @@ export function useCreateMatch() {
         skill_min: input.skillMin,
         skill_max: input.skillMax,
         location: geographyPoint(input.coords),
+        court_count: input.courtCount,
+        court_format: input.courtFormat,
+        court_type: input.courtType,
+        court_structure: input.courtStructure,
+        court_surface: input.courtSurface,
+        category_max: input.categoryMax,
+        category_min: input.categoryMin,
+        price_per_player: input.pricePerPlayer,
+        positions_sought: input.positionsSought,
+        gender_preference: input.genderPreference,
+        age_min: input.ageMin,
+        age_max: input.ageMax,
+        difficulty: input.difficulty,
       };
 
       const { data, error } = await supabase
