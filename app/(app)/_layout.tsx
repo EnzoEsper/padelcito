@@ -27,7 +27,10 @@ export default function AppLayout() {
         <Tabs.Screen name="circuits" />
         <Tabs.Screen name="matches" />
         <Tabs.Screen name="profile" />
-        <Tabs.Screen name="create-match" options={{ href: null }} />
+        <Tabs.Screen
+          name="create-match"
+          options={{ href: null, tabBarStyle: { display: 'none' } }}
+        />
         <Tabs.Screen name="match-detail" options={{ href: null }} />
       </Tabs>
     </>

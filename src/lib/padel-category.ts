@@ -39,9 +39,46 @@ export function formatCategoryLabel(number: number): string {
   return found?.label ?? `${number}ª`;
 }
 
-/** e.g. "5ª to 7ª · 1ª is the highest level" */
+/** e.g. "Categories 3ª to 5ª · 1ª is the highest level" */
 export function formatCategoryRangeLabel(categoryMax: number, categoryMin: number): string {
-  return `${formatCategoryLabel(categoryMax)} to ${formatCategoryLabel(categoryMin)} · 1ª is the highest level`;
+  const suffix = ' · 1ª is the highest level';
+  if (categoryMax === categoryMin) {
+    return `Category ${formatCategoryLabel(categoryMax)}${suffix}`;
+  }
+  return `Categories ${formatCategoryLabel(categoryMax)} to ${formatCategoryLabel(categoryMin)}${suffix}`;
+}
+
+export type CategoryRangeBounds = {
+  categoryMax: number;
+  categoryMin: number;
+};
+
+/**
+ * Discrete range picker (strongest = lower number):
+ * - Tap while a range is shown → select that level only (confirmed single).
+ * - Tap another level while a single is shown → range spanning both.
+ * - Tap the same level again while already single → no change.
+ */
+export function computeNextCategoryRange(
+  categoryMax: number,
+  categoryMin: number,
+  tapped: number,
+): CategoryRangeBounds {
+  const level = Math.min(8, Math.max(1, tapped));
+  const isSingle = categoryMax === categoryMin;
+
+  if (isSingle && level === categoryMax) {
+    return { categoryMax, categoryMin };
+  }
+
+  if (isSingle) {
+    return {
+      categoryMax: Math.min(categoryMax, level),
+      categoryMin: Math.max(categoryMin, level),
+    };
+  }
+
+  return { categoryMax: level, categoryMin: level };
 }
 
 /**

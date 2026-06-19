@@ -8,6 +8,33 @@ export type CourtSurface = Database['public']['Enums']['court_surface'];
 export const DEFAULT_COURT_FORMAT: CourtFormat = 'doubles';
 export const DEFAULT_COURT_TYPE: CourtType = 'indoor';
 export const DEFAULT_COURT_STRUCTURE: CourtStructure = 'glass';
+export const DEFAULT_COURT_SURFACE: CourtSurface = 'grass';
+
+export type CourtConfig = {
+  format: CourtFormat;
+  type: CourtType;
+  structure: CourtStructure;
+  surface: CourtSurface;
+};
+
+export function createDefaultCourtConfig(): CourtConfig {
+  return {
+    format: DEFAULT_COURT_FORMAT,
+    type: DEFAULT_COURT_TYPE,
+    structure: DEFAULT_COURT_STRUCTURE,
+    surface: DEFAULT_COURT_SURFACE,
+  };
+}
+
+export function resizeCourtConfigs(configs: CourtConfig[], courtCount: number): CourtConfig[] {
+  const count = Math.max(1, courtCount);
+  if (configs.length === count) return configs;
+  if (configs.length > count) return configs.slice(0, count);
+  return [
+    ...configs,
+    ...Array.from({ length: count - configs.length }, createDefaultCourtConfig),
+  ];
+}
 
 export const MAX_COURT_COUNT_DOUBLES = 15;
 export const MAX_CAPACITY = 60;
@@ -33,12 +60,20 @@ export function playersPerCourt(format: CourtFormat): number {
   return format === 'singles' ? 2 : 4;
 }
 
+export function totalCourtCapacity(configs: CourtConfig[]): number {
+  return configs.reduce((sum, config) => sum + playersPerCourt(config.format), 0);
+}
+
 export function maxCourtCount(format: CourtFormat = DEFAULT_COURT_FORMAT): number {
   return Math.floor(MAX_CAPACITY / playersPerCourt(format));
 }
 
 export function minTotalPlayers(courtCount: number, format: CourtFormat = DEFAULT_COURT_FORMAT): number {
   return courtCount * playersPerCourt(format);
+}
+
+export function minTotalPlayersFromConfigs(configs: CourtConfig[]): number {
+  return totalCourtCapacity(configs);
 }
 
 export function formatCourtTypeLabel(type: CourtType): string {
@@ -53,7 +88,10 @@ export function formatCourtSurfaceLabel(surface: CourtSurface): string {
   return COURT_SURFACE_OPTIONS.find((o) => o.value === surface)?.label ?? surface;
 }
 
-export function courtCapacityLabel(courtCount: number, format: CourtFormat = DEFAULT_COURT_FORMAT): string {
-  const perCourt = playersPerCourt(format);
+export function courtCapacityLabel(configs: CourtConfig[]): string {
+  const courtCount = configs.length;
+  const capacity = totalCourtCapacity(configs);
+  if (courtCount === 0) return '0 players capacity';
+  const perCourt = capacity / courtCount;
   return `${courtCount} × ${perCourt} players capacity`;
 }

@@ -445,24 +445,19 @@ export type Database = {
           capacity: number
           category_max: number
           category_min: number
+          court_configs: Json
           court_count: number
-          court_format: Database["public"]["Enums"]["court_format"]
-          court_structure: Database["public"]["Enums"]["court_structure"]
-          court_surface: Database["public"]["Enums"]["court_surface"] | null
-          court_type: Database["public"]["Enums"]["court_type"]
           created_at: string
           description: string | null
-          difficulty: Database["public"]["Enums"]["match_difficulty"] | null
+          difficulty: Database["public"]["Enums"]["match_difficulty"]
           duration_minutes: number
-          gender_preference:
-            | Database["public"]["Enums"]["match_gender_preference"]
-            | null
+          gender_preference: Database["public"]["Enums"]["match_gender_preference"]
           host_id: string
           id: string
           is_public: boolean
           late_withdrawal_threshold: string
           location: unknown
-          positions_sought: string[]
+          position_preference: Database["public"]["Enums"]["match_position_preference"]
           price_per_player: number | null
           skill_max: Database["public"]["Enums"]["skill_level"] | null
           skill_min: Database["public"]["Enums"]["skill_level"] | null
@@ -479,24 +474,19 @@ export type Database = {
           capacity: number
           category_max?: number
           category_min?: number
+          court_configs?: Json
           court_count?: number
-          court_format?: Database["public"]["Enums"]["court_format"]
-          court_structure?: Database["public"]["Enums"]["court_structure"]
-          court_surface?: Database["public"]["Enums"]["court_surface"] | null
-          court_type?: Database["public"]["Enums"]["court_type"]
           created_at?: string
           description?: string | null
-          difficulty?: Database["public"]["Enums"]["match_difficulty"] | null
+          difficulty?: Database["public"]["Enums"]["match_difficulty"]
           duration_minutes?: number
-          gender_preference?:
-            | Database["public"]["Enums"]["match_gender_preference"]
-            | null
+          gender_preference?: Database["public"]["Enums"]["match_gender_preference"]
           host_id: string
           id?: string
           is_public?: boolean
           late_withdrawal_threshold?: string
           location: unknown
-          positions_sought?: string[]
+          position_preference?: Database["public"]["Enums"]["match_position_preference"]
           price_per_player?: number | null
           skill_max?: Database["public"]["Enums"]["skill_level"] | null
           skill_min?: Database["public"]["Enums"]["skill_level"] | null
@@ -513,24 +503,19 @@ export type Database = {
           capacity?: number
           category_max?: number
           category_min?: number
+          court_configs?: Json
           court_count?: number
-          court_format?: Database["public"]["Enums"]["court_format"]
-          court_structure?: Database["public"]["Enums"]["court_structure"]
-          court_surface?: Database["public"]["Enums"]["court_surface"] | null
-          court_type?: Database["public"]["Enums"]["court_type"]
           created_at?: string
           description?: string | null
-          difficulty?: Database["public"]["Enums"]["match_difficulty"] | null
+          difficulty?: Database["public"]["Enums"]["match_difficulty"]
           duration_minutes?: number
-          gender_preference?:
-            | Database["public"]["Enums"]["match_gender_preference"]
-            | null
+          gender_preference?: Database["public"]["Enums"]["match_gender_preference"]
           host_id?: string
           id?: string
           is_public?: boolean
           late_withdrawal_threshold?: string
           location?: unknown
-          positions_sought?: string[]
+          position_preference?: Database["public"]["Enums"]["match_position_preference"]
           price_per_player?: number | null
           skill_max?: Database["public"]["Enums"]["skill_level"] | null
           skill_min?: Database["public"]["Enums"]["skill_level"] | null
@@ -1319,6 +1304,14 @@ export type Database = {
           whatsapp_phone: string
         }[]
       }
+      matches_court_capacity_fits: {
+        Args: { p_capacity: number; p_configs: Json }
+        Returns: boolean
+      }
+      matches_court_configs_are_valid: {
+        Args: { p_configs: Json; p_court_count: number }
+        Returns: boolean
+      }
       nearby_listings: {
         Args: {
           p_lat: number
@@ -1391,7 +1384,8 @@ export type Database = {
       listing_status: "open" | "closed" | "archived"
       listing_type: "training_partner" | "team_search" | "coaching_offer"
       match_difficulty: "friendly" | "competitive"
-      match_gender_preference: "open" | "mixed" | "male" | "female"
+      match_gender_preference: "male" | "female" | "mixed"
+      match_position_preference: "any" | "drive" | "backhand"
       match_status: "open" | "full" | "in_progress" | "completed" | "cancelled"
       participant_status:
         | "pending"
@@ -1565,7 +1559,8 @@ export const Constants = {
       listing_status: ["open", "closed", "archived"],
       listing_type: ["training_partner", "team_search", "coaching_offer"],
       match_difficulty: ["friendly", "competitive"],
-      match_gender_preference: ["open", "mixed", "male", "female"],
+      match_gender_preference: ["male", "female", "mixed"],
+      match_position_preference: ["any", "drive", "backhand"],
       match_status: ["open", "full", "in_progress", "completed", "cancelled"],
       participant_status: [
         "pending",

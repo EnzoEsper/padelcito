@@ -3,30 +3,41 @@ import type { Database } from '@/types/database';
 import { categoryRangeToSkillLevels } from '@/lib/padel-category';
 import {
   DEFAULT_COURT_FORMAT,
-  DEFAULT_COURT_STRUCTURE,
-  DEFAULT_COURT_TYPE,
+  createDefaultCourtConfig,
   maxCourtCount,
-  minTotalPlayers,
-  type CourtStructure,
-  type CourtSurface,
-  type CourtType,
+  minTotalPlayersFromConfigs,
+  resizeCourtConfigs,
+  type CourtConfig,
 } from '@/lib/padel-court';
 import type { Coords } from '@/lib/location';
+import { parseArsAmountInput } from '@/lib/currency-ars';
+import type { PositionPreference } from '@/lib/padel-position';
 import type { CreateMatchInput } from '@/features/matches/use-matches';
 
 type MatchDifficulty = Database['public']['Enums']['match_difficulty'];
 type MatchGenderPreference = Database['public']['Enums']['match_gender_preference'];
 
-export const DURATION_OPTIONS = [60, 90, 120] as const;
+/** 30-minute steps from 1 h through 8 h (inclusive). */
+export const DURATION_OPTIONS = [
+  60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480,
+] as const;
 export type DurationOption = (typeof DURATION_OPTIONS)[number];
 
-export const POSITION_OPTIONS = [
-  { value: 'drive', label: 'Drive' },
-  { value: 'back', label: 'Back' },
-  { value: 'both', label: 'Both' },
-] as const;
+export function formatDurationLabel(minutes: number): string {
+  if (minutes % 60 === 0) {
+    const hours = minutes / 60;
+    return hours === 1 ? '1 hr' : `${hours} hr`;
+  }
+  return `${minutes / 60} hr`;
+}
 
-const CONFIRMED_COUNT = 0;
+export function derivedConfirmedCount(totalPlayers: number, openSpots: number): number {
+  return Math.max(0, totalPlayers - 1 - openSpots);
+}
+
+export function maxOpenSpots(totalPlayers: number): number {
+  return Math.max(1, totalPlayers - 1);
+}
 
 function defaultStartsAt(): Date {
   const date = new Date();
@@ -61,19 +72,17 @@ export type CreateMatchFormState = {
   timePart: Date;
   durationMinutes: DurationOption;
   courtCount: number;
-  courtType: CourtType;
-  courtStructure: CourtStructure;
+  courtConfigs: CourtConfig[];
   totalPlayers: number;
   openSpots: number;
   categoryMax: number;
   categoryMin: number;
-  courtSurface: CourtSurface | null;
   pricePerPlayer: string;
-  positionsSought: string[];
-  genderPreference: MatchGenderPreference | null;
+  positionPreference: PositionPreference;
+  genderPreference: MatchGenderPreference;
   ageMin: string;
   ageMax: string;
-  difficulty: MatchDifficulty | null;
+  difficulty: MatchDifficulty;
   notes: string;
   advancedExpanded: boolean;
   minPlayers: number;
@@ -90,22 +99,18 @@ export type CreateMatchFormActions = {
   setTimePart: (value: Date) => void;
   setDurationMinutes: (value: DurationOption) => void;
   setCourtCount: (value: number) => void;
-  setCourtType: (value: CourtType) => void;
-  setCourtStructure: (value: CourtStructure) => void;
+  updateCourtConfig: (index: number, patch: Partial<CourtConfig>) => void;
   setTotalPlayers: (value: number) => void;
   setOpenSpots: (value: number) => void;
   setCategoryRange: (categoryMax: number, categoryMin: number) => void;
-  setCourtSurface: (value: CourtSurface | null) => void;
   setPricePerPlayer: (value: string) => void;
-  togglePosition: (value: string) => void;
-  setGenderPreference: (value: MatchGenderPreference | null) => void;
+  setPositionPreference: (value: PositionPreference) => void;
+  setGenderPreference: (value: MatchGenderPreference) => void;
   setAgeMin: (value: string) => void;
   setAgeMax: (value: string) => void;
-  setDifficulty: (value: MatchDifficulty | null) => void;
+  setDifficulty: (value: MatchDifficulty) => void;
   setNotes: (value: string) => void;
   setAdvancedExpanded: (value: boolean) => void;
-  applyToday: () => void;
-  applyTomorrow: () => void;
   buildSubmitInput: () => { ok: true; input: CreateMatchInput } | { ok: false; message: string };
 };
 
@@ -121,81 +126,63 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
     return d;
   });
   const [timePart, setTimePart] = useState(() => new Date(initialStartsAt));
-  const [durationMinutes, setDurationMinutes] = useState<DurationOption>(90);
+  const [durationMinutes, setDurationMinutes] = useState<DurationOption>(60);
   const [courtCount, setCourtCountState] = useState(1);
-  const [courtType, setCourtType] = useState<CourtType>(DEFAULT_COURT_TYPE);
-  const [courtStructure, setCourtStructure] = useState<CourtStructure>(DEFAULT_COURT_STRUCTURE);
+  const [courtConfigs, setCourtConfigsState] = useState<CourtConfig[]>(() => [createDefaultCourtConfig()]);
   const [totalPlayers, setTotalPlayersState] = useState(4);
-  const [openSpots, setOpenSpotsState] = useState(3);
+  const [openSpots, setOpenSpotsState] = useState(1);
   const [categoryMax, setCategoryMax] = useState(5);
   const [categoryMin, setCategoryMin] = useState(6);
-  const [courtSurface, setCourtSurface] = useState<CourtSurface | null>(null);
   const [pricePerPlayer, setPricePerPlayer] = useState('');
-  const [positionsSought, setPositionsSought] = useState<string[]>([]);
-  const [genderPreference, setGenderPreference] = useState<MatchGenderPreference | null>(null);
+  const [positionPreference, setPositionPreference] = useState<PositionPreference>('any');
+  const [genderPreference, setGenderPreference] = useState<MatchGenderPreference>('male');
   const [ageMin, setAgeMin] = useState('');
   const [ageMax, setAgeMax] = useState('');
-  const [difficulty, setDifficulty] = useState<MatchDifficulty | null>(null);
+  const [difficulty, setDifficulty] = useState<MatchDifficulty>('friendly');
   const [notes, setNotes] = useState('');
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
 
-  const minPlayers = minTotalPlayers(courtCount, DEFAULT_COURT_FORMAT);
+  const minPlayers = minTotalPlayersFromConfigs(courtConfigs);
   const maxPlayers = 60;
-  const maxCourts = Math.min(maxCourtCount(DEFAULT_COURT_FORMAT), Math.floor(totalPlayers / 4));
+  const maxCourts = maxCourtCount(DEFAULT_COURT_FORMAT);
+  const confirmedCount = derivedConfirmedCount(totalPlayers, openSpots);
 
-  const setCourtCount = useCallback(
-    (value: number) => {
-      const next = Math.min(maxCourtCount(DEFAULT_COURT_FORMAT), Math.max(1, value));
-      setCourtCountState(next);
-      const nextMin = minTotalPlayers(next, DEFAULT_COURT_FORMAT);
-      setTotalPlayersState((current) => {
-        const bumped = Math.max(current, nextMin);
-        setOpenSpotsState(bumped - 1 - CONFIRMED_COUNT);
-        return bumped;
-      });
-    },
-    [],
-  );
+  const setCourtCount = useCallback((value: number) => {
+    const next = Math.min(maxCourtCount(DEFAULT_COURT_FORMAT), Math.max(1, value));
+    setCourtCountState(next);
+    setCourtConfigsState((currentConfigs) => {
+      const resized = resizeCourtConfigs(currentConfigs, next);
+      setTotalPlayersState(minTotalPlayersFromConfigs(resized));
+      return resized;
+    });
+    setOpenSpotsState(1);
+  }, []);
+
+  const updateCourtConfig = useCallback((index: number, patch: Partial<CourtConfig>) => {
+    setCourtConfigsState((configs) =>
+      configs.map((config, i) => (i === index ? { ...config, ...patch } : config)),
+    );
+  }, []);
 
   const setTotalPlayers = useCallback(
     (value: number) => {
       const next = Math.min(maxPlayers, Math.max(minPlayers, value));
       setTotalPlayersState(next);
-      setOpenSpotsState(next - 1 - CONFIRMED_COUNT);
-      setCourtCountState((current) => Math.min(current, Math.floor(next / 4)));
+      setOpenSpotsState((current) => Math.min(current, maxOpenSpots(next)));
     },
     [minPlayers],
   );
 
-  const setOpenSpots = useCallback((value: number) => {
-    const maxOpen = maxPlayers - 1 - CONFIRMED_COUNT;
-    const next = Math.min(maxOpen, Math.max(1, value));
-    setOpenSpotsState(next);
-    setTotalPlayersState(next + 1 + CONFIRMED_COUNT);
-  }, []);
+  const setOpenSpots = useCallback(
+    (value: number) => {
+      setOpenSpotsState(Math.min(maxOpenSpots(totalPlayers), Math.max(1, value)));
+    },
+    [totalPlayers],
+  );
 
   const setCategoryRange = useCallback((nextMax: number, nextMin: number) => {
     setCategoryMax(nextMax);
     setCategoryMin(nextMin);
-  }, []);
-
-  const togglePosition = useCallback((value: string) => {
-    setPositionsSought((current) =>
-      current.includes(value) ? current.filter((v) => v !== value) : [...current, value],
-    );
-  }, []);
-
-  const applyToday = useCallback(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    setDatePart(today);
-  }, []);
-
-  const applyTomorrow = useCallback(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    setDatePart(tomorrow);
   }, []);
 
   const buildSubmitInput = useCallback((): { ok: true; input: CreateMatchInput } | { ok: false; message: string } => {
@@ -206,17 +193,22 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
     if (coords === null) {
       return { ok: false, message: 'Add a map pin so players can discover this match.' };
     }
-    if (totalPlayers !== 1 + CONFIRMED_COUNT + openSpots) {
-      return { ok: false, message: 'Player counts do not add up. Adjust total players or open spots.' };
+    if (openSpots < 1 || openSpots > maxOpenSpots(totalPlayers)) {
+      return { ok: false, message: 'Open spots must be between 1 and total players minus host.' };
     }
-    if (courtCount * 4 > totalPlayers) {
-      return { ok: false, message: 'Total players must fit all selected courts.' };
+    if (totalPlayers < minTotalPlayersFromConfigs(courtConfigs)) {
+      return {
+        ok: false,
+        message: `Total players must be at least ${minTotalPlayersFromConfigs(courtConfigs)} for ${courtCount} court${courtCount === 1 ? '' : 's'}.`,
+      };
     }
     if (categoryMax > categoryMin) {
       return { ok: false, message: 'Maximum level must be stronger than minimum level.' };
     }
-
-    const parsedPrice = pricePerPlayer.trim().length > 0 ? Number.parseFloat(pricePerPlayer) : null;
+    if (courtConfigs.length !== courtCount) {
+      return { ok: false, message: 'Court setup does not match the number of courts.' };
+    }
+    const parsedPrice = parseArsAmountInput(pricePerPlayer);
     if (parsedPrice !== null && (Number.isNaN(parsedPrice) || parsedPrice < 0)) {
       return { ok: false, message: 'Enter a valid price per person.' };
     }
@@ -253,14 +245,11 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
         skillMin,
         skillMax,
         courtCount,
-        courtFormat: DEFAULT_COURT_FORMAT,
-        courtType,
-        courtStructure,
-        courtSurface,
+        courtConfigs,
         categoryMax,
         categoryMin,
         pricePerPlayer: parsedPrice,
-        positionsSought,
+        positionPreference,
         genderPreference,
         ageMin: parsedAgeMin,
         ageMax: parsedAgeMax,
@@ -274,16 +263,14 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
     categoryMin,
     coords,
     courtCount,
-    courtStructure,
-    courtSurface,
-    courtType,
+    courtConfigs,
     datePart,
     difficulty,
     durationMinutes,
     genderPreference,
     notes,
     openSpots,
-    positionsSought,
+    positionPreference,
     pricePerPlayer,
     timePart,
     totalPlayers,
@@ -298,15 +285,13 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
     timePart,
     durationMinutes,
     courtCount,
-    courtType,
-    courtStructure,
+    courtConfigs,
     totalPlayers,
     openSpots,
     categoryMax,
     categoryMin,
-    courtSurface,
     pricePerPlayer,
-    positionsSought,
+    positionPreference,
     genderPreference,
     ageMin,
     ageMax,
@@ -316,7 +301,7 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
     minPlayers,
     maxPlayers,
     maxCourts,
-    confirmedCount: CONFIRMED_COUNT,
+    confirmedCount,
     setVenueName,
     setCoords,
     setPlaceLabel,
@@ -324,22 +309,18 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
     setTimePart,
     setDurationMinutes,
     setCourtCount,
-    setCourtType,
-    setCourtStructure,
+    updateCourtConfig,
     setTotalPlayers,
     setOpenSpots,
     setCategoryRange,
-    setCourtSurface,
     setPricePerPlayer,
-    togglePosition,
+    setPositionPreference,
     setGenderPreference,
     setAgeMin,
     setAgeMax,
     setDifficulty,
     setNotes,
     setAdvancedExpanded,
-    applyToday,
-    applyTomorrow,
     buildSubmitInput,
   };
 }

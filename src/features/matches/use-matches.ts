@@ -5,6 +5,7 @@ import {
   UnsupportedSportError,
 } from '@/lib/padel-sport';
 import { roundCoordsForKey, type Coords } from '@/lib/location';
+import type { CourtConfig } from '@/lib/padel-court';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 
@@ -30,18 +31,15 @@ export type CreateMatchInput = {
   skillMin: SkillLevel | null;
   skillMax: SkillLevel | null;
   courtCount: number;
-  courtFormat: Database['public']['Enums']['court_format'];
-  courtType: Database['public']['Enums']['court_type'];
-  courtStructure: Database['public']['Enums']['court_structure'];
-  courtSurface: Database['public']['Enums']['court_surface'] | null;
+  courtConfigs: CourtConfig[];
   categoryMax: number;
   categoryMin: number;
   pricePerPlayer: number | null;
-  positionsSought: string[];
-  genderPreference: Database['public']['Enums']['match_gender_preference'] | null;
+  positionPreference: Database['public']['Enums']['match_position_preference'];
+  genderPreference: Database['public']['Enums']['match_gender_preference'];
   ageMin: number | null;
   ageMax: number | null;
-  difficulty: Database['public']['Enums']['match_difficulty'] | null;
+  difficulty: Database['public']['Enums']['match_difficulty'];
 };
 
 export type MatchSummary = MatchRow & {
@@ -387,14 +385,16 @@ export function useCreateMatch() {
         skill_max: input.skillMax,
         location: geographyPoint(input.coords),
         court_count: input.courtCount,
-        court_format: input.courtFormat,
-        court_type: input.courtType,
-        court_structure: input.courtStructure,
-        court_surface: input.courtSurface,
+        court_configs: input.courtConfigs.map((config) => ({
+          format: config.format,
+          type: config.type,
+          structure: config.structure,
+          surface: config.surface,
+        })),
         category_max: input.categoryMax,
         category_min: input.categoryMin,
         price_per_player: input.pricePerPlayer,
-        positions_sought: input.positionsSought,
+        position_preference: input.positionPreference,
         gender_preference: input.genderPreference,
         age_min: input.ageMin,
         age_max: input.ageMax,

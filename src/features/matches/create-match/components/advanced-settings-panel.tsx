@@ -1,74 +1,51 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Pressable, View, Text, TextInput } from '@/tw';
-import type { Database } from '@/types/database';
-import {
-  COURT_SURFACE_OPTIONS,
-  type CourtSurface,
-} from '@/lib/padel-court';
+import type { CourtConfig } from '@/lib/padel-court';
+import { POSITION_PREFERENCE_OPTIONS, type PositionPreference } from '@/lib/padel-position';
 import { SectionLabel } from './section-label';
 import { SegmentedControl } from './segmented-control';
-import { POSITION_OPTIONS } from '../use-create-match-form';
+import { CurrencyInput } from './currency-input';
+import { CourtsConfigSection } from './courts-config-section';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental !== undefined) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
-
-type MatchDifficulty = Database['public']['Enums']['match_difficulty'];
-type MatchGenderPreference = Database['public']['Enums']['match_gender_preference'];
 
 const PLACEHOLDER = 'rgba(228,228,228,0.20)';
 
 type AdvancedSettingsPanelProps = {
   expanded: boolean;
   onToggle: () => void;
-  courtSurface: CourtSurface | null;
-  onCourtSurfaceChange: (value: CourtSurface | null) => void;
+  courtCount: number;
+  courtConfigs: CourtConfig[];
+  onUpdateCourt: (index: number, patch: Partial<CourtConfig>) => void;
   pricePerPlayer: string;
   onPricePerPlayerChange: (value: string) => void;
-  positionsSought: string[];
-  onTogglePosition: (value: string) => void;
-  genderPreference: MatchGenderPreference | null;
-  onGenderPreferenceChange: (value: MatchGenderPreference | null) => void;
+  positionPreference: PositionPreference;
+  onPositionPreferenceChange: (value: PositionPreference) => void;
   ageMin: string;
   ageMax: string;
   onAgeMinChange: (value: string) => void;
   onAgeMaxChange: (value: string) => void;
-  difficulty: MatchDifficulty | null;
-  onDifficultyChange: (value: MatchDifficulty | null) => void;
   notes: string;
   onNotesChange: (value: string) => void;
 };
 
-const GENDER_OPTIONS: { value: MatchGenderPreference; label: string }[] = [
-  { value: 'open', label: 'Open' },
-  { value: 'mixed', label: 'Mixed' },
-  { value: 'male', label: 'Men' },
-  { value: 'female', label: 'Women' },
-];
-
-const DIFFICULTY_OPTIONS: { value: MatchDifficulty; label: string }[] = [
-  { value: 'friendly', label: 'Friendly' },
-  { value: 'competitive', label: 'Competitive' },
-];
-
 export function AdvancedSettingsPanel({
   expanded,
   onToggle,
-  courtSurface,
-  onCourtSurfaceChange,
+  courtCount,
+  courtConfigs,
+  onUpdateCourt,
   pricePerPlayer,
   onPricePerPlayerChange,
-  positionsSought,
-  onTogglePosition,
-  genderPreference,
-  onGenderPreferenceChange,
+  positionPreference,
+  onPositionPreferenceChange,
   ageMin,
   ageMax,
   onAgeMinChange,
   onAgeMaxChange,
-  difficulty,
-  onDifficultyChange,
   notes,
   onNotesChange,
 }: AdvancedSettingsPanelProps) {
@@ -79,6 +56,7 @@ export function AdvancedSettingsPanel({
 
   return (
     <View>
+      <SectionLabel>More options</SectionLabel>
       <Pressable
         onPress={handleToggle}
         className="rounded-xl bg-surface-1 border border-neutral/10 px-4 py-4 flex-row items-center gap-3"
@@ -89,7 +67,7 @@ export function AdvancedSettingsPanel({
         <View className="flex-1">
           <Text className="font-grotesk text-base font-semibold text-neutral">Advanced settings</Text>
           <Text className="font-grotesk text-xs text-neutral/60 mt-0.5">
-            Price, positions, gender, age, notes
+            Price, positions, age, notes, court setup
           </Text>
         </View>
         <Ionicons
@@ -100,65 +78,18 @@ export function AdvancedSettingsPanel({
       </Pressable>
 
       {expanded ? (
-        <View className="mt-3 gap-5 px-1">
-          <View>
-            <SectionLabel>Court surface</SectionLabel>
-            <SegmentedControl
-              options={[
-                { value: 'none' as const, label: 'Any' },
-                ...COURT_SURFACE_OPTIONS,
-              ]}
-              value={courtSurface ?? 'none'}
-              onChange={(value) =>
-                onCourtSurfaceChange(value === 'none' ? null : value)
-              }
-            />
-          </View>
-
+        <View className="mt-3 gap-5">
           <View>
             <SectionLabel>Price per person</SectionLabel>
-            <TextInput
-              value={pricePerPlayer}
-              onChangeText={onPricePerPlayerChange}
-              keyboardType="decimal-pad"
-              placeholder="Optional"
-              placeholderTextColor={PLACEHOLDER}
-              className="h-14 rounded-xl bg-surface-1 border border-neutral/10 px-4 font-grotesk text-base text-neutral"
-            />
+            <CurrencyInput value={pricePerPlayer} onChangeText={onPricePerPlayerChange} />
           </View>
 
           <View>
             <SectionLabel>Positions sought</SectionLabel>
-            <View className="flex-row flex-wrap gap-2">
-              {POSITION_OPTIONS.map((option) => {
-                const selected = positionsSought.includes(option.value);
-                return (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => onTogglePosition(option.value)}
-                    className={[
-                      'rounded-lg px-4 py-2 border',
-                      selected ? 'bg-primary border-primary-hi' : 'bg-surface-1 border-neutral/10',
-                    ].join(' ')}
-                  >
-                    <Text className="font-grotesk text-sm text-neutral">{option.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View>
-            <SectionLabel>Gender</SectionLabel>
             <SegmentedControl
-              options={[
-                { value: 'none' as const, label: 'Any' },
-                ...GENDER_OPTIONS,
-              ]}
-              value={genderPreference ?? 'none'}
-              onChange={(value) =>
-                onGenderPreferenceChange(value === 'none' ? null : value)
-              }
+              options={POSITION_PREFERENCE_OPTIONS}
+              value={positionPreference}
+              onChange={onPositionPreferenceChange}
             />
           </View>
 
@@ -188,18 +119,6 @@ export function AdvancedSettingsPanel({
           </View>
 
           <View>
-            <SectionLabel>Difficulty</SectionLabel>
-            <SegmentedControl
-              options={[
-                { value: 'none' as const, label: 'Any' },
-                ...DIFFICULTY_OPTIONS,
-              ]}
-              value={difficulty ?? 'none'}
-              onChange={(value) => onDifficultyChange(value === 'none' ? null : value)}
-            />
-          </View>
-
-          <View>
             <SectionLabel>Notes</SectionLabel>
             <TextInput
               value={notes}
@@ -212,6 +131,12 @@ export function AdvancedSettingsPanel({
               className="min-h-24 rounded-xl bg-surface-1 border border-neutral/10 px-4 py-3 font-grotesk text-base text-neutral"
             />
           </View>
+
+          <CourtsConfigSection
+            courtCount={courtCount}
+            courtConfigs={courtConfigs}
+            onUpdateCourt={onUpdateCourt}
+          />
         </View>
       ) : null}
     </View>

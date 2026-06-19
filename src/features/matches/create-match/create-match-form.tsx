@@ -1,18 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, Pressable as RNPressable, StyleSheet } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text, Pressable } from '@/tw';
 import { useCreateMatch } from '@/features/matches/use-matches';
 import {
-  COURT_STRUCTURE_OPTIONS,
-  COURT_TYPE_OPTIONS,
   courtCapacityLabel,
 } from '@/lib/padel-court';
-import { useCreateMatchForm, DURATION_OPTIONS } from './use-create-match-form';
+import { DURATION_OPTIONS, useCreateMatchForm, type CreateMatchFormHook } from './use-create-match-form';
 import { SectionLabel } from './components/section-label';
 import { SegmentedControl } from './components/segmented-control';
 import { StepperField } from './components/stepper-field';
@@ -20,8 +16,7 @@ import { CategoryRangePicker } from './components/category-range-picker';
 import { PlayerRosterPreview } from './components/player-roster-preview';
 import { LocationField } from './components/location-field';
 import { AdvancedSettingsPanel } from './components/advanced-settings-panel';
-
-type DatePreset = 'today' | 'tomorrow' | 'pick';
+import { DurationSelect } from './components/duration-select';
 
 function isSameDay(a: Date, b: Date): boolean {
   return (
@@ -44,57 +39,13 @@ function formatTimeLabel(date: Date): string {
   return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
-export function CreateMatchForm() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const createMatch = useCreateMatch();
-  const form = useCreateMatchForm();
+type CreateMatchFormBodyProps = {
+  form: CreateMatchFormHook;
+};
 
-  const [datePreset, setDatePreset] = useState<DatePreset>(() => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    return isSameDay(form.datePart, now) ? 'today' : 'pick';
-  });
+export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-
-  const durationOptions = useMemo(
-    () =>
-      DURATION_OPTIONS.map((value) => ({
-        value: String(value) as '60' | '90' | '120',
-        label: `${value} min`,
-      })),
-    [],
-  );
-
-  async function handlePublish(): Promise<void> {
-    const result = form.buildSubmitInput();
-    if (!result.ok) {
-      Alert.alert('Cannot publish', result.message);
-      return;
-    }
-
-    try {
-      const matchId = await createMatch.mutateAsync(result.input);
-      router.replace(`/(app)/match-detail?id=${matchId}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not create match.';
-      Alert.alert('Create match failed', message);
-    }
-  }
-
-  function handleDatePreset(preset: DatePreset): void {
-    setDatePreset(preset);
-    if (preset === 'today') {
-      form.applyToday();
-      return;
-    }
-    if (preset === 'tomorrow') {
-      form.applyTomorrow();
-      return;
-    }
-    setShowDatePicker(true);
-  }
 
   function handleDateChange(event: DateTimePickerEvent, selected?: Date): void {
     if (Platform.OS === 'android') {
@@ -102,7 +53,6 @@ export function CreateMatchForm() {
     }
     if (event.type === 'dismissed' || selected === undefined) return;
     form.setDatePart(selected);
-    setDatePreset('pick');
   }
 
   function handleTimeChange(event: DateTimePickerEvent, selected?: Date): void {
@@ -114,8 +64,8 @@ export function CreateMatchForm() {
   }
 
   return (
-    <View className="flex-1">
-      <View className="gap-5 pb-32">
+    <>
+      <View className="gap-6">
         <LocationField
           venueName={form.venueName}
           onVenueNameChange={form.setVenueName}
@@ -126,45 +76,33 @@ export function CreateMatchForm() {
         />
 
         <View>
-          <SectionLabel>Date & time</SectionLabel>
-          <View className="gap-3">
-            <SegmentedControl
-              options={[
-                { value: 'today' as const, label: 'Today' },
-                { value: 'tomorrow' as const, label: 'Tomorrow' },
-                { value: 'pick' as const, label: 'Pick date' },
-              ]}
-              value={datePreset}
-              onChange={handleDatePreset}
+          <SectionLabel>Date, time & duration</SectionLabel>
+          <View className="rounded-xl bg-surface-1 border border-neutral/10 flex-row overflow-hidden">
+            <Pressable
+              onPress={() => setShowDatePicker(true)}
+              className="flex-[1.15] min-h-14 px-4 flex-row items-center justify-between border-r border-neutral/10"
+            >
+              <Text className="font-grotesk text-sm text-neutral" numberOfLines={1}>
+                {formatDateLabel(form.datePart)}
+              </Text>
+              <Ionicons name="calendar-outline" size={16} color="rgba(228,228,228,0.38)" />
+            </Pressable>
+            <Pressable
+              onPress={() => setShowTimePicker(true)}
+              className="flex-1 min-h-14 px-4 flex-row items-center justify-between border-r border-neutral/10"
+            >
+              <Text className="font-mono text-sm text-neutral" numberOfLines={1}>
+                {formatTimeLabel(form.timePart)}
+              </Text>
+              <Ionicons name="time-outline" size={16} color="rgba(228,228,228,0.38)" />
+            </Pressable>
+            <DurationSelect
+              embedded
+              value={form.durationMinutes}
+              options={DURATION_OPTIONS}
+              onChange={form.setDurationMinutes}
             />
-            <View className="flex-row gap-3">
-              <Pressable
-                onPress={() => setShowDatePicker(true)}
-                className="flex-1 h-14 rounded-xl bg-surface-1 border border-neutral/10 px-4 flex-row items-center justify-between"
-              >
-                <Text className="font-grotesk text-base text-neutral">{formatDateLabel(form.datePart)}</Text>
-                <Ionicons name="calendar-outline" size={18} color="rgba(228,228,228,0.38)" />
-              </Pressable>
-              <Pressable
-                onPress={() => setShowTimePicker(true)}
-                className="flex-1 h-14 rounded-xl bg-surface-1 border border-neutral/10 px-4 flex-row items-center justify-between"
-              >
-                <Text className="font-mono text-base text-neutral">{formatTimeLabel(form.timePart)}</Text>
-                <Ionicons name="time-outline" size={18} color="rgba(228,228,228,0.38)" />
-              </Pressable>
-            </View>
           </View>
-        </View>
-
-        <View>
-          <SectionLabel>Format</SectionLabel>
-          <SegmentedControl
-            options={durationOptions}
-            value={String(form.durationMinutes) as '60' | '90' | '120'}
-            onChange={(value) =>
-              form.setDurationMinutes(Number.parseInt(value, 10) as (typeof DURATION_OPTIONS)[number])
-            }
-          />
         </View>
 
         <View>
@@ -172,7 +110,7 @@ export function CreateMatchForm() {
           <View className="rounded-xl bg-surface-1 border border-neutral/10 px-4">
             <StepperField
               label="Number of courts"
-              sublabel={courtCapacityLabel(form.courtCount)}
+              sublabel={courtCapacityLabel(form.courtConfigs)}
               icon="grid-outline"
               value={form.courtCount}
               onDecrement={() => form.setCourtCount(form.courtCount - 1)}
@@ -180,24 +118,6 @@ export function CreateMatchForm() {
               decrementDisabled={form.courtCount <= 1}
               incrementDisabled={form.courtCount >= form.maxCourts}
             />
-          </View>
-          <View className="mt-3 gap-3">
-            <View>
-              <Text className="font-grotesk text-xs text-neutral/60 mb-2">Court type</Text>
-              <SegmentedControl
-                options={COURT_TYPE_OPTIONS}
-                value={form.courtType}
-                onChange={form.setCourtType}
-              />
-            </View>
-            <View>
-              <Text className="font-grotesk text-xs text-neutral/60 mb-2">Court structure</Text>
-              <SegmentedControl
-                options={COURT_STRUCTURE_OPTIONS}
-                value={form.courtStructure}
-                onChange={form.setCourtStructure}
-              />
-            </View>
           </View>
         </View>
 
@@ -212,6 +132,31 @@ export function CreateMatchForm() {
         />
 
         <View>
+          <SectionLabel>Gender</SectionLabel>
+          <SegmentedControl
+            options={[
+              { value: 'male' as const, label: 'Men' },
+              { value: 'female' as const, label: 'Women' },
+              { value: 'mixed' as const, label: 'Mixed' },
+            ]}
+            value={form.genderPreference}
+            onChange={form.setGenderPreference}
+          />
+        </View>
+
+        <View>
+          <SectionLabel>Difficulty</SectionLabel>
+          <SegmentedControl
+            options={[
+              { value: 'friendly' as const, label: 'Friendly' },
+              { value: 'competitive' as const, label: 'Competitive' },
+            ]}
+            value={form.difficulty}
+            onChange={form.setDifficulty}
+          />
+        </View>
+
+        <View>
           <SectionLabel>Category range</SectionLabel>
           <CategoryRangePicker
             categoryMax={form.categoryMax}
@@ -223,48 +168,21 @@ export function CreateMatchForm() {
         <AdvancedSettingsPanel
           expanded={form.advancedExpanded}
           onToggle={() => form.setAdvancedExpanded(!form.advancedExpanded)}
-          courtSurface={form.courtSurface}
-          onCourtSurfaceChange={form.setCourtSurface}
+          courtCount={form.courtCount}
+          courtConfigs={form.courtConfigs}
+          onUpdateCourt={form.updateCourtConfig}
           pricePerPlayer={form.pricePerPlayer}
           onPricePerPlayerChange={form.setPricePerPlayer}
-          positionsSought={form.positionsSought}
-          onTogglePosition={form.togglePosition}
-          genderPreference={form.genderPreference}
-          onGenderPreferenceChange={form.setGenderPreference}
+          positionPreference={form.positionPreference}
+          onPositionPreferenceChange={form.setPositionPreference}
           ageMin={form.ageMin}
           ageMax={form.ageMax}
           onAgeMinChange={form.setAgeMin}
           onAgeMaxChange={form.setAgeMax}
-          difficulty={form.difficulty}
-          onDifficultyChange={form.setDifficulty}
           notes={form.notes}
           onNotesChange={form.setNotes}
         />
       </View>
-
-      <LinearGradient
-        colors={['rgba(11,11,11,0)', '#0B0B0B']}
-        style={[styles.footerGradient, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}
-        pointerEvents="box-none"
-      >
-        <Pressable
-          onPress={() => void handlePublish()}
-          disabled={createMatch.isPending}
-          className={[
-            'h-14 rounded-xl items-center justify-center flex-row gap-2 mx-5',
-            createMatch.isPending ? 'bg-surface-1' : 'bg-primary',
-          ].join(' ')}
-        >
-          {createMatch.isPending ? (
-            <ActivityIndicator color="#E4E4E4" size="small" />
-          ) : (
-            <Ionicons name="flash" size={18} color="#E4E4E4" />
-          )}
-          <Text className="font-grotesk font-bold text-base text-neutral">
-            {createMatch.isPending ? 'Publishing…' : 'Publish match'}
-          </Text>
-        </Pressable>
-      </LinearGradient>
 
       {showDatePicker ? (
         Platform.OS === 'ios' ? (
@@ -319,18 +237,62 @@ export function CreateMatchForm() {
           />
         )
       ) : null}
-    </View>
+    </>
   );
 }
 
+type CreateMatchPublishFooterProps = {
+  form: CreateMatchFormHook;
+};
+
+export function CreateMatchPublishFooter({ form }: CreateMatchPublishFooterProps) {
+  const router = useRouter();
+  const createMatch = useCreateMatch();
+
+  async function handlePublish(): Promise<void> {
+    const result = form.buildSubmitInput();
+    if (!result.ok) {
+      Alert.alert('Cannot publish', result.message);
+      return;
+    }
+
+    try {
+      const matchId = await createMatch.mutateAsync(result.input);
+      router.replace(`/(app)/match-detail?id=${matchId}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not create match.';
+      Alert.alert('Create match failed', message);
+    }
+  }
+
+  return (
+    <Pressable
+      onPress={() => void handlePublish()}
+      disabled={createMatch.isPending}
+      className={[
+        'h-14 rounded-xl items-center justify-center flex-row gap-2',
+        createMatch.isPending ? 'bg-surface-1' : 'bg-primary',
+      ].join(' ')}
+    >
+      {createMatch.isPending ? (
+        <ActivityIndicator color="#E4E4E4" size="small" />
+      ) : (
+        <Ionicons name="flash" size={18} color="#E4E4E4" />
+      )}
+      <Text className="font-grotesk font-bold text-base text-neutral">
+        {createMatch.isPending ? 'Publishing…' : 'Publish match'}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** @deprecated Use CreateMatchFormBody from the screen shell instead. */
+export function CreateMatchForm() {
+  const form = useCreateMatchForm();
+  return <CreateMatchFormBody form={form} />;
+}
+
 const styles = StyleSheet.create({
-  footerGradient: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingTop: 24,
-  },
   modalScrim: {
     flex: 1,
     justifyContent: 'flex-end',

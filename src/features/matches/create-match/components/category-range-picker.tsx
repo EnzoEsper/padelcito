@@ -1,5 +1,9 @@
 import { Pressable, View, Text } from '@/tw';
-import { PADEL_CATEGORIES, formatCategoryRangeLabel } from '@/lib/padel-category';
+import {
+  PADEL_CATEGORIES,
+  computeNextCategoryRange,
+  formatCategoryRangeLabel,
+} from '@/lib/padel-category';
 
 type CategoryRangePickerProps = {
   categoryMax: number;
@@ -13,64 +17,39 @@ export function CategoryRangePicker({
   onChange,
 }: CategoryRangePickerProps) {
   function handlePress(number: number): void {
-    if (number === categoryMax && number === categoryMin) {
-      return;
-    }
-
-    if (number < categoryMax) {
-      onChange(number, categoryMin);
-      return;
-    }
-
-    if (number > categoryMin) {
-      onChange(categoryMax, number);
-      return;
-    }
-
-    if (number >= categoryMax && number <= categoryMin) {
-      const distToMax = number - categoryMax;
-      const distToMin = categoryMin - number;
-      if (distToMax <= distToMin) {
-        onChange(number, categoryMin);
-      } else {
-        onChange(categoryMax, number);
-      }
-      return;
-    }
-
-    onChange(number, number);
+    const next = computeNextCategoryRange(categoryMax, categoryMin, number);
+    onChange(next.categoryMax, next.categoryMin);
   }
 
   return (
     <View>
-      <View className="flex-row flex-wrap gap-2">
-        {PADEL_CATEGORIES.map(({ number, label }) => {
+      <View className="rounded-xl bg-surface-1 border border-neutral/10 px-3 py-2.5 flex-row items-center">
+        {PADEL_CATEGORIES.map(({ number }) => {
           const inRange = number >= categoryMax && number <= categoryMin;
           return (
             <Pressable
               key={number}
               onPress={() => handlePress(number)}
-              className={[
-                'w-10 h-10 rounded-full items-center justify-center border',
-                inRange
-                  ? 'bg-neutral border-neutral'
-                  : 'bg-surface-3 border-neutral/10',
-              ].join(' ')}
+              className="flex-1 items-center justify-center"
             >
-              <Text
-                className={[
-                  'font-mono text-sm font-bold',
-                  inRange ? 'text-background' : 'text-neutral/60',
-                ].join(' ')}
-              >
-                {label.replace('ª', '')}
-              </Text>
+              {inRange ? (
+                <View className="h-9 w-full max-w-[34px] rounded-lg bg-neutral items-center justify-center">
+                  <Text className="font-mono text-sm font-bold text-background">{number}</Text>
+                </View>
+              ) : (
+                <View className="h-9 w-full max-w-[34px] items-center justify-center">
+                  <Text className="font-mono text-sm font-bold text-neutral/55">{number}</Text>
+                </View>
+              )}
             </Pressable>
           );
         })}
       </View>
-      <Text className="font-grotesk text-xs text-neutral/60 mt-3">
+      <Text className="font-grotesk text-xs text-neutral/60 mt-3 leading-5">
         {formatCategoryRangeLabel(categoryMax, categoryMin)}
+      </Text>
+      <Text className="font-grotesk text-xs text-neutral/45 mt-1 leading-5">
+        Tap a level to select it. Tap another while one is selected to set a range.
       </Text>
     </View>
   );
