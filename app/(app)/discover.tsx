@@ -7,6 +7,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ScrollView, View, Text, Pressable } from '@/tw';
 import { useDiscoverMatches, type MatchSummary } from '@/features/matches/use-matches';
 import { useDiscoverMatchesRealtime } from '@/features/matches/use-match-realtime';
+import { SearchRadiusSlider } from '@/features/discover/components/search-radius-slider';
+import { SEARCH_RADIUS_DEFAULT_KM } from '@/features/discover/search-radius';
 import {
   useDiscoverLocation,
   type LocationAccessStatus,
@@ -164,34 +166,6 @@ function HeaderIcon({
     <View style={styles.headerIcon}>
       <Ionicons name={name} size={20} color={C.mist} />
       {hasDot ? <View style={styles.headerDot} /> : null}
-    </View>
-  );
-}
-
-function RadiusCard({ radius }: { radius: number }) {
-  return (
-    <View style={styles.radiusCard}>
-      <View style={styles.radiusHeader}>
-        <View style={styles.inline}>
-          <Ionicons name="location-outline" size={15} color={C.blueHi} />
-          <Text style={styles.radiusLabel}>Search Radius</Text>
-        </View>
-        <View style={styles.inlineBaseline}>
-          <Text style={styles.radiusValue}>{radius.toFixed(1)}</Text>
-          <Text style={styles.radiusUnit}>KM</Text>
-        </View>
-      </View>
-      <View style={styles.sliderTrack}>
-        <View style={styles.sliderHalo} />
-        <View style={styles.sliderRail} />
-        <LinearGradient
-          colors={[C.blue, C.blueMid, C.blueHi]}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={styles.sliderFill}
-        />
-        <View style={styles.sliderThumb} />
-      </View>
     </View>
   );
 }
@@ -396,12 +370,12 @@ export default function DiscoverScreen() {
     openSettings,
   } = useDiscoverLocation();
   const locationReady = locationStatus === 'ready' && coords !== null;
-  const radius = 10;
+  const [searchRadiusKm, setSearchRadiusKm] = useState(SEARCH_RADIUS_DEFAULT_KM);
 
   useDiscoverMatchesRealtime();
   const { data: matches, isPending, isRefetching, refetch, error } = useDiscoverMatches(
     locationReady ? coords : null,
-    radius,
+    searchRadiusKm,
   );
   const [skillFilter, setSkillFilter] = useState<SkillFilter>('All');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -446,7 +420,7 @@ export default function DiscoverScreen() {
             </View>
           ) : null}
 
-          <RadiusCard radius={radius} />
+          <SearchRadiusSlider radiusKm={searchRadiusKm} onRadiusCommit={setSearchRadiusKm} />
           <FilterChips value={skillFilter} onChange={setSkillFilter} />
 
           <View style={styles.sectionHeader}>
@@ -563,92 +537,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: C.background,
   },
-  radiusCard: {
-    marginHorizontal: 20,
-    marginBottom: 20,
-    backgroundColor: C.surface1,
-    borderWidth: 1,
-    borderColor: C.hair,
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-  },
-  radiusHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 14,
-  },
   inline: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  inlineBaseline: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 3,
-  },
-  radiusLabel: {
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 11.5,
-    letterSpacing: 2,
-    color: C.label,
-    textTransform: 'uppercase',
-  },
-  radiusValue: {
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 17,
-    color: C.mist,
-  },
-  radiusUnit: {
-    fontFamily: 'Space Mono',
-    fontSize: 11,
-    letterSpacing: 1,
-    color: C.dim,
-  },
-  sliderTrack: {
-    height: 28,
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  sliderHalo: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: 'rgba(116,136,216,0.055)',
-    shadowColor: C.blueHi,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  sliderRail: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: C.surface3,
-  },
-  sliderFill: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 4,
-    borderRadius: 2,
-  },
-  sliderThumb: {
-    position: 'absolute',
-    right: -1,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: C.mist,
-    borderWidth: 4,
-    borderColor: 'rgba(116,136,216,0.22)',
   },
   chipRow: {
     paddingHorizontal: 20,
