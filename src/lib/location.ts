@@ -73,3 +73,53 @@ export function parseCoordsFromText(text: string): ParseCoordsResult {
 
   return { ok: true, coords: { lat, lng } };
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Parse PostgREST geography/GeoJSON or WKT POINT into lat/lng. */
+export function parseGeographyPoint(location: unknown): Coords | null {
+  if (typeof location === 'string') {
+    const wktMatch = location.match(/POINT\s*\(\s*([-\d.]+)\s+([-\d.]+)\s*\)/iu);
+    if (wktMatch !== null) {
+      const lng = Number.parseFloat(wktMatch[1]);
+      const lat = Number.parseFloat(wktMatch[2]);
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        return { lat, lng };
+      }
+    }
+    return null;
+  }
+
+  if (!isRecord(location)) return null;
+
+  if (location.type === 'Point' && Array.isArray(location.coordinates)) {
+    const [lngRaw, latRaw] = location.coordinates;
+    const lng = typeof lngRaw === 'number' ? lngRaw : Number.parseFloat(String(lngRaw));
+    const lat = typeof latRaw === 'number' ? latRaw : Number.parseFloat(String(latRaw));
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      return { lat, lng };
+    }
+  }
+
+  return null;
+}
+
+const EARTH_RADIUS_M = 6_371_000;
+
+/** Great-circle distance in meters between two WGS84 coordinates. */
+export function distanceMeters(from: Coords, to: Coords): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(to.lat - from.lat);
+  const dLng = toRad(to.lng - from.lng);
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return EARTH_RADIUS_M * c;
+}

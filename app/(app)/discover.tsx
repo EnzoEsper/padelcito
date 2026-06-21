@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScrollView, View, Text, Pressable } from '@/tw';
 import { useDiscoverMatches, type MatchSummary } from '@/features/matches/use-matches';
+import { formatDiscoverMatchWhen } from '@/lib/match-time';
+import { formatDistanceKm } from '@/features/matches/match-display';
 import { useDiscoverMatchesRealtime } from '@/features/matches/use-match-realtime';
 import { SearchRadiusSlider } from '@/features/discover/components/search-radius-slider';
 import { SEARCH_RADIUS_DEFAULT_KM } from '@/features/discover/search-radius';
@@ -50,30 +52,6 @@ const AVATAR_TONES: [string, string][] = [
   ['#2A2B30', '#E4E4E4'],
 ];
 
-function formatWhen(value: string): { day: string; time: string } {
-  const date = new Date(value);
-  const now = new Date();
-  const tomorrow = new Date();
-  tomorrow.setDate(now.getDate() + 1);
-
-  const sameDate = (left: Date, right: Date) =>
-    left.getFullYear() === right.getFullYear() &&
-    left.getMonth() === right.getMonth() &&
-    left.getDate() === right.getDate();
-
-  const day = sameDate(date, now)
-    ? 'Today'
-    : sameDate(date, tomorrow)
-      ? 'Tomorrow'
-      : new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(date);
-  const time = new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-
-  return { day, time };
-}
-
 function skillBadge(match: MatchSummary): 'A' | 'B' | 'C' | 'D' {
   const level = match.skill_max ?? match.skill_min;
   switch (level) {
@@ -89,12 +67,6 @@ function skillBadge(match: MatchSummary): 'A' | 'B' | 'C' | 'D' {
     default:
       return 'B';
   }
-}
-
-function formatDistanceKm(distanceM: number | undefined): string {
-  if (distanceM === undefined) return '—';
-  const km = distanceM / 1000;
-  return `${km < 10 ? km.toFixed(1) : Math.round(km).toString()}KM`;
 }
 
 function headerLocationLabel(
@@ -281,7 +253,7 @@ function SkillBadge({ level }: { level: 'A' | 'B' | 'C' | 'D' }) {
 
 function MatchCard({ match, onPress }: { match: MatchSummary; onPress: () => void }) {
   const hostName = match.host?.display_name ?? 'Player';
-  const { day, time } = formatWhen(match.starts_at);
+  const { day, time } = formatDiscoverMatchWhen(match.starts_at);
   const filled = Math.min(match.acceptedVisibleCount, match.capacity);
   const openSpots = Math.max(match.capacity - filled, 0);
   const level = skillBadge(match);
@@ -324,7 +296,9 @@ function MatchCard({ match, onPress }: { match: MatchSummary; onPress: () => voi
         </View>
         <View style={styles.distancePill}>
           <Ionicons name="location-outline" size={12} color={C.blueHi} />
-          <Text style={styles.distanceText}>{formatDistanceKm(match.distanceM)}</Text>
+          <Text style={styles.distanceText}>
+            {match.distanceM !== undefined ? formatDistanceKm(match.distanceM) : '—'}
+          </Text>
         </View>
       </View>
 

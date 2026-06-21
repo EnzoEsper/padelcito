@@ -4,7 +4,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 import { ScrollView, View, Text, Pressable } from '@/tw';
+import { useDiscoverLocation } from '@/features/discover/use-discover-location';
 import {
   useCancelPendingRequest,
   useMatchContacts,
@@ -14,11 +16,31 @@ import {
   type MatchDetail,
 } from '@/features/matches/use-matches';
 import { useMatchRealtime } from '@/features/matches/use-match-realtime';
+import { CourtsInfoChip } from '@/features/matches/courts-info-sheet';
+import {
+  buildMatchMetaChips,
+  formatCategoryCompact,
+  formatDifficultyLabel,
+  formatDistanceKm,
+  formatMatchPriceArs,
+  formatProfileRating,
+  formatWithdrawalThreshold,
+  hasHostNote,
+  resolveMatchCourtConfigs,
+  resolveMatchDistanceM,
+  type MatchMetaChipEmphasis,
+} from '@/features/matches/match-display';
+import type { CourtConfig } from '@/lib/padel-court';
+import { formatMatchScheduleLabel } from '@/lib/match-time';
 import { UnsupportedSportError } from '@/lib/padel-sport';
 import type { Database } from '@/types/database';
 
-type SkillBadgeLevel = 'A' | 'B' | 'C' | 'D';
 type PublicProfile = Database['public']['Views']['public_profiles']['Row'];
+
+const SCREEN_PADDING = 20;
+const HEADER_BUTTON_SIZE = 44;
+/** Header button width + gap — eyebrow sits beside the floating control. */
+const HEADER_TEXT_INSET = HEADER_BUTTON_SIZE + 12;
 
 const C = {
   background: '#0B0B0B',
@@ -26,7 +48,6 @@ const C = {
   surface2: '#1B1C21',
   surface3: '#232429',
   blue: '#2B396D',
-  blueDeep: '#1C2649',
   blueHi: '#5E70B8',
   mist: '#E4E4E4',
   dim: 'rgba(228,228,228,0.60)',
@@ -38,85 +59,12 @@ const C = {
   warning: '#E0B15B',
 } as const;
 
-const SKILL_LABEL: Record<SkillBadgeLevel, string> = {
-  A: 'A · Pro',
-  B: 'B · Adv',
-  C: 'C · Int',
-  D: 'D · Beg',
-};
-
 const AVATAR_TONES: [string, string][] = [
   ['#4458A6', '#E4E4E4'],
   ['#263665', '#E4E4E4'],
   ['#2B396D', '#E4E4E4'],
   ['#3A4A86', '#0B0B0B'],
 ];
-
-function formatWhen(value: string): string {
-  const date = new Date(value);
-  const now = new Date();
-  const tomorrow = new Date();
-  tomorrow.setDate(now.getDate() + 1);
-
-  const sameDate = (left: Date, right: Date) =>
-    left.getFullYear() === right.getFullYear() &&
-    left.getMonth() === right.getMonth() &&
-    left.getDate() === right.getDate();
-
-  const day = sameDate(date, now)
-    ? 'Today'
-    : sameDate(date, tomorrow)
-      ? 'Tomorrow'
-      : new Intl.DateTimeFormat(undefined, { weekday: 'long' }).format(date);
-  const time = new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-
-  return `${day}, ${time}`;
-}
-
-function skillBadge(match: MatchDetail): SkillBadgeLevel {
-  const level = match.skill_max ?? match.skill_min;
-  switch (level) {
-    case 'pro':
-    case 'expert':
-      return 'A';
-    case 'advanced':
-      return 'B';
-    case 'intermediate':
-      return 'C';
-    case 'beginner':
-      return 'D';
-    default:
-      return 'B';
-  }
-}
-
-function derivedDistance(matchId: string): number {
-  const seed = Number.parseInt(matchId.slice(0, 2), 16);
-  const normalized = Number.isNaN(seed) ? 0.35 : seed / 255;
-  return Math.round((0.6 + normalized * 3.2) * 10) / 10;
-}
-
-function derivedPrice(matchId: string): number {
-  const seed = Number.parseInt(matchId.slice(-2), 16);
-  const normalized = Number.isNaN(seed) ? 0.5 : seed / 255;
-  return Math.round(8 + normalized * 8);
-}
-
-function derivedRating(profileId: string): string {
-  const seed = Number.parseInt(profileId.slice(0, 2), 16);
-  const normalized = Number.isNaN(seed) ? 0.6 : seed / 255;
-  return (4.1 + normalized * 0.8).toFixed(1);
-}
-
-function surfaceLabel(match: MatchDetail): string {
-  const source = `${match.title} ${match.venue_name ?? ''}`.toLowerCase();
-  if (source.includes('panoramic')) return 'Panoramic';
-  if (source.includes('clay')) return 'Clay';
-  return 'Glass';
-}
 
 function initials(name: string): string {
   return name
@@ -127,27 +75,69 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-function SkillBadge({ level, small = false }: { level: SkillBadgeLevel; small?: boolean }) {
-  const primary = level === 'A' || level === 'B';
+function MetaChip({ label, emphasis }: { label: string; emphasis: MatchMetaChipEmphasis }) {
   return (
-    <View style={[styles.skillBadge, small && styles.skillBadgeSmall, primary ? styles.skillPrimary : styles.skillMuted]}>
-      <Text style={[styles.skillText, small && styles.skillTextSmall, primary ? styles.skillTextPrimary : styles.skillTextMuted]}>
-        {SKILL_LABEL[level]}
+    <View
+      style={[
+        styles.metaChip,
+        emphasis === 'primary' && styles.metaChipPrimary,
+        emphasis === 'secondary' && styles.metaChipSecondary,
+        emphasis === 'default' && styles.metaChipDefault,
+      ]}
+    >
+      <Text
+        style={[
+          styles.metaChipText,
+          emphasis === 'primary' && styles.metaChipTextPrimary,
+          emphasis === 'secondary' && styles.metaChipTextSecondary,
+          emphasis === 'default' && styles.metaChipTextDefault,
+        ]}
+      >
+        {label}
       </Text>
     </View>
   );
 }
 
-function HeaderButton({
+function MatchDetailChips({
+  match,
+  courtConfigs,
+}: {
+  match: MatchDetail;
+  courtConfigs: CourtConfig[];
+}) {
+  const chips = buildMatchMetaChips(match);
+  return (
+    <View style={styles.preferenceRow}>
+      <CourtsInfoChip courtCount={match.court_count} configs={courtConfigs} />
+      {chips.map((chip) => (
+        <MetaChip key={chip.key} label={chip.label} emphasis={chip.emphasis} />
+      ))}
+    </View>
+  );
+}
+
+function FloatingHeaderButton({
   icon,
   onPress,
+  accessibilityLabel,
+  style,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
+  accessibilityLabel: string;
+  style: { top: number; left?: number; right?: number };
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.heroButton}>
-      <Ionicons name={icon} size={21} color={C.mist} />
+    <Pressable
+      onPress={onPress}
+      style={[styles.headerButton, style]}
+      className="rounded-xl bg-surface-1 border border-neutral/10 items-center justify-center"
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={8}
+    >
+      <Ionicons name={icon} size={22} color={C.mist} />
     </Pressable>
   );
 }
@@ -175,19 +165,17 @@ function Avatar({ name, index }: { name: string; index: number }) {
 
 function PlayerRow({
   name,
-  profileId,
   index,
   host = false,
   you = false,
-  level,
+  ratingLabel,
   onRemove,
 }: {
   name: string;
-  profileId: string;
   index: number;
   host?: boolean;
   you?: boolean;
-  level: SkillBadgeLevel;
+  ratingLabel: string | null;
   onRemove?: () => void;
 }) {
   return (
@@ -204,18 +192,18 @@ function PlayerRow({
             </View>
           ) : null}
         </View>
-        <View style={styles.trustRow}>
-          <Ionicons name="shield-checkmark-outline" size={13} color={C.blueHi} />
-          <Text style={styles.trustText}>{derivedRating(profileId)}</Text>
-        </View>
+        {ratingLabel !== null ? (
+          <View style={styles.trustRow}>
+            <Ionicons name="shield-checkmark-outline" size={13} color={C.blueHi} />
+            <Text style={styles.trustText}>{ratingLabel}</Text>
+          </View>
+        ) : null}
       </View>
       {onRemove !== undefined ? (
         <Pressable onPress={onRemove} style={styles.removeButton}>
           <Text style={styles.removeText}>Remove</Text>
         </Pressable>
-      ) : (
-        <SkillBadge level={level} small />
-      )}
+      ) : null}
     </View>
   );
 }
@@ -326,6 +314,8 @@ function FooterAction({
 export default function MatchDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { coords: userCoords } = useDiscoverLocation();
   const params = useLocalSearchParams<{ id?: string }>();
   const matchId = typeof params.id === 'string' ? params.id : null;
   const { data: match, isPending, error, refetch } = useMatchDetail(matchId);
@@ -424,94 +414,142 @@ export default function MatchDetailScreen() {
     );
   }
 
-  const level = skillBadge(match);
+  const courtConfigs = resolveMatchCourtConfigs(match.court_configs, match.court_count);
+  const distanceM = resolveMatchDistanceM({
+    matchId: match.id,
+    matchLocation: match.location,
+    userCoords,
+    queryClient,
+  });
+  const hostNote = match.description?.trim() ?? '';
+  const showSubtitle =
+    match.venue_name !== null &&
+    match.venue_name.trim().length > 0 &&
+    match.title.trim().length > 0 &&
+    match.venue_name.trim() !== match.title.trim();
   const acceptedParticipants = match.visibleParticipants.filter(
     (participant) => participant.status === 'accepted',
   );
   const filled = Math.min(1 + acceptedParticipants.length, match.capacity);
   const spotsOpen = Math.max(match.capacity - filled, 0);
   const hostName = match.host?.display_name ?? 'Host';
-  const hostProfileId = match.host_id;
   const isAccepted = match.isHost || match.currentUserParticipant?.status === 'accepted';
-  const note = match.description ?? 'Competitive doubles, looking for one solid player to close the match.';
+  const hostRatingLabel = formatProfileRating(
+    match.host?.rating_avg ?? null,
+    match.host?.rating_count ?? null,
+  );
+  const withdrawalThreshold = formatWithdrawalThreshold(match.late_withdrawal_threshold);
+  const headerTop = insets.top + 16;
 
   return (
     <View style={styles.root}>
+      <FloatingHeaderButton
+        icon="chevron-back"
+        onPress={() => router.back()}
+        accessibilityLabel="Go back"
+        style={{ top: headerTop, left: SCREEN_PADDING }}
+      />
+      <FloatingHeaderButton
+        icon="share-outline"
+        onPress={() => undefined}
+        accessibilityLabel="Share match"
+        style={{ top: headerTop, right: SCREEN_PADDING }}
+      />
+
       <ScrollView
         className="flex-1"
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: isAccepted ? 164 : 100 }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: headerTop,
+            paddingBottom: isAccepted ? 164 : 100,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
       >
+        {/*
+          Future club hero image (venue photo + court caption overlay).
+          When Storage/club assets exist, restore a ~188px hero here with:
+          - cover image from club or match metadata
+          - formatHeroCaption(court_count, courtConfigs) as overlay label
+          - absolute-positioned back/share over the image
         <View style={styles.hero}>
-          <LinearGradient
-            colors={[C.blueDeep, C.surface2]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          {Array.from({ length: 18 }).map((_, index) => (
-            <View
-              key={index}
-              style={[
-                styles.heroStripe,
-                { left: index * 24 - 120 },
-              ]}
-            />
-          ))}
-          <LinearGradient
-            colors={['rgba(11,11,11,0.05)', C.background]}
-            style={StyleSheet.absoluteFill}
-          />
-          <View style={[styles.heroControls, { top: insets.top + 14 }]}>
-            <HeaderButton icon="chevron-back" onPress={() => router.back()} />
-            <HeaderButton icon="share-outline" onPress={() => undefined} />
-          </View>
-          <Text style={styles.heroCaption}>
-            Court Photo · {surfaceLabel(match)} Court
+          ...
+        </View>
+        */}
+
+        <View style={styles.headerMetaRow}>
+          <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38">
+            MATCH DETAILS
           </Text>
         </View>
 
-        <View style={styles.body}>
-          <View style={styles.badgeRow}>
-            <SkillBadge level={level} small />
-            <View style={styles.distancePill}>
-              <Ionicons name="location-outline" size={12} color={C.blueHi} />
-              <Text style={styles.distanceText}>{derivedDistance(match.id).toFixed(1)}KM</Text>
+        <View style={styles.titleRow}>
+            <View style={styles.titleInlineGroup}>
+              <Text style={styles.matchTitle} numberOfLines={2}>
+                {match.venue_name ?? match.title}
+              </Text>
+              {distanceM !== null ? (
+                <View style={styles.titleDistancePill}>
+                  <Ionicons name="location-outline" size={12} color={C.blueHi} />
+                  <Text style={styles.distanceText}>{formatDistanceKm(distanceM)}</Text>
+                </View>
+              ) : null}
             </View>
           </View>
-
-          <Text style={styles.matchTitle}>{match.venue_name ?? match.title}</Text>
+          {showSubtitle ? (
+            <Text style={styles.matchSubtitle} numberOfLines={2}>
+              {match.title}
+            </Text>
+          ) : null}
           <View style={styles.dateRow}>
             <Ionicons name="calendar-outline" size={15} color={C.dim} />
-            <Text style={styles.dateText}>{formatWhen(match.starts_at)}</Text>
+            <Text style={styles.dateText}>
+              {formatMatchScheduleLabel(match.starts_at, match.duration_minutes)}
+            </Text>
           </View>
 
           <View style={styles.statsRow}>
             <StatBox label="Duration" value={String(match.duration_minutes)} sub="MIN" />
-            <StatBox label="Surface" value={surfaceLabel(match)} />
-            <StatBox label="Per Player" value={`$${derivedPrice(match.id)}`} />
+            <StatBox
+              label="Category"
+              value={formatCategoryCompact(match.category_max, match.category_min)}
+            />
+            <StatBox
+              label={match.price_per_player !== null ? 'Per Player' : 'Difficulty'}
+              value={
+                match.price_per_player !== null
+                  ? formatMatchPriceArs(match.price_per_player)
+                  : formatDifficultyLabel(match.difficulty)
+              }
+            />
           </View>
+
+          <MatchDetailChips match={match} courtConfigs={courtConfigs} />
 
           <SectionHeader title="Roster" right={`${filled}/${match.capacity} Filled`} />
           <View style={styles.rosterCard}>
             <PlayerRow
               name={hostName}
-              profileId={hostProfileId}
               index={0}
               host
-              level={level}
+              ratingLabel={hostRatingLabel}
             />
             {acceptedParticipants.map((participant, index) => {
               const profile = participantProfilesById.get(participant.profile_id);
               const name = profile?.display_name ?? 'Player';
+              const ratingLabel = formatProfileRating(
+                profile?.rating_avg ?? null,
+                profile?.rating_count ?? null,
+              );
               return (
                 <View key={participant.id}>
                   <View style={styles.rosterDivider} />
                   <PlayerRow
                     name={name}
-                    profileId={participant.profile_id}
                     index={index + 1}
                     you={participant.profile_id === match.currentUserId}
-                    level={level}
+                    ratingLabel={ratingLabel}
                     onRemove={
                       match.isHost
                         ? () => void handleParticipantStatus(participant.id, 'removed')
@@ -570,20 +608,21 @@ export default function MatchDetailScreen() {
             </View>
           ) : null}
 
-          <View style={styles.noteCard}>
-            <Text style={styles.noteLabel}>Note From {hostName.split(' ')[0] ?? 'Host'}</Text>
-            <Text style={styles.noteText}>{note}</Text>
-          </View>
+          {hasHostNote(match.description) ? (
+            <View style={styles.noteCard}>
+              <Text style={styles.noteLabel}>Note From {hostName.split(' ')[0] ?? 'Host'}</Text>
+              <Text style={styles.noteText}>{hostNote}</Text>
+            </View>
+          ) : null}
 
           {isAccepted ? (
             <View style={styles.penaltyCard}>
               <Ionicons name="notifications-outline" size={16} color={C.warning} style={styles.penaltyIcon} />
               <Text style={styles.penaltyText}>
-                Cancelling within <Text style={styles.penaltyStrong}>12h</Text> of start time affects your trust score and may incur a no-show penalty.
+                Cancelling within <Text style={styles.penaltyStrong}>{withdrawalThreshold}</Text> of start time affects your trust score and may incur a no-show penalty.
               </Text>
             </View>
           ) : null}
-        </View>
       </ScrollView>
 
       <LinearGradient
@@ -591,7 +630,7 @@ export default function MatchDetailScreen() {
         colors={['transparent', C.background]}
         style={styles.footerFade}
       />
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <FooterAction
           match={match}
           isBusy={requestToJoin.isPending}
@@ -661,98 +700,77 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     backgroundColor: C.background,
+    paddingHorizontal: SCREEN_PADDING,
   },
-  hero: {
-    height: 188,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  heroStripe: {
+  headerButton: {
     position: 'absolute',
-    top: -80,
-    width: 1,
-    height: 360,
-    backgroundColor: 'rgba(94,112,184,0.24)',
-    transform: [{ rotate: '43deg' }],
+    zIndex: 10,
+    width: HEADER_BUTTON_SIZE,
+    height: HEADER_BUTTON_SIZE,
   },
-  heroControls: {
-    position: 'absolute',
-    left: 18,
-    right: 18,
+  headerMetaRow: {
+    height: HEADER_BUTTON_SIZE,
+    justifyContent: 'center',
+    paddingLeft: HEADER_TEXT_INSET,
+    paddingRight: HEADER_TEXT_INSET,
+    marginBottom: 4,
+  },
+  titleRow: {
+    marginBottom: 4,
+  },
+  titleInlineGroup: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: 8,
+    rowGap: 6,
+    maxWidth: '100%',
   },
-  heroButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    backgroundColor: 'rgba(11,11,11,0.55)',
+  metaChip: {
+    minHeight: 34,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: C.hair,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroCaption: {
-    position: 'absolute',
-    alignSelf: 'center',
-    top: 56,
-    maxWidth: 190,
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 10.5,
-    lineHeight: 21,
-    letterSpacing: 2,
-    color: C.dim,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-  },
-  body: {
-    paddingHorizontal: 8,
-    marginTop: -34,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 9,
-  },
-  skillBadge: {
-    borderRadius: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  skillBadgeSmall: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  skillPrimary: {
+  metaChipPrimary: {
     backgroundColor: 'rgba(68,88,166,0.18)',
+    borderColor: C.blue,
   },
-  skillMuted: {
-    backgroundColor: C.surface3,
+  metaChipSecondary: {
+    backgroundColor: C.surface1,
+    borderColor: 'rgba(94,112,184,0.45)',
   },
-  skillText: {
+  metaChipDefault: {
+    backgroundColor: C.surface1,
+    borderColor: C.hair,
+  },
+  metaChipText: {
     fontFamily: 'SpaceMono-Bold',
     fontSize: 11,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
-  skillTextSmall: {
-    fontSize: 10,
-  },
-  skillTextPrimary: {
+  metaChipTextPrimary: {
     color: '#C7CEE8',
   },
-  skillTextMuted: {
+  metaChipTextSecondary: {
+    color: C.mist,
+  },
+  metaChipTextDefault: {
     color: C.dim,
   },
-  distancePill: {
+  titleDistancePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: C.surface3,
     borderRadius: 8,
     paddingHorizontal: 9,
-    paddingVertical: 5,
+    paddingVertical: 6,
+    flexShrink: 0,
   },
   distanceText: {
     fontFamily: 'SpaceMono-Bold',
@@ -761,18 +779,25 @@ const styles = StyleSheet.create({
     color: C.mist,
   },
   matchTitle: {
+    flexShrink: 1,
     fontFamily: 'HankenGrotesk-ExtraBold',
     fontSize: 25,
     lineHeight: 30,
     color: C.mist,
     letterSpacing: -0.6,
+  },
+  matchSubtitle: {
+    fontFamily: 'HankenGrotesk-Medium',
+    fontSize: 14,
+    lineHeight: 20,
+    color: C.dim,
     marginBottom: 6,
   },
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 24,
+    marginBottom: 18,
   },
   dateText: {
     fontFamily: 'HankenGrotesk-Bold',
@@ -782,7 +807,14 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 26,
+    marginBottom: 14,
+  },
+  preferenceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 22,
   },
   statBox: {
     flex: 1,
@@ -1066,9 +1098,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 8,
-    paddingTop: 14,
-    backgroundColor: 'rgba(11,11,11,0.92)',
+    paddingHorizontal: SCREEN_PADDING,
+    paddingTop: 12,
+    backgroundColor: 'rgba(11,11,11,0.94)',
     borderTopWidth: 1,
     borderTopColor: C.hair2,
   },

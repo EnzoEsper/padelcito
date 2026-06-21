@@ -4,6 +4,7 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { View, Text, Pressable } from '@/tw';
+import { formatMatchTime } from '@/lib/match-time';
 import { useCreateMatch } from '@/features/matches/use-matches';
 import {
   courtCapacityLabel,
@@ -33,10 +34,6 @@ function formatDateLabel(date: Date): string {
   if (isSameDay(date, now)) return 'Today';
   if (isSameDay(date, tomorrow)) return 'Tomorrow';
   return new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short' }).format(date);
-}
-
-function formatTimeLabel(date: Date): string {
-  return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
 type CreateMatchFormBodyProps = {
@@ -92,7 +89,7 @@ export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
               className="flex-1 min-h-14 px-4 flex-row items-center justify-between border-r border-neutral/10"
             >
               <Text className="font-mono text-sm text-neutral" numberOfLines={1}>
-                {formatTimeLabel(form.timePart)}
+                {formatMatchTime(form.timePart)}
               </Text>
               <Ionicons name="time-outline" size={16} color="rgba(228,228,228,0.38)" />
             </Pressable>
@@ -221,6 +218,7 @@ export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
                   mode="time"
                   display="spinner"
                   minuteInterval={15}
+                  is24Hour
                   onChange={handleTimeChange}
                   themeVariant="dark"
                 />
@@ -233,6 +231,7 @@ export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
             mode="time"
             display="default"
             minuteInterval={15}
+            is24Hour
             onChange={handleTimeChange}
           />
         )

@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScrollView, View, Text, Pressable } from '@/tw';
+import { formatMatchListDateTime } from '@/lib/match-time';
 import {
   useMyMatches,
   useUpdateParticipantStatus,
@@ -10,15 +11,6 @@ import {
   type MatchSummary,
 } from '@/features/matches/use-matches';
 import { useMyMatchesRealtime } from '@/features/matches/use-match-realtime';
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
-}
 
 function StatePill({ label }: { label: string }) {
   return (
@@ -67,7 +59,7 @@ function MatchRow({ match, onPress }: { match: MatchSummary; onPress: () => void
             {match.title}
           </Text>
           <Text className="font-grotesk text-sm text-neutral/60">
-            {formatDate(match.starts_at)} · {match.venue_name ?? 'Venue shared by host'}
+            {formatMatchListDateTime(match.starts_at)} · {match.venue_name ?? 'Venue shared by host'}
           </Text>
         </View>
         <StatePill label={status} />
