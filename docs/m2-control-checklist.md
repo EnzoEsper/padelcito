@@ -4,7 +4,7 @@ This document is the handoff point for M2 Core Matchmaking MVP sessions.
 
 ## Scope
 
-- Create public **padel** pickup matches (sport slug `padel`) with venue, map pin, datetime, capacity, duration, and skill range.
+- Create public **padel** pickup matches (sport slug `padel`) with venue, map pin, datetime, capacity, duration, skill range, court setup (`court_count` + per-court `court_configs`), padel category band (`category_min` / `category_max`), required host preferences (`gender_preference`, `difficulty`, `position_preference`), and optional advanced fields (`price_per_player`, `age_min`, `age_max`).
 - Browse the padel match feed as a list, without map UI.
 - Open match details and request to join with a message.
 - Let hosts accept, reject, or remove participants.
@@ -19,6 +19,12 @@ This document is the handoff point for M2 Core Matchmaking MVP sessions.
 - `match_contact_details(p_match_id)` is the only allowed path to other players' WhatsApp numbers.
 - `public_profiles` is safe for other users; direct `profiles.whatsapp_phone` reads are not.
 - Padel sport is resolved via `PADEL_SPORT_SLUG` in `src/lib/padel-sport.ts`; match queries filter by padel `sport_id`.
+- `matches.court_count` and `matches.court_configs` (jsonb array) must stay aligned: array length equals `court_count`. Each element has `format`, `type`, `structure`, and `surface` (see `src/lib/padel-court.ts`). DB helpers `matches_court_configs_are_valid` and `matches_court_capacity_fits` enforce shape and that per-court slot totals do not exceed `capacity`.
+- `matches.category_min` / `matches.category_max` define the accepted padel category band (lower number = stronger player; `category_max <= category_min`).
+- `matches.gender_preference` is required: `male`, `female`, or `mixed` (no `open` value).
+- `matches.difficulty` is required: `friendly` or `competitive`.
+- `matches.position_preference` is required: `any`, `drive`, or `backhand` (replaces the removed `positions_sought` column).
+- `matches.price_per_player`, `matches.age_min`, and `matches.age_max` are optional; when both ages are set, `age_min <= age_max`.
 
 ## Verification Checklist
 

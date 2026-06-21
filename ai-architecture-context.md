@@ -73,6 +73,6 @@
 
 ## 8. Canonical References
 
-- Schema source of truth: `supabase/migrations/0001_initial_schema.sql` (originally `schema.sql` in the architecture package).
-- Architecture rationale & roadmap: `docs/ARCHITECTURE.md`.
+- Schema source of truth: the full `supabase/migrations/` chain (starting with `20260608050054_0001_initial_schema.sql` and all subsequent migrations).
+- Architecture rationale & roadmap: `ARCHITECTURE.md` (repo root).
 - Generated DB types: `src/types/database.ts` (never hand-edit).

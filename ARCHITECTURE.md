@@ -149,7 +149,7 @@ Ordered strictly by **data dependency** so nothing is ever built on sand. Each m
 
 ### M2 — Core Matchmaking MVP (≈ 2 weeks) ← first real release
 
-- Create match (sport, venue, map pin, datetime, capacity, skill range).
+- Create match (sport, venue, map pin, datetime, capacity, duration, skill range, court count + per-court configs, category band, gender/difficulty/position preferences, optional price and age filters).
 - Match feed (list, no map yet) + detail screen; request to join with message.
 - Host inbox: accept / reject (watch the capacity trigger flip `open → full`).
 - On acceptance: call `match_contact_details()` and render `wa.me` deep links (`Linking.openURL`).
