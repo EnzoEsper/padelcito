@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Linking, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,6 +30,7 @@ import {
   resolveMatchDistanceM,
   type MatchMetaChipEmphasis,
 } from '@/features/matches/match-display';
+import { RosterInfoButton, RosterInfoSheet } from '@/features/matches/roster-info-sheet';
 import type { CourtConfig } from '@/lib/padel-court';
 import { formatMatchScheduleLabel } from '@/lib/match-time';
 import { UnsupportedSportError } from '@/lib/padel-sport';
@@ -208,11 +209,58 @@ function PlayerRow({
   );
 }
 
-function SectionHeader({ title, right }: { title: string; right?: string }) {
+function SectionHeader({
+  title,
+  right,
+  trailingAction,
+}: {
+  title: string;
+  right?: string;
+  trailingAction?: ReactNode;
+}) {
   return (
     <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionTitleGroup}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {trailingAction}
+      </View>
       {right !== undefined ? <Text style={styles.sectionRight}>{right}</Text> : null}
+    </View>
+  );
+}
+
+function OfflineConfirmedSummary({
+  count,
+  onInfoPress,
+}: {
+  count: number;
+  onInfoPress: () => void;
+}) {
+  const visibleDots = Math.min(count, 3);
+  const overflow = count - visibleDots;
+
+  return (
+    <View style={styles.offlineSummaryRow}>
+      <View style={styles.offlineDotStack}>
+        {Array.from({ length: visibleDots }).map((_, index) => (
+          <View
+            key={`offline-dot-${index}`}
+            style={[styles.offlineDot, index > 0 ? styles.offlineDotOverlap : null]}
+          />
+        ))}
+        {overflow > 0 ? (
+          <View style={[styles.offlineDotOverflow, styles.offlineDotOverlap]}>
+            <Text style={styles.offlineDotOverflowText}>+{overflow}</Text>
+          </View>
+        ) : null}
+      </View>
+      <View style={styles.offlineSummaryCopy}>
+        <Text style={styles.offlineSummaryTitle}>
+          {count === 1 ? '1 player confirmed' : `${count} players confirmed`}
+        </Text>
+        <Text style={styles.offlineSummaryHint}>Outside the app</Text>
+      </View>
+      <RosterInfoButton onPress={onInfoPress} />
     </View>
   );
 }
@@ -321,6 +369,7 @@ export default function MatchDetailScreen() {
   const { data: match, isPending, error, refetch } = useMatchDetail(matchId);
   useMatchRealtime(matchId);
   const [message] = useState('');
+  const [rosterInfoOpen, setRosterInfoOpen] = useState(false);
   const requestToJoin = useRequestToJoin(matchId ?? '');
   const updateStatus = useUpdateParticipantStatus(matchId ?? '');
   const cancelPending = useCancelPendingRequest(matchId ?? '');
@@ -430,8 +479,6 @@ export default function MatchDetailScreen() {
   const acceptedParticipants = match.visibleParticipants.filter(
     (participant) => participant.status === 'accepted',
   );
-  const filled = Math.min(1 + acceptedParticipants.length, match.capacity);
-  const spotsOpen = Math.max(match.capacity - filled, 0);
   const hostName = match.host?.display_name ?? 'Host';
   const isAccepted = match.isHost || match.currentUserParticipant?.status === 'accepted';
   const hostRatingLabel = formatProfileRating(
@@ -527,7 +574,15 @@ export default function MatchDetailScreen() {
 
           <MatchDetailChips match={match} courtConfigs={courtConfigs} />
 
-          <SectionHeader title="Roster" right={`${filled}/${match.capacity} Filled`} />
+          <SectionHeader
+            title="Roster"
+            right={`${match.totalFilled}/${match.capacity} players`}
+            trailingAction={
+              match.offlineConfirmedCount === 0 ? (
+                <RosterInfoButton onPress={() => setRosterInfoOpen(true)} />
+              ) : null
+            }
+          />
           <View style={styles.rosterCard}>
             <PlayerRow
               name={hostName}
@@ -535,6 +590,15 @@ export default function MatchDetailScreen() {
               host
               ratingLabel={hostRatingLabel}
             />
+            {match.offlineConfirmedCount > 0 ? (
+              <>
+                <View style={styles.rosterDivider} />
+                <OfflineConfirmedSummary
+                  count={match.offlineConfirmedCount}
+                  onInfoPress={() => setRosterInfoOpen(true)}
+                />
+              </>
+            ) : null}
             {acceptedParticipants.map((participant, index) => {
               const profile = participantProfilesById.get(participant.profile_id);
               const name = profile?.display_name ?? 'Player';
@@ -547,7 +611,7 @@ export default function MatchDetailScreen() {
                   <View style={styles.rosterDivider} />
                   <PlayerRow
                     name={name}
-                    index={index + 1}
+                    index={match.offlineConfirmedCount + index + 1}
                     you={participant.profile_id === match.currentUserId}
                     ratingLabel={ratingLabel}
                     onRemove={
@@ -559,10 +623,10 @@ export default function MatchDetailScreen() {
                 </View>
               );
             })}
-            {spotsOpen > 0 ? (
+            {match.joinSpotsRemaining > 0 ? (
               <>
                 <View style={styles.rosterDivider} />
-                <OpenSpots count={spotsOpen} />
+                <OpenSpots count={match.joinSpotsRemaining} />
               </>
             ) : null}
           </View>
@@ -650,6 +714,18 @@ export default function MatchDetailScreen() {
           onOpenContacts={() => void openFirstContact()}
         />
       </View>
+
+      <RosterInfoSheet
+        visible={rosterInfoOpen}
+        onClose={() => setRosterInfoOpen(false)}
+        stats={{
+          capacity: match.capacity,
+          offlineConfirmedCount: match.offlineConfirmedCount,
+          appAcceptedCount: match.appAcceptedCount,
+          joinSpotsRemaining: match.joinSpotsRemaining,
+          totalFilled: match.totalFilled,
+        }}
+      />
     </View>
   );
 }
@@ -856,7 +932,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 10,
+  },
+  sectionTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   sectionTitle: {
     fontFamily: 'SpaceMono-Bold',
@@ -957,6 +1038,59 @@ const styles = StyleSheet.create({
   rosterDivider: {
     height: 1,
     backgroundColor: C.hair2,
+  },
+  offlineSummaryRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 4,
+  },
+  offlineDotStack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 52,
+  },
+  offlineDot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.surface3,
+    borderWidth: 1.5,
+    borderColor: C.surface1,
+  },
+  offlineDotOverlap: {
+    marginLeft: -8,
+  },
+  offlineDotOverflow: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.surface2,
+    borderWidth: 1.5,
+    borderColor: C.surface1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  offlineDotOverflowText: {
+    fontFamily: 'SpaceMono-Bold',
+    fontSize: 8,
+    color: C.dim,
+  },
+  offlineSummaryCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  offlineSummaryTitle: {
+    fontFamily: 'HankenGrotesk-Medium',
+    fontSize: 13.5,
+    color: C.dim,
+  },
+  offlineSummaryHint: {
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 11.5,
+    color: C.faint,
+    marginTop: 1,
   },
   openSpotsRow: {
     minHeight: 72,

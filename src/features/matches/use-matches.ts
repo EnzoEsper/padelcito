@@ -7,6 +7,7 @@ import {
 import { roundCoordsForKey, type Coords } from '@/lib/location';
 import type { CourtConfig } from '@/lib/padel-court';
 import { supabase } from '@/lib/supabase';
+import { computeMatchRosterStats } from '@/features/matches/match-roster';
 import type { Database } from '@/types/database';
 
 type MatchRow = Database['public']['Tables']['matches']['Row'];
@@ -27,6 +28,7 @@ export type CreateMatchInput = {
   startsAt: string;
   durationMinutes: number;
   capacity: number;
+  openSpots: number;
   coords: Coords;
   skillMin: SkillLevel | null;
   skillMax: SkillLevel | null;
@@ -47,6 +49,11 @@ export type MatchSummary = MatchRow & {
   host: PublicProfileRow | null;
   currentUserParticipant: ParticipantRow | null;
   acceptedVisibleCount: number;
+  offlineConfirmedCount: number;
+  appAcceptedCount: number;
+  joinSpotsRemaining: number;
+  totalFilled: number;
+  isJoinFull: boolean;
   isHostedByCurrentUser: boolean;
   distanceM?: number;
 };
@@ -154,14 +161,20 @@ function summarizeMatch(
   userId: string,
 ): MatchSummary {
   const participants = visibleParticipants.filter((participant) => participant.match_id === match.id);
+  const roster = computeMatchRosterStats(match.capacity, match.open_spots, participants);
+
   return {
     ...match,
     sport: sportsById.get(match.sport_id) ?? null,
     host: profilesById.get(match.host_id) ?? null,
     currentUserParticipant:
       participants.find((participant) => participant.profile_id === userId) ?? null,
-    acceptedVisibleCount:
-      1 + participants.filter((participant) => participant.status === 'accepted').length,
+    acceptedVisibleCount: 1 + roster.appAcceptedCount,
+    offlineConfirmedCount: roster.offlineConfirmedCount,
+    appAcceptedCount: roster.appAcceptedCount,
+    joinSpotsRemaining: roster.joinSpotsRemaining,
+    totalFilled: roster.totalFilled,
+    isJoinFull: roster.isJoinFull,
     isHostedByCurrentUser: match.host_id === userId,
   };
 }
@@ -381,6 +394,7 @@ export function useCreateMatch() {
         starts_at: input.startsAt,
         duration_minutes: input.durationMinutes,
         capacity: input.capacity,
+        open_spots: input.openSpots,
         skill_min: input.skillMin,
         skill_max: input.skillMax,
         location: geographyPoint(input.coords),

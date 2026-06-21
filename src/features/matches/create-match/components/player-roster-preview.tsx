@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text } from '@/tw';
-import { maxOpenSpots } from '../use-create-match-form';
+import { maxOpenSpots } from '@/features/matches/match-roster';
 import { SectionLabel } from './section-label';
 import { StepperField } from './stepper-field';
 

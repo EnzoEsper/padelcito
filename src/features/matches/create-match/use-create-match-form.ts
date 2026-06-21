@@ -12,7 +12,13 @@ import {
 import type { Coords } from '@/lib/location';
 import { parseArsAmountInput } from '@/lib/currency-ars';
 import type { PositionPreference } from '@/lib/padel-position';
+import {
+  derivedConfirmedCount,
+  maxOpenSpots,
+} from '@/features/matches/match-roster';
 import type { CreateMatchInput } from '@/features/matches/use-matches';
+
+export { derivedConfirmedCount, maxOpenSpots };
 
 type MatchDifficulty = Database['public']['Enums']['match_difficulty'];
 type MatchGenderPreference = Database['public']['Enums']['match_gender_preference'];
@@ -29,14 +35,6 @@ export function formatDurationLabel(minutes: number): string {
     return hours === 1 ? '1 hr' : `${hours} hr`;
   }
   return `${minutes / 60} hr`;
-}
-
-export function derivedConfirmedCount(totalPlayers: number, openSpots: number): number {
-  return Math.max(0, totalPlayers - 1 - openSpots);
-}
-
-export function maxOpenSpots(totalPlayers: number): number {
-  return Math.max(1, totalPlayers - 1);
 }
 
 function defaultStartsAt(): Date {
@@ -241,6 +239,7 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
         startsAt: startsAtDate.toISOString(),
         durationMinutes,
         capacity: totalPlayers,
+        openSpots,
         coords,
         skillMin,
         skillMax,

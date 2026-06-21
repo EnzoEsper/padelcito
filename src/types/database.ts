@@ -457,6 +457,7 @@ export type Database = {
           is_public: boolean
           late_withdrawal_threshold: string
           location: unknown
+          open_spots: number
           position_preference: Database["public"]["Enums"]["match_position_preference"]
           price_per_player: number | null
           skill_max: Database["public"]["Enums"]["skill_level"] | null
@@ -486,6 +487,7 @@ export type Database = {
           is_public?: boolean
           late_withdrawal_threshold?: string
           location: unknown
+          open_spots: number
           position_preference?: Database["public"]["Enums"]["match_position_preference"]
           price_per_player?: number | null
           skill_max?: Database["public"]["Enums"]["skill_level"] | null
@@ -515,6 +517,7 @@ export type Database = {
           is_public?: boolean
           late_withdrawal_threshold?: string
           location?: unknown
+          open_spots?: number
           position_preference?: Database["public"]["Enums"]["match_position_preference"]
           price_per_player?: number | null
           skill_max?: Database["public"]["Enums"]["skill_level"] | null

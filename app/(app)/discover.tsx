@@ -254,10 +254,10 @@ function SkillBadge({ level }: { level: 'A' | 'B' | 'C' | 'D' }) {
 function MatchCard({ match, onPress }: { match: MatchSummary; onPress: () => void }) {
   const hostName = match.host?.display_name ?? 'Player';
   const { day, time } = formatDiscoverMatchWhen(match.starts_at);
-  const filled = Math.min(match.acceptedVisibleCount, match.capacity);
-  const openSpots = Math.max(match.capacity - filled, 0);
+  const filled = match.totalFilled;
+  const openSpots = match.joinSpotsRemaining;
   const level = skillBadge(match);
-  const full = filled >= match.capacity;
+  const full = match.isJoinFull || match.status === 'full';
   const avatarNames = [hostName, match.sport?.name ?? 'Player', match.venue_name ?? 'Match'];
   const accentColors =
     level === 'A'

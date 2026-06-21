@@ -65,7 +65,7 @@ function MatchRow({ match, onPress }: { match: MatchSummary; onPress: () => void
         <StatePill label={status} />
       </View>
       <Text className="font-mono text-[10px] tracking-[0.12em] uppercase text-neutral/38">
-        {match.acceptedVisibleCount}/{match.capacity} visible confirmed
+        {match.totalFilled}/{match.capacity} filled
       </Text>
     </Pressable>
   );
