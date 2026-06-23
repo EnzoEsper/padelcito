@@ -66,6 +66,25 @@ auth.users ──1:1── profiles ──N:M── sports (via profile_sports)
 
 Acceptance of a join request is therefore the exact moment contact data becomes reachable — matching the product flow precisely.
 
+**1:1 contact only (no group chat):** the client never renders a group WhatsApp button. Accepted players message the host via a footer CTA; the host messages each accepted player individually from roster rows. Both paths call `match_contact_details()` then `Linking.openURL` to the returned `wa.me` link. Contact is blocked when `is_match_active()` is false (`cancelled` or `finished`).
+
+### Match lifecycle — schedule-driven status machine
+
+`matches.status` uses enum `match_status`: `open | full | in_progress | finished | cancelled`.
+
+| Status | Meaning |
+| ------ | ------- |
+| `open` / `full` | Pre-start; capacity trigger toggles between them when roster fills or spots reopen. |
+| `in_progress` | `starts_at ≤ now() < starts_at + duration_minutes`. |
+| `finished` | End time reached; set automatically by `sync_match_lifecycle()`. |
+| `cancelled` | Host cancellation before start (`UPDATE status = 'cancelled'` — never hard-delete). |
+
+**`sync_match_lifecycle(match_id)`** (SECURITY DEFINER) compares `now()` to `starts_at` and `starts_at + duration_minutes`, promoting `open/full → in_progress → finished`. Authorized callers: match host, any participant with a relationship row, or any authenticated user when `matches.is_public` (so discover viewers can open detail). The match-detail hook calls this RPC before fetch so stale UI cannot show pre-start actions after kickoff.
+
+**Pre-start locks** (`is_match_pre_start`, `is_match_roster_editable`): until `starts_at`, the host may cancel, accept/reject/remove participants, and players may withdraw. After start, triggers and RLS block cancel, roster removal, and withdrawal. **`cancelled` and `finished`** block all participant mutations and WhatsApp reveal.
+
+Client helpers in `src/features/matches/use-matches.ts` mirror these rules; `useMatchScheduleClock` forces re-render at schedule boundaries.
+
 ### Automated trust penalties — zero moderation screens
 
 The state machine lives in one trigger (`handle_participant_status_change`):
@@ -73,7 +92,7 @@ The state machine lives in one trigger (`handle_participant_status_change`):
 - `accepted → withdrawn` within `matches.late_withdrawal_threshold` (default 2h, **per-match configurable**) sets `was_late_withdrawal = true` on the participant row.
 - `accepted → removed` within the same window sets `was_removed_by_host = true`.
 
-These flags _unlock_ context-flagged ratings (`rating_context = 'late_withdrawal' | 'host_removal'`). The `validate_rating` trigger enforces every combination: standard ratings need a completed match and mutual membership; penalty ratings need the corresponding flag. No admin UI is ever needed — the database is the referee. Rating aggregates (`rating_avg`, `rating_count`) are denormalized onto `profiles` by trigger for cheap card rendering.
+These flags _unlock_ context-flagged ratings (`rating_context = 'late_withdrawal' | 'host_removal'`). The `validate_rating` trigger enforces every combination: standard ratings need a **finished** match (`match_status = 'finished'`) and mutual membership; penalty ratings need the corresponding flag. No admin UI is ever needed — the database is the referee. Rating aggregates (`rating_avg`, `rating_count`) are denormalized onto `profiles` by trigger for cheap card rendering.
 
 ### Non-expiring listings by construction
 
@@ -101,7 +120,7 @@ All location columns are `geography(Point, 4326)` with GIST indexes. Discovery R
 
 | Table                  | Why it streams                                                                |
 | ---------------------- | ----------------------------------------------------------------------------- |
-| `matches`              | status flips `open → full → open` update discovery feeds instantly            |
+| `matches`              | capacity flips `open ↔ full`; lifecycle sync flips `in_progress` / `finished`; cancel updates lists |
 | `match_participants`   | join-request lifecycle: requester sees accept/reject the moment the host taps |
 | `tournament_matches`   | **live scores** + court assignments to every spectator device                 |
 | `tournament_standings` | leaderboard refresh the instant a result lands                                |
@@ -152,13 +171,13 @@ Ordered strictly by **data dependency** so nothing is ever built on sand. Each m
 - Create match (sport, venue, map pin, datetime, capacity, duration, skill range, court count + per-court configs, category band, gender/difficulty/position preferences, optional price and age filters).
 - Match feed (list, no map yet) + detail screen; request to join with message.
 - Host inbox: accept / reject (watch the capacity trigger flip `open → full`).
-- On acceptance: call `match_contact_details()` and render `wa.me` deep links (`Linking.openURL`).
-- Withdraw / remove flows.
-- **Exit criteria:** two phones complete the full host→request→accept→WhatsApp loop.
+- On acceptance: call `match_contact_details()` and render **1:1** `wa.me` deep links (`Linking.openURL`) — player→host in footer; host→each accepted player on roster rows.
+- Withdraw / remove flows (pre-start only); host cancel match (`status = 'cancelled'`) pre-start; schedule-driven `in_progress` / `finished` via `sync_match_lifecycle`.
+- **Exit criteria:** two phones complete the full host→request→accept→WhatsApp loop; cancel and post-start lock behavior verified.
 
 ### M3 — Trust & Penalties (≈ 1 week)
 
-- Post-match mutual rating sheet (stars + performance tags) once host marks `completed`.
+- Post-match mutual rating sheet (stars + performance tags) once the match is **`finished`** (auto when `starts_at + duration_minutes` passes).
 - Penalty rating prompts driven entirely by the `was_late_withdrawal` / `was_removed_by_host` flags.
 - Rating display on profile cards (`rating_avg`, `rating_count`).
 - **Exit criteria:** late withdrawal inside 2h automatically enables a penalty review; aggregates update live.

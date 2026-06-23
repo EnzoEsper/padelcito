@@ -45,6 +45,8 @@ export function useMatchRealtime(matchId: string | null): void {
       void queryClient.invalidateQueries({
         queryKey: matchKeys.detail(matchId),
       });
+      void queryClient.invalidateQueries({ queryKey: matchKeys.mine });
+      void queryClient.invalidateQueries({ queryKey: matchKeys.discoverPrefix });
     }, 300);
 
     void (async () => {
@@ -126,6 +128,25 @@ export function useMyMatchesRealtime(userId: string | null): void {
             event: "*",
             schema: "public",
             table: "match_participants",
+          },
+          () => debouncedInvalidate(),
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "matches",
+            filter: `host_id=eq.${userId}`,
+          },
+          () => debouncedInvalidate(),
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "matches",
           },
           () => debouncedInvalidate(),
         )

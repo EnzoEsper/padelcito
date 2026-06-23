@@ -75,8 +75,81 @@ export type MyMatchesData = {
   userId: string;
   upcoming: MatchSummary[];
   history: MatchSummary[];
+  pendingOutgoing: MatchSummary[];
   hostRequests: HostRequest[];
 };
+
+function isConfirmedParticipation(match: MatchSummary): boolean {
+  return match.isHostedByCurrentUser || match.currentUserParticipant?.status === 'accepted';
+}
+
+function isFutureMatch(match: MatchSummary, now: number): boolean {
+  return new Date(match.starts_at).getTime() >= now;
+}
+
+function isUpcomingListMatch(match: MatchSummary, now: number): boolean {
+  return (
+    match.status !== 'cancelled' &&
+    (match.status === 'open' || match.status === 'full') &&
+    isFutureMatch(match, now) &&
+    isConfirmedParticipation(match)
+  );
+}
+
+function isHistoryListMatch(match: MatchSummary, now: number): boolean {
+  if (!isConfirmedParticipation(match)) return false;
+  if (match.status === 'cancelled') return true;
+  if (match.status === 'in_progress' || match.status === 'finished') return true;
+  return !isFutureMatch(match, now);
+}
+
+type MatchScheduleFields = Pick<MatchSummary, 'starts_at' | 'status'>;
+
+export function isMatchPreStart(
+  match: MatchScheduleFields,
+  nowMs: number = Date.now(),
+): boolean {
+  return (
+    (match.status === 'open' || match.status === 'full') &&
+    new Date(match.starts_at).getTime() > nowMs
+  );
+}
+
+export function canHostEditRoster(
+  match: MatchScheduleFields & { isHost: boolean },
+  nowMs: number = Date.now(),
+): boolean {
+  return match.isHost && isMatchPreStart(match, nowMs);
+}
+
+export function canHostManageRoster(
+  match: MatchScheduleFields & { isHost: boolean; appAcceptedCount: number },
+  nowMs: number = Date.now(),
+): boolean {
+  return canHostEditRoster(match, nowMs) && match.appAcceptedCount > 0;
+}
+
+export function canHostCancelMatch(
+  match: MatchScheduleFields,
+  nowMs: number = Date.now(),
+): boolean {
+  return isMatchPreStart(match, nowMs);
+}
+
+export function canPlayerWithdraw(
+  match: MatchScheduleFields & {
+    isHost: boolean;
+    currentUserParticipant: ParticipantRow | null;
+  },
+  nowMs: number = Date.now(),
+): boolean {
+  return (
+    !match.isHost &&
+    match.status !== 'cancelled' &&
+    match.currentUserParticipant?.status === 'accepted' &&
+    isMatchPreStart(match, nowMs)
+  );
+}
 
 export const matchKeys = {
   all: ['matches'] as const,
@@ -257,6 +330,12 @@ export function useMatchDetail(matchId: string | null) {
         getCurrentUserId(),
         ensurePadelSport(queryClient),
       ]);
+
+      const { error: syncError } = await supabase.rpc('sync_match_lifecycle', {
+        p_match_id: matchId,
+      });
+      if (syncError !== null) throw syncError;
+
       const { data: match, error } = await supabase
         .from('matches')
         .select('*')
@@ -358,12 +437,21 @@ export function useMyMatches() {
 
       return {
         userId,
-        upcoming: summaries.filter((match) => new Date(match.starts_at).getTime() >= now),
-        history: summaries.filter((match) => new Date(match.starts_at).getTime() < now),
+        upcoming: summaries.filter((match) => isUpcomingListMatch(match, now)),
+        history: summaries.filter((match) => isHistoryListMatch(match, now)),
+        pendingOutgoing: summaries.filter(
+          (match) =>
+            match.status !== 'cancelled' &&
+            isFutureMatch(match, now) &&
+            !match.isHostedByCurrentUser &&
+            match.currentUserParticipant?.status === 'pending',
+        ),
         hostRequests: pendingRequests
           .map((participant) => {
             const match = summariesById.get(participant.match_id);
             if (match === undefined) return null;
+            if (match.status === 'cancelled') return null;
+            if (!isFutureMatch(match, now)) return null;
             return {
               participant,
               match,
@@ -518,6 +606,29 @@ export function useCancelPendingRequest(matchId: string) {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: matchKeys.detail(matchId) }),
+        queryClient.invalidateQueries({ queryKey: matchKeys.discoverPrefix }),
+        queryClient.invalidateQueries({ queryKey: matchKeys.mine }),
+      ]);
+    },
+  });
+}
+
+export function useCancelMatch(matchId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('matches')
+        .update({ status: 'cancelled' })
+        .eq('id', matchId);
+
+      if (error !== null) throw error;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: matchKeys.detail(matchId) }),
+        queryClient.invalidateQueries({ queryKey: matchKeys.contacts(matchId) }),
         queryClient.invalidateQueries({ queryKey: matchKeys.discoverPrefix }),
         queryClient.invalidateQueries({ queryKey: matchKeys.mine }),
       ]);

@@ -8,6 +8,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ScrollView, View, Text, Pressable } from '@/tw';
 import { useDiscoverLocation } from '@/features/discover/use-discover-location';
 import {
+  canHostCancelMatch,
+  canHostEditRoster,
+  canHostManageRoster,
+  canPlayerWithdraw,
+  useCancelMatch,
   useCancelPendingRequest,
   useMatchContacts,
   useMatchDetail,
@@ -16,6 +21,7 @@ import {
   type MatchDetail,
 } from '@/features/matches/use-matches';
 import { useMatchRealtime } from '@/features/matches/use-match-realtime';
+import { useMatchScheduleClock } from '@/features/matches/use-match-schedule-clock';
 import { CourtsInfoChip } from '@/features/matches/courts-info-sheet';
 import {
   buildMatchMetaChips,
@@ -28,7 +34,9 @@ import {
   hasHostNote,
   resolveMatchCourtConfigs,
   resolveMatchDistanceM,
+  resolveMatchStatusBadge,
   type MatchMetaChipEmphasis,
+  type MatchStatusBadgeTone,
 } from '@/features/matches/match-display';
 import { RosterInfoButton, RosterInfoSheet } from '@/features/matches/roster-info-sheet';
 import type { CourtConfig } from '@/lib/padel-court';
@@ -37,6 +45,21 @@ import { UnsupportedSportError } from '@/lib/padel-sport';
 import type { Database } from '@/types/database';
 
 type PublicProfile = Database['public']['Views']['public_profiles']['Row'];
+type ContactRow = Database['public']['Functions']['match_contact_details']['Returns'][number];
+type MatchStatus = Database['public']['Enums']['match_status'];
+
+async function openContactForProfile(
+  contacts: ContactRow[] | undefined,
+  profileId: string,
+): Promise<void> {
+  const contact = contacts?.find((row) => row.profile_id === profileId);
+  const link = contact?.whatsapp_link;
+  if (link === undefined || link === null) {
+    Alert.alert('No WhatsApp link', 'This player has not added a WhatsApp number yet.');
+    return;
+  }
+  await Linking.openURL(link);
+}
 
 const SCREEN_PADDING = 20;
 const HEADER_BUTTON_SIZE = 44;
@@ -60,6 +83,52 @@ const C = {
   warning: '#E0B15B',
 } as const;
 
+const STATUS_BADGE_TONE_STYLES: Record<
+  MatchStatusBadgeTone,
+  {
+    container: { backgroundColor: string; borderColor: string };
+    text: { color: string };
+    showDot?: boolean;
+  }
+> = {
+  open: {
+    container: {
+      backgroundColor: 'rgba(91,224,166,0.10)',
+      borderColor: 'rgba(91,224,166,0.30)',
+    },
+    text: { color: C.success },
+  },
+  full: {
+    container: {
+      backgroundColor: 'rgba(68,88,166,0.18)',
+      borderColor: 'rgba(94,112,184,0.35)',
+    },
+    text: { color: C.blueHi },
+  },
+  live: {
+    container: {
+      backgroundColor: 'rgba(91,224,166,0.10)',
+      borderColor: 'rgba(91,224,166,0.35)',
+    },
+    text: { color: C.success },
+    showDot: true,
+  },
+  finished: {
+    container: {
+      backgroundColor: C.surface3,
+      borderColor: C.hair,
+    },
+    text: { color: C.dim },
+  },
+  cancelled: {
+    container: {
+      backgroundColor: 'rgba(228,228,228,0.08)',
+      borderColor: 'rgba(228,228,228,0.20)',
+    },
+    text: { color: C.dim },
+  },
+};
+
 const AVATAR_TONES: [string, string][] = [
   ['#4458A6', '#E4E4E4'],
   ['#263665', '#E4E4E4'],
@@ -74,6 +143,18 @@ function initials(name: string): string {
     .slice(0, 2)
     .join('')
     .toUpperCase();
+}
+
+function MatchStatusBadge({ status }: { status: MatchStatus }) {
+  const badge = resolveMatchStatusBadge(status);
+  const tone = STATUS_BADGE_TONE_STYLES[badge.tone];
+
+  return (
+    <View style={[styles.statusBadge, tone.container]}>
+      {tone.showDot === true ? <View style={styles.statusBadgeDot} /> : null}
+      <Text style={[styles.statusBadgeText, tone.text]}>{badge.label}</Text>
+    </View>
+  );
 }
 
 function MetaChip({ label, emphasis }: { label: string; emphasis: MatchMetaChipEmphasis }) {
@@ -171,6 +252,7 @@ function PlayerRow({
   you = false,
   ratingLabel,
   onRemove,
+  onWhatsApp,
 }: {
   name: string;
   index: number;
@@ -178,6 +260,7 @@ function PlayerRow({
   you?: boolean;
   ratingLabel: string | null;
   onRemove?: () => void;
+  onWhatsApp?: () => void;
 }) {
   return (
     <View style={styles.playerRow}>
@@ -200,10 +283,23 @@ function PlayerRow({
           </View>
         ) : null}
       </View>
-      {onRemove !== undefined ? (
-        <Pressable onPress={onRemove} style={styles.removeButton}>
-          <Text style={styles.removeText}>Remove</Text>
-        </Pressable>
+      {onWhatsApp !== undefined || onRemove !== undefined ? (
+        <View style={styles.playerActions}>
+          {onWhatsApp !== undefined ? (
+            <Pressable
+              onPress={onWhatsApp}
+              style={styles.rosterWhatsAppButton}
+              accessibilityLabel="Message on WhatsApp"
+            >
+              <Ionicons name="chatbox-outline" size={16} color={C.mist} />
+            </Pressable>
+          ) : null}
+          {onRemove !== undefined ? (
+            <Pressable onPress={onRemove} style={styles.removeButton}>
+              <Text style={styles.removeText}>Remove</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -281,36 +377,86 @@ function OpenSpots({ count }: { count: number }) {
 
 function FooterAction({
   match,
+  scheduleNow,
   isBusy,
   onRequest,
-  onCancel,
+  onCancelRequest,
   onWithdraw,
-  onOpenContacts,
+  onMessageHost,
+  onCancelMatch,
 }: {
   match: MatchDetail;
+  scheduleNow: number;
   isBusy: boolean;
   onRequest: () => void;
-  onCancel: () => void;
+  onCancelRequest: () => void;
   onWithdraw: () => void;
-  onOpenContacts: () => void;
+  onMessageHost: () => void;
+  onCancelMatch: () => void;
 }) {
   const participant = match.currentUserParticipant;
-  const accepted = match.isHost || participant?.status === 'accepted';
   const pending = participant?.status === 'pending';
   const rejected = participant?.status === 'rejected';
+  const pendingRequestCount = match.visibleParticipants.filter(
+    (row) => row.status === 'pending',
+  ).length;
+  const hostCanEditRoster = canHostEditRoster(match, scheduleNow);
+  const hostCanCancel = canHostCancelMatch(match, scheduleNow);
+  const playerCanWithdraw = canPlayerWithdraw(match, scheduleNow);
 
-  if (accepted) {
+  if (match.status === 'cancelled') {
+    return (
+      <View style={styles.footerInner}>
+        <View style={styles.pendingButton}>
+          <Text style={styles.pendingText}>This match was cancelled</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (match.status === 'finished') {
+    return (
+      <View style={styles.footerInner}>
+        <View style={styles.pendingButton}>
+          <Text style={styles.pendingText}>This match has finished</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (match.isHost) {
+    return (
+      <View style={styles.footerInner}>
+        <View style={styles.confirmedRow}>
+          <Ionicons name="checkmark" size={15} color={C.success} />
+          <Text style={styles.confirmedText}>You're hosting this match</Text>
+        </View>
+        {hostCanEditRoster && pendingRequestCount > 0 ? (
+          <Text style={styles.hostPendingHint}>
+            {pendingRequestCount} request{pendingRequestCount === 1 ? '' : 's'} waiting below
+          </Text>
+        ) : null}
+        {hostCanCancel ? (
+          <Pressable onPress={onCancelMatch} style={styles.footerGhostButton}>
+            <Text style={styles.footerGhostText}>Cancel match</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  }
+
+  if (participant?.status === 'accepted') {
     return (
       <View style={styles.footerInner}>
         <View style={styles.confirmedRow}>
           <Ionicons name="checkmark" size={15} color={C.success} />
           <Text style={styles.confirmedText}>You're in — roster confirmed</Text>
         </View>
-        <Pressable onPress={onOpenContacts} style={styles.whatsappButton}>
+        <Pressable onPress={onMessageHost} style={styles.whatsappButton}>
           <Ionicons name="chatbox-outline" size={19} color={C.background} />
-          <Text style={styles.whatsappText}>Message group on WhatsApp</Text>
+          <Text style={styles.whatsappText}>Message host on WhatsApp</Text>
         </Pressable>
-        {!match.isHost ? (
+        {playerCanWithdraw ? (
           <Pressable onPress={onWithdraw} style={styles.footerGhostButton}>
             <Text style={styles.footerGhostText}>Withdraw from match</Text>
           </Pressable>
@@ -326,7 +472,7 @@ function FooterAction({
           <View style={styles.pendingDot} />
           <Text style={styles.pendingText}>Request sent · awaiting host</Text>
         </View>
-        <Pressable onPress={onCancel} style={styles.footerGhostButton}>
+        <Pressable onPress={onCancelRequest} style={styles.footerGhostButton}>
           <Text style={styles.footerGhostText}>Cancel request</Text>
         </Pressable>
       </View>
@@ -352,7 +498,13 @@ function FooterAction({
       >
         <Ionicons name="flash" size={18} color={C.mist} />
         <Text style={styles.requestText}>
-          {isBusy ? 'Sending...' : match.status === 'open' ? 'Request to Join' : 'Match is full'}
+          {isBusy
+            ? 'Sending...'
+            : match.status === 'open'
+              ? 'Request to Join'
+              : match.status === 'full'
+                ? 'Match is full'
+                : 'Match unavailable'}
         </Text>
       </Pressable>
     </View>
@@ -368,16 +520,37 @@ export default function MatchDetailScreen() {
   const matchId = typeof params.id === 'string' ? params.id : null;
   const { data: match, isPending, error, refetch } = useMatchDetail(matchId);
   useMatchRealtime(matchId);
+  const scheduleNow = useMatchScheduleClock(
+    matchId,
+    match?.starts_at,
+    match?.duration_minutes,
+  );
   const [message] = useState('');
   const [rosterInfoOpen, setRosterInfoOpen] = useState(false);
   const requestToJoin = useRequestToJoin(matchId ?? '');
   const updateStatus = useUpdateParticipantStatus(matchId ?? '');
   const cancelPending = useCancelPendingRequest(matchId ?? '');
+  const cancelMatch = useCancelMatch(matchId ?? '');
 
   const canViewContacts =
     match !== undefined &&
-    (match.isHost || match.currentUserParticipant?.status === 'accepted');
-  const contacts = useMatchContacts(matchId, canViewContacts);
+    match.status !== 'cancelled' &&
+    match.status !== 'finished' &&
+    ((match.isHost && match.appAcceptedCount > 0) ||
+      (!match.isHost && match.currentUserParticipant?.status === 'accepted'));
+  const contactsQuery = useMatchContacts(matchId, canViewContacts);
+  const hostManagesRoster =
+    match !== undefined && canHostManageRoster(match, scheduleNow);
+  const hostEditsRoster =
+    match !== undefined && canHostEditRoster(match, scheduleNow);
+
+  async function resolveContactList(): Promise<ContactRow[] | undefined> {
+    if (contactsQuery.data !== undefined && contactsQuery.data.length > 0) {
+      return contactsQuery.data;
+    }
+    const result = await contactsQuery.refetch();
+    return result.data;
+  }
 
   const participantProfilesById = useMemo(() => {
     return new Map(
@@ -423,13 +596,44 @@ export default function MatchDetailScreen() {
     }
   }
 
-  async function openFirstContact(): Promise<void> {
-    const firstLink = contacts.data?.find((contact) => contact.whatsapp_link !== null)?.whatsapp_link;
-    if (firstLink === undefined || firstLink === null) {
-      Alert.alert('No WhatsApp link', 'No contact has a WhatsApp link available yet.');
+  function handleCancelMatch(): void {
+    if (match === undefined || !canHostCancelMatch(match, scheduleNow)) {
       return;
     }
-    await Linking.openURL(firstLink);
+
+    Alert.alert(
+      'Cancel match?',
+      'Players will no longer be able to join. Accepted players will see that this match was cancelled.',
+      [
+        { text: 'Keep match', style: 'cancel' },
+        {
+          text: 'Cancel match',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await cancelMatch.mutateAsync();
+              } catch (cancelError) {
+                const text =
+                  cancelError instanceof Error ? cancelError.message : 'Could not cancel match.';
+                Alert.alert('Cancel failed', text);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }
+
+  async function openHostContact(): Promise<void> {
+    if (match === undefined) return;
+    const contactList = await resolveContactList();
+    await openContactForProfile(contactList, match.host_id);
+  }
+
+  async function openPlayerContact(profileId: string): Promise<void> {
+    const contactList = await resolveContactList();
+    await openContactForProfile(contactList, profileId);
   }
 
   if (isPending) {
@@ -480,7 +684,21 @@ export default function MatchDetailScreen() {
     (participant) => participant.status === 'accepted',
   );
   const hostName = match.host?.display_name ?? 'Host';
-  const isAccepted = match.isHost || match.currentUserParticipant?.status === 'accepted';
+  const isAcceptedPlayer =
+    !match.isHost && match.currentUserParticipant?.status === 'accepted';
+  const playerCanWithdraw = canPlayerWithdraw(match, scheduleNow);
+  const pendingRequestCount = match.visibleParticipants.filter(
+    (participant) => participant.status === 'pending',
+  ).length;
+  const scrollPaddingBottom = playerCanWithdraw
+    ? 164
+    : isAcceptedPlayer
+      ? 120
+      : match.isHost && match.status !== 'cancelled'
+        ? pendingRequestCount > 0
+          ? 130
+          : 110
+        : 100;
   const hostRatingLabel = formatProfileRating(
     match.host?.rating_avg ?? null,
     match.host?.rating_count ?? null,
@@ -509,7 +727,7 @@ export default function MatchDetailScreen() {
           styles.scrollContent,
           {
             paddingTop: headerTop,
-            paddingBottom: isAccepted ? 164 : 100,
+            paddingBottom: scrollPaddingBottom,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -551,9 +769,12 @@ export default function MatchDetailScreen() {
           ) : null}
           <View style={styles.dateRow}>
             <Ionicons name="calendar-outline" size={15} color={C.dim} />
-            <Text style={styles.dateText}>
-              {formatMatchScheduleLabel(match.starts_at, match.duration_minutes)}
-            </Text>
+            <View style={styles.dateScheduleGroup}>
+              <Text style={styles.dateText}>
+                {formatMatchScheduleLabel(match.starts_at, match.duration_minutes)}
+              </Text>
+              <MatchStatusBadge status={match.status} />
+            </View>
           </View>
 
           <View style={styles.statsRow}>
@@ -615,15 +836,20 @@ export default function MatchDetailScreen() {
                     you={participant.profile_id === match.currentUserId}
                     ratingLabel={ratingLabel}
                     onRemove={
-                      match.isHost
+                      hostManagesRoster
                         ? () => void handleParticipantStatus(participant.id, 'removed')
+                        : undefined
+                    }
+                    onWhatsApp={
+                      match.isHost && canViewContacts
+                        ? () => void openPlayerContact(participant.profile_id)
                         : undefined
                     }
                   />
                 </View>
               );
             })}
-            {match.joinSpotsRemaining > 0 ? (
+            {match.joinSpotsRemaining > 0 && match.status !== 'cancelled' ? (
               <>
                 <View style={styles.rosterDivider} />
                 <OpenSpots count={match.joinSpotsRemaining} />
@@ -631,7 +857,7 @@ export default function MatchDetailScreen() {
             ) : null}
           </View>
 
-          {match.isHost ? (
+          {match.isHost && hostEditsRoster ? (
             <View style={styles.hostInboxCard}>
               <Text style={styles.noteLabel}>Pending Requests</Text>
               {match.visibleParticipants.filter((participant) => participant.status === 'pending').length === 0 ? (
@@ -679,7 +905,7 @@ export default function MatchDetailScreen() {
             </View>
           ) : null}
 
-          {isAccepted ? (
+          {playerCanWithdraw ? (
             <View style={styles.penaltyCard}>
               <Ionicons name="notifications-outline" size={16} color={C.warning} style={styles.penaltyIcon} />
               <Text style={styles.penaltyText}>
@@ -697,9 +923,10 @@ export default function MatchDetailScreen() {
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <FooterAction
           match={match}
+          scheduleNow={scheduleNow}
           isBusy={requestToJoin.isPending}
           onRequest={() => void handleRequest()}
-          onCancel={() => {
+          onCancelRequest={() => {
             const participantId = match.currentUserParticipant?.id;
             if (participantId !== undefined) {
               void handleCancelPending(participantId);
@@ -711,7 +938,8 @@ export default function MatchDetailScreen() {
               void handleParticipantStatus(participantId, 'withdrawn');
             }
           }}
-          onOpenContacts={() => void openFirstContact()}
+          onMessageHost={() => void openHostContact()}
+          onCancelMatch={handleCancelMatch}
         />
       </View>
 
@@ -875,10 +1103,40 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 18,
   },
+  dateScheduleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
+    minWidth: 0,
+  },
   dateText: {
     fontFamily: 'HankenGrotesk-Bold',
     fontSize: 14.5,
     color: C.dim,
+    flexShrink: 1,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    flexShrink: 0,
+  },
+  statusBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.success,
+  },
+  statusBadgeText: {
+    fontFamily: 'SpaceMono-Bold',
+    fontSize: 9.5,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
   },
   statsRow: {
     flexDirection: 'row',
@@ -1019,6 +1277,21 @@ const styles = StyleSheet.create({
     fontFamily: 'SpaceMono-Bold',
     fontSize: 12,
     color: C.mist,
+  },
+  playerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rosterWhatsAppButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: C.surface3,
+    borderWidth: 1,
+    borderColor: C.hair,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   removeButton: {
     borderRadius: 8,
@@ -1253,6 +1526,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: C.success,
     textTransform: 'uppercase',
+  },
+  hostPendingHint: {
+    fontFamily: 'HankenGrotesk-Medium',
+    fontSize: 13,
+    color: C.dim,
+    textAlign: 'center',
   },
   whatsappButton: {
     height: 56,

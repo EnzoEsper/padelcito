@@ -1,5 +1,5 @@
-import { StyleSheet } from 'react-native';
-import { Pressable, View, Text } from '@/tw';
+import { StyleSheet } from "react-native";
+import { Pressable, View, Text } from "@/tw";
 
 type SegmentedOption<T extends string> = {
   value: T;
@@ -14,7 +14,7 @@ type SegmentedControlProps<T extends string> = {
 
 /** Same shell as category range bar (rounded-xl, px-3, py-2.5). */
 const CAPSULE_CLASS =
-  'rounded-xl bg-surface-1 border border-neutral/10 px-3 py-2.5 flex-row items-center gap-1';
+  "rounded-xl bg-surface-1 border border-neutral/10 px-3 py-2.5 flex-row items-center gap-1";
 
 /** h-9 — matches category inner cell height. */
 const SEGMENT_HEIGHT = 36;
@@ -37,14 +37,17 @@ export function SegmentedControl<T extends string>({
             className="flex-1 min-w-0"
           >
             <View
-              style={[styles.segment, selected ? styles.segmentSelected : styles.segmentIdle]}
+              style={[
+                styles.segment,
+                selected ? styles.segmentSelected : styles.segmentIdle,
+              ]}
               className="w-full items-center justify-center px-2"
             >
               <Text
                 className={[
-                  'font-grotesk text-sm font-semibold',
-                  selected ? 'text-neutral' : 'text-neutral/55',
-                ].join(' ')}
+                  "font-grotesk text-sm font-semibold",
+                  selected ? "text-neutral" : "text-neutral/55",
+                ].join(" ")}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.85}
@@ -63,12 +66,12 @@ const styles = StyleSheet.create({
   segment: {
     height: SEGMENT_HEIGHT,
     borderRadius: SEGMENT_RADIUS,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   segmentSelected: {
-    backgroundColor: '#2B396D',
+    backgroundColor: "#2B396D",
   },
   segmentIdle: {
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
 });

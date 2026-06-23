@@ -217,7 +217,6 @@ export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
                   value={form.timePart}
                   mode="time"
                   display="spinner"
-                  minuteInterval={15}
                   is24Hour
                   onChange={handleTimeChange}
                   themeVariant="dark"
@@ -230,7 +229,6 @@ export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
             value={form.timePart}
             mode="time"
             display="default"
-            minuteInterval={15}
             is24Hour
             onChange={handleTimeChange}
           />

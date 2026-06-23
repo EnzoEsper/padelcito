@@ -1277,6 +1277,7 @@ export type Database = {
       }
       is_listing_open: { Args: { p_listing_id: string }; Returns: boolean }
       is_listing_owner: { Args: { p_listing_id: string }; Returns: boolean }
+      is_match_active: { Args: { p_match_id: string }; Returns: boolean }
       is_match_host: { Args: { p_match_id: string }; Returns: boolean }
       is_match_member: { Args: { p_match_id: string }; Returns: boolean }
       is_match_member_of: {
@@ -1284,6 +1285,11 @@ export type Database = {
         Returns: boolean
       }
       is_match_open: { Args: { p_match_id: string }; Returns: boolean }
+      is_match_pre_start: { Args: { p_match_id: string }; Returns: boolean }
+      is_match_roster_editable: {
+        Args: { p_match_id: string }
+        Returns: boolean
+      }
       is_registration_open: {
         Args: { p_tournament_id: string }
         Returns: boolean
@@ -1377,6 +1383,10 @@ export type Database = {
         Args: { p_stage_id: string }
         Returns: undefined
       }
+      sync_match_lifecycle: {
+        Args: { p_match_id: string }
+        Returns: Database["public"]["Enums"]["match_status"]
+      }
     }
     Enums: {
       conversation_type: "match" | "direct" | "tournament"
@@ -1389,7 +1399,7 @@ export type Database = {
       match_difficulty: "friendly" | "competitive"
       match_gender_preference: "male" | "female" | "mixed"
       match_position_preference: "any" | "drive" | "backhand"
-      match_status: "open" | "full" | "in_progress" | "completed" | "cancelled"
+      match_status: "open" | "full" | "in_progress" | "finished" | "cancelled"
       participant_status:
         | "pending"
         | "accepted"
@@ -1564,7 +1574,7 @@ export const Constants = {
       match_difficulty: ["friendly", "competitive"],
       match_gender_preference: ["male", "female", "mixed"],
       match_position_preference: ["any", "drive", "backhand"],
-      match_status: ["open", "full", "in_progress", "completed", "cancelled"],
+      match_status: ["open", "full", "in_progress", "finished", "cancelled"],
       participant_status: [
         "pending",
         "accepted",

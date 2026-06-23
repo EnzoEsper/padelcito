@@ -24,7 +24,15 @@ import type { Database } from '@/types/database';
 type Json = Database['public']['Tables']['matches']['Row']['court_configs'];
 type GenderPreference = Database['public']['Enums']['match_gender_preference'];
 type MatchDifficulty = Database['public']['Enums']['match_difficulty'];
+type MatchStatus = Database['public']['Enums']['match_status'];
 type PositionPreference = Database['public']['Enums']['match_position_preference'];
+
+export type MatchStatusBadgeTone = 'open' | 'full' | 'live' | 'finished' | 'cancelled';
+
+export type MatchStatusBadgeConfig = {
+  label: string;
+  tone: MatchStatusBadgeTone;
+};
 
 export type SkillBadgeTier = 'A' | 'B' | 'C' | 'D';
 
@@ -326,4 +334,27 @@ export function formatProfileRating(
 
 export function hasHostNote(description: string | null): boolean {
   return description !== null && description.trim().length > 0;
+}
+
+const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
+  open: 'Open',
+  full: 'Full',
+  in_progress: 'Live',
+  finished: 'Finished',
+  cancelled: 'Cancelled',
+};
+
+export function resolveMatchStatusBadge(status: MatchStatus): MatchStatusBadgeConfig {
+  switch (status) {
+    case 'open':
+      return { label: MATCH_STATUS_LABELS.open, tone: 'open' };
+    case 'full':
+      return { label: MATCH_STATUS_LABELS.full, tone: 'full' };
+    case 'in_progress':
+      return { label: MATCH_STATUS_LABELS.in_progress, tone: 'live' };
+    case 'finished':
+      return { label: MATCH_STATUS_LABELS.finished, tone: 'finished' };
+    case 'cancelled':
+      return { label: MATCH_STATUS_LABELS.cancelled, tone: 'cancelled' };
+  }
 }

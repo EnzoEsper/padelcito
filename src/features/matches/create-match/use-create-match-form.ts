@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { Database } from '@/types/database';
 import { categoryRangeToSkillLevels } from '@/lib/padel-category';
 import {
@@ -37,13 +37,14 @@ export function formatDurationLabel(minutes: number): string {
   return `${minutes / 60} hr`;
 }
 
-function defaultStartsAt(): Date {
+function defaultDatePart(): Date {
   const date = new Date();
-  date.setHours(19, 30, 0, 0);
-  if (date.getTime() <= Date.now()) {
-    date.setDate(date.getDate() + 1);
-  }
+  date.setHours(0, 0, 0, 0);
   return date;
+}
+
+function defaultTimePart(): Date {
+  return new Date();
 }
 
 function formatAutoTitle(venueName: string, startsAt: Date): string {
@@ -113,17 +114,11 @@ export type CreateMatchFormActions = {
 };
 
 export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActions {
-  const initialStartsAt = useMemo(() => defaultStartsAt(), []);
-
   const [venueName, setVenueName] = useState('');
   const [coords, setCoords] = useState<Coords | null>(null);
   const [placeLabel, setPlaceLabel] = useState<string | null>(null);
-  const [datePart, setDatePart] = useState(() => {
-    const d = new Date(initialStartsAt);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  });
-  const [timePart, setTimePart] = useState(() => new Date(initialStartsAt));
+  const [datePart, setDatePart] = useState(defaultDatePart);
+  const [timePart, setTimePart] = useState(defaultTimePart);
   const [durationMinutes, setDurationMinutes] = useState<DurationOption>(60);
   const [courtCount, setCourtCountState] = useState(1);
   const [courtConfigs, setCourtConfigsState] = useState<CourtConfig[]>(() => [createDefaultCourtConfig()]);

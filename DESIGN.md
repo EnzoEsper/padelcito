@@ -254,7 +254,11 @@ The one permitted depth shortcut is a background-color `linear-gradient` from `t
 
 `button-primary-pressed` — identical tokens to `button-primary`; the visual change is the scale transform and opacity reduction to 0.97, not a token swap.
 
-`button-accepted` — renders after a join request is confirmed. Inverts to Neutral fill with Background text. Use for the "Message group on WhatsApp" CTA. The label above it ("YOU'RE IN — ROSTER CONFIRMED") uses `label-caps` in Success color.
+`button-accepted` — renders after a join request is confirmed. Inverts to Neutral fill with Background text. Use for the "Message host on WhatsApp" CTA (accepted players message the host 1:1; hosts message accepted players from roster rows). The label above it ("YOU'RE IN — ROSTER CONFIRMED") uses `label-caps` in Success color. Hosts use a separate "You're hosting this match" label without a footer WhatsApp CTA. Hide this button when `matches.status` is `cancelled` or `finished`.
+
+`match-status-badge` — inline pill beside date/time on match detail (~8 px gap). Tones: Open (Primary), Full (Primary-Hi), Live (Success + pulse dot), Finished (Neutral dim), Cancelled (Warning). Driven by `resolveMatchStatusBadge()`.
+
+`footer-readonly` — replaces action footer when match is `cancelled` or `finished` (e.g. "This match has been cancelled" / "This match has finished"). Neutral `body-sm` on the sticky footer gradient; no CTAs.
 
 `button-disabled` — Surface-1 fill, Neutral text at `faint` (38 %) opacity. Used for "Match is full · Join waitlist" and the "Request sent · awaiting host" pending state. The pending state adds a pulsing Primary-Hi dot to the left of the label.
 

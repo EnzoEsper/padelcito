@@ -70,8 +70,43 @@
 8. Do NOT store secrets in code, `app.json`, or AsyncStorage — env vars + `expo-secure-store` only.
 9. Do NOT poll endpoints that have Realtime subscriptions available.
 10. Do NOT write schema changes outside `supabase/migrations/`.
+11. Do NOT add group WhatsApp CTAs or expose `whatsapp_phone` outside `match_contact_details()` — contact is **1:1 only** (accepted player → host; host → each accepted player from roster rows).
+12. Do NOT allow roster edits, host cancel, player withdraw, or WhatsApp after `starts_at`, or any roster/contact action when `matches.status` is `cancelled` or `finished` — DB triggers/RLS enforce this; mirror with client helpers.
 
-## 8. Canonical References
+## 8. Match Lifecycle & Contact Rules (M2)
+
+### `match_status` enum
+
+`open | full | in_progress | finished | cancelled`
+
+- **`open` / `full`:** pre-start; capacity trigger flips between them. Host may cancel (`status → cancelled`), accept/reject/remove roster, and use 1:1 WhatsApp on accepted players.
+- **`in_progress`:** `starts_at` has passed and `starts_at + duration_minutes` is still in the future. No host cancel, no roster remove, no player withdraw. WhatsApp remains available until finish/cancel.
+- **`finished`:** end time reached (auto via `sync_match_lifecycle`). Read-only detail footer; no WhatsApp; standard post-match ratings unlock when implemented (M3).
+- **`cancelled`:** host sets before start. Read-only footer; no roster or WhatsApp; accepted players leave Upcoming and appear in History.
+
+Never set `full`, `in_progress`, or `finished` from client code except host cancel (`cancelled`). Lifecycle transitions are trigger- or RPC-maintained.
+
+### Key database helpers & RPCs
+
+| Function | Role |
+| -------- | ---- |
+| `is_match_pre_start(match_id)` | `open`/`full` and `starts_at > now()` |
+| `is_match_roster_editable(match_id)` | Alias of pre-start; gates accept/reject/remove/withdraw |
+| `is_match_active(match_id)` | Not `cancelled` or `finished`; required for `match_contact_details()` |
+| `sync_match_lifecycle(match_id)` | SECURITY DEFINER; advances `open/full → in_progress → finished` from schedule. Callable by host, participant, or any authenticated user viewing a **public** match (discover). Call before loading match detail. |
+| `match_contact_details(match_id)` | Only path to other users' WhatsApp; blocked when match inactive |
+
+Migrations: `20260622120000_block_actions_on_cancelled_matches`, `20260622140000_match_start_lifecycle_locks`, `20260622150000_fix_sync_match_lifecycle_auth`, `20260623120000_rename_match_completed_to_finished`.
+
+### Client mirrors (`src/features/matches/`)
+
+- `isMatchPreStart`, `canHostEditRoster`, `canHostManageRoster`, `canHostCancelMatch`, `canPlayerWithdraw` in `use-matches.ts` — must stay aligned with DB helpers.
+- `useMatchScheduleClock` in `use-match-schedule-clock.ts` — re-render at `starts_at` and end boundaries so footer/roster UI does not go stale.
+- `useMatchDetail` calls `sync_match_lifecycle` before fetch; `useMatchRealtime` invalidates lists on `matches` / `match_participants` changes.
+- `resolveMatchStatusBadge()` in `match-display.ts` — inline status badge on detail (Open / Full / Live / Finished / Cancelled).
+- WhatsApp: accepted players get footer CTA to message **host** only; hosts get per-row WhatsApp on **accepted** roster entries only — never a group button.
+
+## 9. Canonical References
 
 - Schema source of truth: the full `supabase/migrations/` chain (starting with `20260608050054_0001_initial_schema.sql` and all subsequent migrations).
 - Architecture rationale & roadmap: `ARCHITECTURE.md` (repo root).
