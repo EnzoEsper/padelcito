@@ -30,14 +30,46 @@ export const profileSchema = z.object({
     .max(30, 'Cannot exceed 30 characters')
     .regex(/^[a-zA-Z0-9_]+$/, 'Only letters, numbers, and underscores'),
   bio: z.string().max(500, 'Bio cannot exceed 500 characters'),
-  whatsapp_phone: z.string().refine(
-    (val) => val === '' || /^\+[1-9][0-9]{6,14}$/.test(val),
-    { message: 'Use international format, e.g. +54911XXXXXXXX' },
-  ),
+  whatsapp_phone: z
+    .string()
+    .transform(normalizeWhatsAppPhone)
+    .pipe(
+      z.string().refine(
+        (val) => val === '' || /^\+[1-9][0-9]{6,14}$/.test(val),
+        { message: 'Use international format, e.g. +54911XXXXXXXX' },
+      ),
+    ),
   skill_level: z.enum(SKILL_LEVELS),
 });
 
 export type ProfileFormData = z.infer<typeof profileSchema>;
+
+/** TEMP: Argentina-only WhatsApp helpers for easier local onboarding. Revert for international input. */
+export const TEMP_ARGENTINA_WHATSAPP_PREFIX = '+54';
+export const TEMP_DEFAULT_WHATSAPP_LOCAL = '911';
+
+export function formatArgentinaWhatsAppLocal(fullPhone: string): string {
+  if (fullPhone === '') return '';
+  if (fullPhone.startsWith(TEMP_ARGENTINA_WHATSAPP_PREFIX)) {
+    return fullPhone.slice(TEMP_ARGENTINA_WHATSAPP_PREFIX.length);
+  }
+  return fullPhone.replace(/\D/g, '');
+}
+
+export function composeArgentinaWhatsAppPhone(localDigits: string): string {
+  const digits = localDigits.replace(/\D/g, '');
+  if (digits === '') return '';
+  return `${TEMP_ARGENTINA_WHATSAPP_PREFIX}${digits}`;
+}
+
+function normalizeWhatsAppPhone(val: string): string {
+  const trimmed = val.trim();
+  if (trimmed === '') return '';
+  if (/^\+[1-9][0-9]{6,14}$/.test(trimmed)) return trimmed;
+  // TEMP: unfinished Argentine entry stays optional — drop partial prefix on save.
+  if (trimmed.startsWith(TEMP_ARGENTINA_WHATSAPP_PREFIX)) return '';
+  return trimmed;
+}
 
 // ─── Main onboarding hook ─────────────────────────────────────────────────────
 
@@ -67,7 +99,7 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
     defaultValues: {
       username: '',
       bio: '',
-      whatsapp_phone: '',
+      whatsapp_phone: composeArgentinaWhatsAppPhone(TEMP_DEFAULT_WHATSAPP_LOCAL),
     },
   });
 

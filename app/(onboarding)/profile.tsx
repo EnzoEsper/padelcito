@@ -12,6 +12,10 @@ import { View, Text, Pressable, TextInput, ScrollView } from '@/tw';
 import {
   useOnboardingProfile,
   SKILL_LEVELS,
+  formatArgentinaWhatsAppLocal,
+  composeArgentinaWhatsAppPhone,
+  TEMP_ARGENTINA_WHATSAPP_PREFIX,
+  TEMP_DEFAULT_WHATSAPP_LOCAL,
   type SkillLevel,
   type ProfileFormData,
 } from '@/features/onboarding/use-onboarding-profile';
@@ -154,7 +158,7 @@ function WhatsAppField({ control, error }: WhatsAppFieldProps) {
   const { field } = useController({
     control,
     name: 'whatsapp_phone',
-    defaultValue: '',
+    defaultValue: composeArgentinaWhatsAppPhone(TEMP_DEFAULT_WHATSAPP_LOCAL),
   });
 
   const borderColor = error
@@ -163,22 +167,31 @@ function WhatsAppField({ control, error }: WhatsAppFieldProps) {
       ? BORDER_FOCUSED
       : BORDER_DEFAULT;
 
+  const localValue = formatArgentinaWhatsAppLocal(field.value);
+
   return (
     <View className="mb-6">
       <SectionLabel>WhatsApp — Optional</SectionLabel>
-      <TextInput
-        value={field.value}
-        onChangeText={(text) => field.onChange(text)}
-        onBlur={() => { field.onBlur(); setIsFocused(false); }}
-        onFocus={() => setIsFocused(true)}
-        keyboardType="phone-pad"
-        autoComplete="tel"
-        returnKeyType="done"
-        placeholder="+54911XXXXXXXX"
-        placeholderTextColor={PLACEHOLDER_COLOR}
-        style={[styles.textInput, { borderColor }]}
-        className="bg-surface-2 font-grotesk text-base text-neutral"
-      />
+      <View
+        style={[styles.inputRow, { borderColor }]}
+        className="bg-surface-2"
+      >
+        <Text className="font-mono text-base text-neutral/60 pl-4">
+          {TEMP_ARGENTINA_WHATSAPP_PREFIX}
+        </Text>
+        <TextInput
+          value={localValue}
+          onChangeText={(text) => field.onChange(composeArgentinaWhatsAppPhone(text))}
+          onBlur={() => { field.onBlur(); setIsFocused(false); }}
+          onFocus={() => setIsFocused(true)}
+          keyboardType="phone-pad"
+          autoComplete="tel"
+          returnKeyType="done"
+          placeholder="911XXXXXXXX"
+          placeholderTextColor={PLACEHOLDER_COLOR}
+          className="flex-1 font-grotesk text-base text-neutral px-2 h-full"
+        />
+      </View>
       <FieldError message={error} />
     </View>
   );
