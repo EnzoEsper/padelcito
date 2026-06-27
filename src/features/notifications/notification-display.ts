@@ -148,6 +148,14 @@ export function resolveNotificationPresentation(
         title: 'Request declined',
         body: `${actor} declined your request for ${label}.`,
       };
+    case 'join_request_cancelled':
+      return {
+        ...base,
+        icon: 'close-circle-outline',
+        accent: 'primary',
+        title: 'Request cancelled',
+        body: `${actor} cancelled their join request for ${label}.`,
+      };
     case 'participant_withdrawn':
       return {
         ...base,

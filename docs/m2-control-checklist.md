@@ -39,8 +39,9 @@ This document is the handoff point for M2 Core Matchmaking MVP sessions.
 - Request to join from a second account.
 - Confirm the host sees the pending request in Matches.
 - Accept the request and confirm the requester sees an accepted state with footer WhatsApp to **host only** (not "roster confirmed" for the host).
-- Open WhatsApp contacts after acceptance (player→host footer; host→player per roster row).
-- Test pending cancellation, accepted withdrawal, and host removal — all **before** `starts_at` only.
+- Open WhatsApp contacts after acceptance (player→host footer; host→player per roster row); message opens pre-filled with match venue and schedule.
+- Test pending cancellation, accepted withdrawal, and host removal — all **before** `starts_at` only; each action shows a confirmation dialog (withdraw/remove warn inside the late-withdrawal window).
+- Player cancels pending request → host receives `join_request_cancelled` in-app notification.
 - Host cancels match pre-start → both devices show read-only footer; no roster remove; no WhatsApp; accepted player leaves Upcoming, appears in History (realtime).
 - After `starts_at`: Cancel / remove / withdraw hidden or blocked; status badge shows **Live**; `sync_match_lifecycle` sets `in_progress`.
 - After `starts_at + duration_minutes`: status **Finished**; read-only footer; no WhatsApp for anyone.

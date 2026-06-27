@@ -213,6 +213,22 @@ export function formatWithdrawalThreshold(interval: string): string {
   return `${hours}h ${minutes}m`;
 }
 
+export function lateWithdrawalThresholdMs(interval: string): number {
+  const parsed = parseIntervalHoursMinutes(interval);
+  if (parsed === null) return 2 * 60 * 60 * 1000;
+  return (parsed.hours * 60 + parsed.minutes) * 60 * 1000;
+}
+
+/** Mirrors DB: now >= starts_at - late_withdrawal_threshold. */
+export function isWithinLateWithdrawalWindow(
+  startsAt: string,
+  thresholdInterval: string,
+  nowMs: number = Date.now(),
+): boolean {
+  const startMs = new Date(startsAt).getTime();
+  return nowMs >= startMs - lateWithdrawalThresholdMs(thresholdInterval);
+}
+
 function allSame<T>(values: T[]): boolean {
   return values.every((value) => value === values[0]);
 }

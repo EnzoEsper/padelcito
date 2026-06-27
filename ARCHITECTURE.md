@@ -67,7 +67,7 @@ auth.users ──1:1── profiles ──N:M── sports (via profile_sports)
 
 Acceptance of a join request is therefore the exact moment contact data becomes reachable — matching the product flow precisely.
 
-**1:1 contact only (no group chat):** the client never renders a group WhatsApp button. Accepted players message the host via a footer CTA; the host messages each accepted player individually from roster rows. Both paths call `match_contact_details()` then `Linking.openURL` to the returned `wa.me` link. Contact is blocked when `is_match_active()` is false (`cancelled` or `finished`).
+**1:1 contact only (no group chat):** the client never renders a group WhatsApp button. Accepted players message the host via a footer CTA; the host messages each accepted player individually from roster rows. Both paths call `match_contact_details()` then `Linking.openURL` on a `wa.me` link with a pre-filled match-context message (`src/features/matches/match-whatsapp.ts`). Contact is blocked when `is_match_active()` is false (`cancelled` or `finished`).
 
 ### Match lifecycle — schedule-driven status machine
 

@@ -115,7 +115,7 @@ Migrations: `20260622120000_block_actions_on_cancelled_matches`, `20260622140000
 ### In-app notifications
 
 - Table: `notifications` (Realtime-enabled). Rows inserted only by `emit_notification()` (SECURITY DEFINER) from lifecycle triggers.
-- Types: `join_request`, `join_accepted`, `join_rejected`, `participant_withdrawn`, `participant_removed`, `match_cancelled`, `rating_request`.
+- Types: `join_request`, `join_accepted`, `join_rejected`, `join_request_cancelled`, `participant_withdrawn`, `participant_removed`, `match_cancelled`, `rating_request`.
 - Client: `src/features/notifications/` (`use-notifications.ts`, `notification-display.ts`), `NotificationBell`, `app/(app)/notifications.tsx`. Mount `useNotificationsRealtime()` once in `app/(app)/_layout.tsx`.
 - Penalty-eligible notifications deep-link to `app/(app)/report-penalty.tsx`; `rating_request` deep-links to `app/(app)/rate-match.tsx`.
 
@@ -134,7 +134,7 @@ Migrations: `20260622120000_block_actions_on_cancelled_matches`, `20260622140000
 
 ### M3 migrations
 
-`20260623140000_create_notifications`, `20260623150000_notification_triggers`, `20260623200000_match_cancellation_timestamp`, `20260623210000_reliability_reports`, `20260623220000_reliability_aggregates`, `20260624100000_post_match_ratings`, `20260624110000_schedule_match_finalizer`.
+`20260623140000_create_notifications`, `20260623150000_notification_triggers`, `20260623200000_match_cancellation_timestamp`, `20260623210000_reliability_reports`, `20260623220000_reliability_aggregates`, `20260624100000_post_match_ratings`, `20260624110000_schedule_match_finalizer`, `20260627230000_join_request_cancelled_notification`.
 
 ### Client mirrors (`src/features/matches/`)
 
@@ -142,7 +142,9 @@ Migrations: `20260622120000_block_actions_on_cancelled_matches`, `20260622140000
 - `useMatchScheduleClock` in `use-match-schedule-clock.ts` — re-render at `starts_at` and end boundaries so footer/roster UI does not go stale.
 - `useMatchDetail` calls `sync_match_lifecycle` before fetch; `useMatchRealtime` invalidates lists on `matches` / `match_participants` changes.
 - `resolveMatchStatusBadge()` in `match-display.ts` — inline status badge on detail (Open / Full / Live / Finished / Cancelled).
-- WhatsApp: accepted players get footer CTA to message **host** only; hosts get per-row WhatsApp on **accepted** roster entries only — never a group button.
+- `isWithinLateWithdrawalWindow()` in `match-display.ts` — client mirror of DB late-withdrawal penalty window for confirm-dialog copy.
+- WhatsApp: accepted players get footer CTA to message **host** only; hosts get per-row WhatsApp on **accepted** roster entries only — never a group button. Links open with pre-filled match-context text via `match-whatsapp.ts`.
+- Match detail destructive actions (remove player, withdraw, cancel pending request) require confirmation alerts before mutating roster state.
 
 ## 10. Canonical References
 

@@ -34,6 +34,7 @@ import {
   formatProfileRating,
   formatWithdrawalThreshold,
   hasHostNote,
+  isWithinLateWithdrawalWindow,
   resolveMatchCourtConfigs,
   resolveMatchDistanceM,
   resolveMatchStatusBadge,
@@ -43,6 +44,11 @@ import {
 import { formatPublicReliabilityScore } from '@/features/ratings/penalty-report';
 import { RosterInfoButton, RosterInfoSheet } from '@/features/matches/roster-info-sheet';
 import type { CourtConfig } from '@/lib/padel-court';
+import {
+  buildHostToPlayerWhatsAppMessage,
+  buildPlayerToHostWhatsAppMessage,
+  buildWhatsAppLinkWithMessage,
+} from '@/features/matches/match-whatsapp';
 import { formatMatchScheduleLabel } from '@/lib/match-time';
 import { resolveMatchLocationSubtitle } from '@/lib/match-location';
 import { UnsupportedSportError } from '@/lib/padel-sport';
@@ -55,6 +61,7 @@ type MatchStatus = Database['public']['Enums']['match_status'];
 async function openContactForProfile(
   contacts: ContactRow[] | undefined,
   profileId: string,
+  message?: string,
 ): Promise<void> {
   const contact = contacts?.find((row) => row.profile_id === profileId);
   const link = contact?.whatsapp_link;
@@ -62,7 +69,11 @@ async function openContactForProfile(
     Alert.alert('No WhatsApp link', 'This player has not added a WhatsApp number yet.');
     return;
   }
-  await Linking.openURL(link);
+  const url =
+    message !== undefined && message.length > 0
+      ? buildWhatsAppLinkWithMessage(link, message)
+      : link;
+  await Linking.openURL(url);
 }
 
 const SCREEN_PADDING = 20;
@@ -669,15 +680,98 @@ export default function MatchDetailScreen() {
     );
   }
 
+  function confirmRemovePlayer(participantId: string, playerName: string): void {
+    if (match === undefined || !hostManagesRoster) return;
+
+    const thresholdLabel = formatWithdrawalThreshold(match.late_withdrawal_threshold);
+    const isLate = isWithinLateWithdrawalWindow(
+      match.starts_at,
+      match.late_withdrawal_threshold,
+      scheduleNow,
+    );
+
+    const message = isLate
+      ? `${playerName} will be removed within ${thresholdLabel} of start time. Their spot will reopen, but this may affect your trust score and they can report unfair removal.`
+      : `${playerName} will be removed from the roster and their spot will reopen for others to join.`;
+
+    Alert.alert('Remove player?', message, [
+      { text: 'Keep player', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          void handleParticipantStatus(participantId, 'removed');
+        },
+      },
+    ]);
+  }
+
+  function confirmWithdraw(): void {
+    if (match === undefined || !canPlayerWithdraw(match, scheduleNow)) return;
+
+    const participantId = match.currentUserParticipant?.id;
+    if (participantId === undefined) return;
+
+    const thresholdLabel = formatWithdrawalThreshold(match.late_withdrawal_threshold);
+    const isLate = isWithinLateWithdrawalWindow(
+      match.starts_at,
+      match.late_withdrawal_threshold,
+      scheduleNow,
+    );
+
+    const message = isLate
+      ? `You're withdrawing within ${thresholdLabel} of start time. This affects your trust score and may incur a no-show penalty.`
+      : 'Your spot will reopen for others. You can request to join again if spots remain.';
+
+    Alert.alert('Withdraw from match?', message, [
+      { text: 'Stay in match', style: 'cancel' },
+      {
+        text: 'Withdraw',
+        style: 'destructive',
+        onPress: () => {
+          void handleParticipantStatus(participantId, 'withdrawn');
+        },
+      },
+    ]);
+  }
+
+  function confirmCancelRequest(): void {
+    if (match === undefined) return;
+
+    const participant = match.currentUserParticipant;
+    if (participant?.status !== 'pending') return;
+
+    Alert.alert(
+      'Cancel request?',
+      'Your join request will be withdrawn and the host will no longer review it. You can send a new request if spots remain.',
+      [
+        { text: 'Keep request', style: 'cancel' },
+        {
+          text: 'Cancel request',
+          style: 'destructive',
+          onPress: () => {
+            void handleCancelPending(participant.id);
+          },
+        },
+      ],
+    );
+  }
+
   async function openHostContact(): Promise<void> {
     if (match === undefined) return;
     const contactList = await resolveContactList();
-    await openContactForProfile(contactList, match.host_id);
+    const hostDisplayName = match.host?.display_name ?? 'Host';
+    const message = buildPlayerToHostWhatsAppMessage(match, hostDisplayName);
+    await openContactForProfile(contactList, match.host_id, message);
   }
 
   async function openPlayerContact(profileId: string): Promise<void> {
+    if (match === undefined) return;
     const contactList = await resolveContactList();
-    await openContactForProfile(contactList, profileId);
+    const profile = participantProfilesById.get(profileId);
+    const recipientName = profile?.display_name ?? 'Player';
+    const message = buildHostToPlayerWhatsAppMessage(match, recipientName);
+    await openContactForProfile(contactList, profileId, message);
   }
 
   if (isPending) {
@@ -887,7 +981,7 @@ export default function MatchDetailScreen() {
                     reliabilityLabel={reliabilityLabel}
                     onRemove={
                       hostManagesRoster
-                        ? () => void handleParticipantStatus(participant.id, 'removed')
+                        ? () => confirmRemovePlayer(participant.id, name)
                         : undefined
                     }
                     onWhatsApp={
@@ -976,18 +1070,8 @@ export default function MatchDetailScreen() {
           scheduleNow={scheduleNow}
           isBusy={requestToJoin.isPending}
           onRequest={() => void handleRequest()}
-          onCancelRequest={() => {
-            const participantId = match.currentUserParticipant?.id;
-            if (participantId !== undefined) {
-              void handleCancelPending(participantId);
-            }
-          }}
-          onWithdraw={() => {
-            const participantId = match.currentUserParticipant?.id;
-            if (participantId !== undefined) {
-              void handleParticipantStatus(participantId, 'withdrawn');
-            }
-          }}
+          onCancelRequest={confirmCancelRequest}
+          onWithdraw={confirmWithdraw}
           onMessageHost={() => void openHostContact()}
           onCancelMatch={handleCancelMatch}
           needsRating={needsRating}

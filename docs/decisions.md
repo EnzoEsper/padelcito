@@ -14,7 +14,13 @@ Migrations `20260616120000_add_match_host_metadata`, `20260617120000_restrict_ma
 
 ## In-app notifications (2026-06-23 — M3)
 
-Match lifecycle events (join request, accept/reject, withdraw, remove, cancel, rating request) emit rows into a dedicated `notifications` table via `emit_notification()` from AFTER triggers — not from client code. Realtime keeps the bell badge live; recipients mark rows read via RLS-scoped UPDATE on `read_at` only. Migrations `20260623140000_create_notifications` and `20260623150000_notification_triggers`. Client: `src/features/notifications/`, `NotificationBell`, `app/(app)/notifications.tsx`.
+Match lifecycle events (join request, accept/reject, request cancel, withdraw, remove, match cancel, rating request) emit rows into a dedicated `notifications` table via `emit_notification()` from AFTER triggers — not from client code. Realtime keeps the bell badge live; recipients mark rows read via RLS-scoped UPDATE on `read_at` only. Migrations `20260623140000_create_notifications`, `20260623150000_notification_triggers`, and `20260627230000_join_request_cancelled_notification` (player cancels pending request → host inbox). Client: `src/features/notifications/`, `NotificationBell`, `app/(app)/notifications.tsx`.
+
+---
+
+## Match detail roster UX (2026-06-27)
+
+WhatsApp deep links include editable match-context templates (`match-whatsapp.ts`). Destructive roster actions on match detail (remove player, withdraw, cancel pending request) require native confirmation dialogs; withdraw/remove copy warns inside the `late_withdrawal_threshold` window using `isWithinLateWithdrawalWindow()` in `match-display.ts`, mirroring DB penalty flags.
 
 ---
 

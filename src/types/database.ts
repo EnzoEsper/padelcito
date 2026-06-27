@@ -1593,6 +1593,7 @@ export type Database = {
         | "join_request"
         | "join_accepted"
         | "join_rejected"
+        | "join_request_cancelled"
         | "participant_withdrawn"
         | "participant_removed"
         | "match_cancelled"
@@ -1784,6 +1785,7 @@ export const Constants = {
         "participant_removed",
         "match_cancelled",
         "rating_request",
+        "join_request_cancelled",
       ],
       participant_status: [
         "pending",
