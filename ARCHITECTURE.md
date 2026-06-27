@@ -28,7 +28,8 @@ auth.users ──1:1── profiles ──N:M── sports (via profile_sports)
  match_participants  listing_responses      tournaments     conversation_members
         │                                        │               │
      ratings                          ┌──────────┼──────────┐  messages
-                                      │          │          │
+  reliability_reports                 │          │          │
+  notifications                       │          │          │
                           tournament_courts  registrations  stages
                                       │          │          │
                                       └── tournament_matches ┘
@@ -37,13 +38,13 @@ auth.users ──1:1── profiles ──N:M── sports (via profile_sports)
                                        circuit_standings
 ```
 
-**19 tables across 6 domains:**
+**21 tables across 6 domains** (includes `notifications` and `reliability_reports` added in M3):
 
 | Domain                 | Tables                                                                                                                                                             | Roadmap phase                      |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
 | Identity & catalog     | `sports`, `profiles`, `profile_sports`                                                                                                                             | MVP                                |
 | Core matchmaking       | `matches`, `match_participants`                                                                                                                                    | MVP                                |
-| Trust & penalties      | `ratings`                                                                                                                                                          | Phase 2                            |
+| Trust & penalties      | `ratings`, `reliability_reports`, `notifications`                                                                                                                  | Phase 2 (M3 — shipped)             |
 | Open listings          | `listings`, `listing_responses`                                                                                                                                    | Phase 3                            |
 | Tournaments & circuits | `circuits`, `tournaments`, `tournament_courts`, `tournament_registrations`, `tournament_stages`, `tournament_matches`, `tournament_standings`, `circuit_standings` | Phases 4–5                         |
 | Chat (dormant)         | `conversations`, `conversation_members`, `messages`                                                                                                                | Future — zero-migration activation |
@@ -79,20 +80,23 @@ Acceptance of a join request is therefore the exact moment contact data becomes 
 | `finished` | End time reached; set automatically by `sync_match_lifecycle()`. |
 | `cancelled` | Host cancellation before start (`UPDATE status = 'cancelled'` — never hard-delete). |
 
-**`sync_match_lifecycle(match_id)`** (SECURITY DEFINER) compares `now()` to `starts_at` and `starts_at + duration_minutes`, promoting `open/full → in_progress → finished`. Authorized callers: match host, any participant with a relationship row, or any authenticated user when `matches.is_public` (so discover viewers can open detail). The match-detail hook calls this RPC before fetch so stale UI cannot show pre-start actions after kickoff.
+**`sync_match_lifecycle(match_id)`** (SECURITY DEFINER) compares `now()` to `starts_at` and `starts_at + duration_minutes`, promoting `open/full → in_progress → finished` and stamping `finished_at`. On finish it emits `rating_request` notifications. Authorized callers: match host, any participant with a relationship row, or any authenticated user when `matches.is_public`. The match-detail hook calls this RPC before fetch.
+
+**`finalize_due_matches()`** (SECURITY DEFINER, pg_cron every 2 min) set-based finalizer — guarantees matches reach `finished` even if nobody opens detail. Not client-callable.
 
 **Pre-start locks** (`is_match_pre_start`, `is_match_roster_editable`): until `starts_at`, the host may cancel, accept/reject/remove participants, and players may withdraw. After start, triggers and RLS block cancel, roster removal, and withdrawal. **`cancelled` and `finished`** block all participant mutations and WhatsApp reveal.
 
 Client helpers in `src/features/matches/use-matches.ts` mirror these rules; `useMatchScheduleClock` forces re-render at schedule boundaries.
 
-### Automated trust penalties — zero moderation screens
+### Trust — quality vs reliability (two metrics)
 
-The state machine lives in one trigger (`handle_participant_status_change`):
+**Quality (stars):** `ratings` table with `context = 'standard'`. Mutual optional 1–5 star ratings after a match is **`finished`**, within 14 days of `finished_at`. Double-blind RLS (rater reads own rows only); `rating_avg` / `rating_count` denormalized on `profiles` by trigger.
 
-- `accepted → withdrawn` within `matches.late_withdrawal_threshold` (default 2h, **per-match configurable**) sets `was_late_withdrawal = true` on the participant row.
-- `accepted → removed` within the same window sets `was_removed_by_host = true`.
+**Reliability (penalties):** `reliability_reports` table — optional wronged-party confirmations for `late_withdrawal`, `host_removal`, and `late_cancellation`. Separate from stars. `reliability_score`, `penalty_count`, and `commitment_count` on `profiles` are trigger-maintained.
 
-These flags _unlock_ context-flagged ratings (`rating_context = 'late_withdrawal' | 'host_removal'`). The `validate_rating` trigger enforces every combination: standard ratings need a **finished** match (`match_status = 'finished'`) and mutual membership; penalty ratings need the corresponding flag. No admin UI is ever needed — the database is the referee. Rating aggregates (`rating_avg`, `rating_count`) are denormalized onto `profiles` by trigger for cheap card rendering.
+The participant state machine sets eligibility flags (`was_late_withdrawal`, `was_removed_by_host`); late cancellation uses `matches.cancelled_at` vs `late_withdrawal_threshold`. In-app notifications deep-link to optional report/rating screens — nothing is applied automatically.
+
+Legacy `rating_context` penalty values (`late_withdrawal`, `host_removal`) remain in the enum but `validate_rating` rejects them; use `reliability_reports` instead.
 
 ### Non-expiring listings by construction
 
@@ -122,11 +126,12 @@ All location columns are `geography(Point, 4326)` with GIST indexes. Discovery R
 | ---------------------- | ----------------------------------------------------------------------------- |
 | `matches`              | capacity flips `open ↔ full`; lifecycle sync flips `in_progress` / `finished`; cancel updates lists |
 | `match_participants`   | join-request lifecycle: requester sees accept/reject the moment the host taps |
+| `notifications`        | in-app inbox badge + list update live for the recipient                       |
 | `tournament_matches`   | **live scores** + court assignments to every spectator device                 |
 | `tournament_standings` | leaderboard refresh the instant a result lands                                |
 | `messages`             | future chat, already wired                                                    |
 
-All five use `REPLICA IDENTITY FULL` so UPDATE events carry previous state (needed for client-side diffing). Everything else is request/response — keeping the publication minimal protects Realtime throughput.
+All six use `REPLICA IDENTITY FULL` so UPDATE events carry previous state (needed for client-side diffing). Everything else is request/response — keeping the publication minimal protects Realtime throughput.
 
 ### RLS architecture
 
@@ -175,17 +180,18 @@ Ordered strictly by **data dependency** so nothing is ever built on sand. Each m
 - Withdraw / remove flows (pre-start only); host cancel match (`status = 'cancelled'`) pre-start; schedule-driven `in_progress` / `finished` via `sync_match_lifecycle`.
 - **Exit criteria:** two phones complete the full host→request→accept→WhatsApp loop; cancel and post-start lock behavior verified.
 
-### M3 — Trust & Penalties (≈ 1 week)
+### M3 — Trust & Penalties (≈ 1 week) ✅ shipped
 
-- Post-match mutual rating sheet (stars + performance tags) once the match is **`finished`** (auto when `starts_at + duration_minutes` passes).
-- Penalty rating prompts driven entirely by the `was_late_withdrawal` / `was_removed_by_host` flags.
-- Rating display on profile cards (`rating_avg`, `rating_count`).
-- **Exit criteria:** late withdrawal inside 2h automatically enables a penalty review; aggregates update live.
+- In-app notifications for match lifecycle events (`notifications` table + Realtime + bell icon).
+- Separate reliability reports (`reliability_reports`) for late withdrawal, host removal, and late cancellation — distinct from quality stars.
+- Post-match mutual quality rating sheet (`rate-match` route) once **`finished`**, with pg_cron finalizer + 14-day window.
+- Rating/reliability display on profile and match cards (`rating_avg`, `reliability_score`).
+- **Exit criteria met:** penalty reports optional and validated in DB; quality ratings double-blind; aggregates trigger-maintained.
 
 ### M4 — Spatial Discovery & Realtime (≈ 1 week)
 
 - Map view + radius slider calling `nearby_matches` (persist preference to `search_radius_m`).
-- Realtime subscriptions: requester subscribes to their `match_participants` row; host subscribes to the match channel. Kill all polling.
+- Realtime subscriptions for match lifecycle and notifications are **already wired** (`useMatchRealtime`, `useNotificationsRealtime`). Remaining M4 work: map UI and any polling cleanup outside those paths.
 - **Exit criteria:** acceptance appears on the requester's device within ~1s, app backgrounded-then-resumed included.
 
 ### M5 — Open Listings (≈ 1 week)

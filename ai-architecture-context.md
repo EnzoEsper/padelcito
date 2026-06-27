@@ -37,7 +37,7 @@
 - Single client instance in `src/lib/supabase.ts`, typed with `Database` from generated types; session storage via `expo-secure-store` adapter. Only the **anon key** in the app — `service_role` never ships to a client.
 - **Spatial queries:** always through RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`). Never download rows and filter distance client-side. Pass `p_sport_id` from `fetchPadelSport()` for padel-scoped discovery.
 - **Bracket operations:** always through RPCs (`generate_single_elimination_bracket`, `generate_round_robin`). Never construct brackets client-side.
-- **Realtime:** subscribe only to the published tables (`matches`, `match_participants`, `tournament_matches`, `tournament_standings`, `messages`). Channel naming: `match:{id}`, `tournament:{id}`, `conversation:{id}`. Always `removeChannel` on unmount. Do not poll a table that has Realtime.
+- **Realtime:** subscribe only to the published tables (`matches`, `match_participants`, `notifications`, `tournament_matches`, `tournament_standings`, `messages`). Channel naming: `match:{id}`, `notifications:{userId}`, `tournament:{id}`, `conversation:{id}`. Always `removeChannel` on unmount. Do not poll a table that has Realtime.
 - **Storage:** avatars → `avatars/{user_id}/...` (public); payment receipts → `receipts/{registration_id}/...` (private). Respect these path conventions — bucket policies depend on them.
 - **Errors:** every Supabase call checks `error` explicitly; surface RLS denials as user-facing permission messages, never swallow them.
 
@@ -81,7 +81,7 @@
 
 - **`open` / `full`:** pre-start; capacity trigger flips between them. Host may cancel (`status → cancelled`), accept/reject/remove roster, and use 1:1 WhatsApp on accepted players.
 - **`in_progress`:** `starts_at` has passed and `starts_at + duration_minutes` is still in the future. No host cancel, no roster remove, no player withdraw. WhatsApp remains available until finish/cancel.
-- **`finished`:** end time reached (auto via `sync_match_lifecycle`). Read-only detail footer; no WhatsApp; standard post-match ratings unlock when implemented (M3).
+- **`finished`:** end time reached (primary: `finalize_due_matches()` via pg_cron every 2 min; fallback: `sync_match_lifecycle()` on detail open). Read-only roster; no WhatsApp; optional post-match quality ratings unlock for members (14-day window from `matches.finished_at`).
 - **`cancelled`:** host sets before start. Read-only footer; no roster or WhatsApp; accepted players leave Upcoming and appear in History.
 
 Never set `full`, `in_progress`, or `finished` from client code except host cancel (`cancelled`). Lifecycle transitions are trigger- or RPC-maintained.
@@ -93,10 +93,48 @@ Never set `full`, `in_progress`, or `finished` from client code except host canc
 | `is_match_pre_start(match_id)` | `open`/`full` and `starts_at > now()` |
 | `is_match_roster_editable(match_id)` | Alias of pre-start; gates accept/reject/remove/withdraw |
 | `is_match_active(match_id)` | Not `cancelled` or `finished`; required for `match_contact_details()` |
-| `sync_match_lifecycle(match_id)` | SECURITY DEFINER; advances `open/full → in_progress → finished` from schedule. Callable by host, participant, or any authenticated user viewing a **public** match (discover). Call before loading match detail. |
+| `sync_match_lifecycle(match_id)` | SECURITY DEFINER; advances `open/full → in_progress → finished` from schedule; stamps `finished_at` and emits `rating_request` notifications on finish. Callable by host, participant, or any authenticated user viewing a **public** match (discover). Call before loading match detail. |
+| `finalize_due_matches()` | SECURITY DEFINER; set-based cron finalizer (pg_cron every 2 min). Not client-callable. |
 | `match_contact_details(match_id)` | Only path to other users' WhatsApp; blocked when match inactive |
 
 Migrations: `20260622120000_block_actions_on_cancelled_matches`, `20260622140000_match_start_lifecycle_locks`, `20260622150000_fix_sync_match_lifecycle_auth`, `20260623120000_rename_match_completed_to_finished`.
+
+## 9. Trust, Notifications & Ratings (M3)
+
+### Two separate metrics — do not conflate
+
+| Metric | Storage | Public signal | Meaning |
+| ------ | ------- | ------------- | ------- |
+| **Quality** | `ratings` (`context = 'standard'`) | `rating_avg`, `rating_count` on `public_profiles` | 1–5 stars + optional tags after a **finished** match |
+| **Reliability** | `reliability_reports` | `reliability_score`, `penalty_count` on `public_profiles` | Optional wronged-party confirmation of late withdrawal, host removal, or late cancellation |
+
+- **Quality ratings are double-blind:** RLS allows each rater to read only their own `ratings` rows; aggregates are trigger-maintained on `profiles`. Never expose individual rating rows to ratees.
+- **Penalty contexts in `rating_context` enum are dead:** `validate_rating` rejects non-`standard` inserts. Penalties go through `reliability_reports` + `validate_reliability_report`.
+- **Reliability aggregates** (`penalty_count`, `commitment_count`, `reliability_score`) are trigger-maintained — never write them from client code.
+
+### In-app notifications
+
+- Table: `notifications` (Realtime-enabled). Rows inserted only by `emit_notification()` (SECURITY DEFINER) from lifecycle triggers.
+- Types: `join_request`, `join_accepted`, `join_rejected`, `participant_withdrawn`, `participant_removed`, `match_cancelled`, `rating_request`.
+- Client: `src/features/notifications/` (`use-notifications.ts`, `notification-display.ts`), `NotificationBell`, `app/(app)/notifications.tsx`. Mount `useNotificationsRealtime()` once in `app/(app)/_layout.tsx`.
+- Penalty-eligible notifications deep-link to `app/(app)/report-penalty.tsx`; `rating_request` deep-links to `app/(app)/rate-match.tsx`.
+
+### Post-match quality ratings
+
+- Eligibility: match `status = 'finished'`, caller is host or `accepted` participant, ≥2 members, within 14 days of `finished_at`.
+- `emit_rating_requests_for_match()` fans out `rating_request` notifications when a match finishes (cron or lazy sync).
+- `get_pending_rating_matches()` RPC drives History "Rate" hints without exposing others' rating rows.
+- Client: `src/features/ratings/use-ratings.ts`, `rating-display.ts`, `app/(app)/rate-match.tsx`. Batch insert into `ratings`; unique `(match_id, rater_id, ratee_id)`.
+
+### Reliability reports
+
+- Table: `reliability_reports` with `reliability_event_type`: `late_withdrawal`, `host_removal`, `late_cancellation`.
+- Late cancellation detected via `matches.cancelled_at` (stamped on cancel) vs `late_withdrawal_threshold`.
+- Client: `src/features/ratings/use-reliability.ts`, `penalty-report.ts`, `app/(app)/report-penalty.tsx`, `ReliabilityBadge`.
+
+### M3 migrations
+
+`20260623140000_create_notifications`, `20260623150000_notification_triggers`, `20260623200000_match_cancellation_timestamp`, `20260623210000_reliability_reports`, `20260623220000_reliability_aggregates`, `20260624100000_post_match_ratings`, `20260624110000_schedule_match_finalizer`.
 
 ### Client mirrors (`src/features/matches/`)
 
@@ -106,7 +144,7 @@ Migrations: `20260622120000_block_actions_on_cancelled_matches`, `20260622140000
 - `resolveMatchStatusBadge()` in `match-display.ts` — inline status badge on detail (Open / Full / Live / Finished / Cancelled).
 - WhatsApp: accepted players get footer CTA to message **host** only; hosts get per-row WhatsApp on **accepted** roster entries only — never a group button.
 
-## 9. Canonical References
+## 10. Canonical References
 
 - Schema source of truth: the full `supabase/migrations/` chain (starting with `20260608050054_0001_initial_schema.sql` and all subsequent migrations).
 - Architecture rationale & roadmap: `ARCHITECTURE.md` (repo root).
