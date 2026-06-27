@@ -1,5 +1,6 @@
 import { ScrollView, View, Text } from '@/tw';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { NotificationBell } from '@/components/notification-bell';
 
 function BracketSkeleton() {
   return (
@@ -28,13 +29,19 @@ export default function CircuitsScreen() {
       className="flex-1 bg-background"
       contentContainerClassName="pb-6"
     >
-      <View style={{ paddingTop: insets.top + 16 }} className="px-5 pb-5">
-        <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-1">
-          CIRCUITS
-        </Text>
-        <Text className="font-grotesk font-extrabold text-[30px] text-neutral" style={{ letterSpacing: -0.8 }}>
-          Tournaments
-        </Text>
+      <View
+        style={{ paddingTop: insets.top + 16 }}
+        className="px-5 pb-5 flex-row justify-between items-start"
+      >
+        <View>
+          <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-1">
+            CIRCUITS
+          </Text>
+          <Text className="font-grotesk font-extrabold text-[30px] text-neutral" style={{ letterSpacing: -0.8 }}>
+            Tournaments
+          </Text>
+        </View>
+        <NotificationBell />
       </View>
 
       {[0, 1, 2].map((i) => (

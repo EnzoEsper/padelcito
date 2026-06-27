@@ -442,6 +442,7 @@ export type Database = {
         Row: {
           age_max: number | null
           age_min: number | null
+          cancelled_at: string | null
           capacity: number
           category_max: number
           category_min: number
@@ -451,6 +452,7 @@ export type Database = {
           description: string | null
           difficulty: Database["public"]["Enums"]["match_difficulty"]
           duration_minutes: number
+          finished_at: string | null
           gender_preference: Database["public"]["Enums"]["match_gender_preference"]
           host_id: string
           id: string
@@ -472,6 +474,7 @@ export type Database = {
         Insert: {
           age_max?: number | null
           age_min?: number | null
+          cancelled_at?: string | null
           capacity: number
           category_max?: number
           category_min?: number
@@ -481,6 +484,7 @@ export type Database = {
           description?: string | null
           difficulty?: Database["public"]["Enums"]["match_difficulty"]
           duration_minutes?: number
+          finished_at?: string | null
           gender_preference?: Database["public"]["Enums"]["match_gender_preference"]
           host_id: string
           id?: string
@@ -502,6 +506,7 @@ export type Database = {
         Update: {
           age_max?: number | null
           age_min?: number | null
+          cancelled_at?: string | null
           capacity?: number
           category_max?: number
           category_min?: number
@@ -511,6 +516,7 @@ export type Database = {
           description?: string | null
           difficulty?: Database["public"]["Enums"]["match_difficulty"]
           duration_minutes?: number
+          finished_at?: string | null
           gender_preference?: Database["public"]["Enums"]["match_gender_preference"]
           host_id?: string
           id?: string
@@ -599,6 +605,57 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          data: Json
+          id: string
+          match_id: string | null
+          participant_id: string | null
+          read_at: string | null
+          recipient_id: string
+          type: Database["public"]["Enums"]["notification_type"]
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          data?: Json
+          id?: string
+          match_id?: string | null
+          participant_id?: string | null
+          read_at?: string | null
+          recipient_id: string
+          type: Database["public"]["Enums"]["notification_type"]
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          data?: Json
+          id?: string
+          match_id?: string | null
+          participant_id?: string | null
+          read_at?: string | null
+          recipient_id?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "match_participants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_sports: {
         Row: {
           created_at: string
@@ -655,12 +712,15 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
+          commitment_count: number
           created_at: string
           display_name: string
           home_location: unknown
           id: string
+          penalty_count: number
           rating_avg: number | null
           rating_count: number
+          reliability_score: number | null
           search_radius_m: number
           updated_at: string
           username: string | null
@@ -669,12 +729,15 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           bio?: string | null
+          commitment_count?: number
           created_at?: string
           display_name?: string
           home_location?: unknown
           id: string
+          penalty_count?: number
           rating_avg?: number | null
           rating_count?: number
+          reliability_score?: number | null
           search_radius_m?: number
           updated_at?: string
           username?: string | null
@@ -683,12 +746,15 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           bio?: string | null
+          commitment_count?: number
           created_at?: string
           display_name?: string
           home_location?: unknown
           id?: string
+          penalty_count?: number
           rating_avg?: number | null
           rating_count?: number
+          reliability_score?: number | null
           search_radius_m?: number
           updated_at?: string
           username?: string | null
@@ -762,6 +828,85 @@ export type Database = {
           {
             foreignKeyName: "ratings_rater_id_fkey"
             columns: ["rater_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reliability_reports: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          match_id: string
+          participant_id: string | null
+          reason_tags: string[]
+          reporter_id: string
+          subject_id: string
+          type: Database["public"]["Enums"]["reliability_event_type"]
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          match_id: string
+          participant_id?: string | null
+          reason_tags?: string[]
+          reporter_id: string
+          subject_id: string
+          type: Database["public"]["Enums"]["reliability_event_type"]
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          match_id?: string
+          participant_id?: string | null
+          reason_tags?: string[]
+          reporter_id?: string
+          subject_id?: string
+          type?: Database["public"]["Enums"]["reliability_event_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reliability_reports_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reliability_reports_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "match_participants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reliability_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reliability_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reliability_reports_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reliability_reports_subject_id_fkey"
+            columns: ["subject_id"]
             isOneToOne: false
             referencedRelation: "public_profiles"
             referencedColumns: ["id"]
@@ -1225,8 +1370,10 @@ export type Database = {
           created_at: string | null
           display_name: string | null
           id: string | null
+          penalty_count: number | null
           rating_avg: number | null
           rating_count: number | null
+          reliability_score: number | null
           username: string | null
         }
         Insert: {
@@ -1235,8 +1382,10 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string | null
+          penalty_count?: number | null
           rating_avg?: number | null
           rating_count?: number | null
+          reliability_score?: number | null
           username?: string | null
         }
         Update: {
@@ -1245,8 +1394,10 @@ export type Database = {
           created_at?: string | null
           display_name?: string | null
           id?: string | null
+          penalty_count?: number | null
           rating_avg?: number | null
           rating_count?: number | null
+          reliability_score?: number | null
           username?: string | null
         }
         Relationships: []
@@ -1257,6 +1408,22 @@ export type Database = {
         Args: { p_tournament_match_id: string }
         Returns: boolean
       }
+      emit_notification: {
+        Args: {
+          p_actor_id: string
+          p_extra?: Json
+          p_match_id: string
+          p_participant_id?: string
+          p_recipient_id: string
+          p_type: Database["public"]["Enums"]["notification_type"]
+        }
+        Returns: string
+      }
+      emit_rating_requests_for_match: {
+        Args: { p_match_id: string }
+        Returns: undefined
+      }
+      finalize_due_matches: { Args: never; Returns: number }
       generate_round_robin: {
         Args: { p_tournament_id: string }
         Returns: string
@@ -1265,7 +1432,19 @@ export type Database = {
         Args: { p_tournament_id: string }
         Returns: string
       }
+      get_pending_rating_matches: {
+        Args: never
+        Returns: {
+          match_id: string
+          member_count: number
+          pending_count: number
+        }[]
+      }
       has_match_relationship: { Args: { p_match_id: string }; Returns: boolean }
+      increment_profile_commitment: {
+        Args: { p_profile_id: string }
+        Returns: undefined
+      }
       is_circuit_organizer: { Args: { p_circuit_id: string }; Returns: boolean }
       is_conversation_creator: {
         Args: { p_conversation_id: string }
@@ -1379,6 +1558,10 @@ export type Database = {
           status: Database["public"]["Enums"]["tournament_status"]
         }[]
       }
+      recompute_profile_reliability: {
+        Args: { p_profile_id: string }
+        Returns: undefined
+      }
       recompute_stage_standings: {
         Args: { p_stage_id: string }
         Returns: undefined
@@ -1400,6 +1583,14 @@ export type Database = {
       match_gender_preference: "male" | "female" | "mixed"
       match_position_preference: "any" | "drive" | "backhand"
       match_status: "open" | "full" | "in_progress" | "finished" | "cancelled"
+      notification_type:
+        | "join_request"
+        | "join_accepted"
+        | "join_rejected"
+        | "participant_withdrawn"
+        | "participant_removed"
+        | "match_cancelled"
+        | "rating_request"
       participant_status:
         | "pending"
         | "accepted"
@@ -1415,6 +1606,10 @@ export type Database = {
         | "rejected"
       rating_context: "standard" | "late_withdrawal" | "host_removal"
       registration_status: "pending" | "approved" | "rejected" | "withdrawn"
+      reliability_event_type:
+        | "late_withdrawal"
+        | "host_removal"
+        | "late_cancellation"
       response_status: "pending" | "accepted" | "declined"
       skill_level: "beginner" | "intermediate" | "advanced" | "expert" | "pro"
       tournament_format:
@@ -1575,6 +1770,15 @@ export const Constants = {
       match_gender_preference: ["male", "female", "mixed"],
       match_position_preference: ["any", "drive", "backhand"],
       match_status: ["open", "full", "in_progress", "finished", "cancelled"],
+      notification_type: [
+        "join_request",
+        "join_accepted",
+        "join_rejected",
+        "participant_withdrawn",
+        "participant_removed",
+        "match_cancelled",
+        "rating_request",
+      ],
       participant_status: [
         "pending",
         "accepted",
@@ -1592,6 +1796,11 @@ export const Constants = {
       ],
       rating_context: ["standard", "late_withdrawal", "host_removal"],
       registration_status: ["pending", "approved", "rejected", "withdrawn"],
+      reliability_event_type: [
+        "late_withdrawal",
+        "host_removal",
+        "late_cancellation",
+      ],
       response_status: ["pending", "accepted", "declined"],
       skill_level: ["beginner", "intermediate", "advanced", "expert", "pro"],
       tournament_format: [

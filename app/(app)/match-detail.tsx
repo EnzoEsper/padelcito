@@ -22,6 +22,8 @@ import {
 } from '@/features/matches/use-matches';
 import { useMatchRealtime } from '@/features/matches/use-match-realtime';
 import { useMatchScheduleClock } from '@/features/matches/use-match-schedule-clock';
+import { buildRateMatchRoute } from '@/features/ratings/rating-display';
+import { useRatableMatch } from '@/features/ratings/use-ratings';
 import { CourtsInfoChip } from '@/features/matches/courts-info-sheet';
 import {
   buildMatchMetaChips,
@@ -38,6 +40,7 @@ import {
   type MatchMetaChipEmphasis,
   type MatchStatusBadgeTone,
 } from '@/features/matches/match-display';
+import { formatPublicReliabilityScore } from '@/features/ratings/penalty-report';
 import { RosterInfoButton, RosterInfoSheet } from '@/features/matches/roster-info-sheet';
 import type { CourtConfig } from '@/lib/padel-court';
 import { formatMatchScheduleLabel } from '@/lib/match-time';
@@ -251,6 +254,7 @@ function PlayerRow({
   host = false,
   you = false,
   ratingLabel,
+  reliabilityLabel,
   onRemove,
   onWhatsApp,
 }: {
@@ -259,6 +263,7 @@ function PlayerRow({
   host?: boolean;
   you?: boolean;
   ratingLabel: string | null;
+  reliabilityLabel?: string | null;
   onRemove?: () => void;
   onWhatsApp?: () => void;
 }) {
@@ -276,10 +281,12 @@ function PlayerRow({
             </View>
           ) : null}
         </View>
-        {ratingLabel !== null ? (
+        {ratingLabel !== null || reliabilityLabel !== null ? (
           <View style={styles.trustRow}>
             <Ionicons name="shield-checkmark-outline" size={13} color={C.blueHi} />
-            <Text style={styles.trustText}>{ratingLabel}</Text>
+            <Text style={styles.trustText}>
+              {[ratingLabel, reliabilityLabel].filter((value) => value !== null).join(' · ')}
+            </Text>
           </View>
         ) : null}
       </View>
@@ -384,6 +391,8 @@ function FooterAction({
   onWithdraw,
   onMessageHost,
   onCancelMatch,
+  needsRating,
+  onRatePlayers,
 }: {
   match: MatchDetail;
   scheduleNow: number;
@@ -393,6 +402,8 @@ function FooterAction({
   onWithdraw: () => void;
   onMessageHost: () => void;
   onCancelMatch: () => void;
+  needsRating: boolean;
+  onRatePlayers: () => void;
 }) {
   const participant = match.currentUserParticipant;
   const pending = participant?.status === 'pending';
@@ -415,10 +426,25 @@ function FooterAction({
   }
 
   if (match.status === 'finished') {
+    if (needsRating) {
+      return (
+        <View style={styles.footerInner}>
+          <Pressable onPress={onRatePlayers} style={styles.requestButton}>
+            <Ionicons name="star-outline" size={18} color={C.mist} />
+            <Text style={styles.requestText}>Rate players</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.footerInner}>
         <View style={styles.pendingButton}>
-          <Text style={styles.pendingText}>This match has finished</Text>
+          <Text style={styles.pendingText}>
+            {match.isHost || match.currentUserParticipant?.status === 'accepted'
+              ? 'Ratings submitted'
+              : 'This match has finished'}
+          </Text>
         </View>
       </View>
     );
@@ -531,6 +557,23 @@ export default function MatchDetailScreen() {
   const updateStatus = useUpdateParticipantStatus(matchId ?? '');
   const cancelPending = useCancelPendingRequest(matchId ?? '');
   const cancelMatch = useCancelMatch(matchId ?? '');
+
+  const canLoadRatings =
+    match !== undefined &&
+    match.status === 'finished' &&
+    (match.isHost || match.currentUserParticipant?.status === 'accepted');
+  const { data: ratableMatch } = useRatableMatch(
+    canLoadRatings && matchId !== null ? matchId : null,
+  );
+  const needsRating =
+    ratableMatch?.ratingWindowOpen === true &&
+    ratableMatch.allRated === false &&
+    ratableMatch.members.length > 0;
+
+  function openRateMatch() {
+    if (matchId === null) return;
+    router.push(buildRateMatchRoute(matchId));
+  }
 
   const canViewContacts =
     match !== undefined &&
@@ -703,6 +746,10 @@ export default function MatchDetailScreen() {
     match.host?.rating_avg ?? null,
     match.host?.rating_count ?? null,
   );
+  const hostReliabilityLabel = formatPublicReliabilityScore(
+    match.host?.reliability_score ?? null,
+    match.host?.penalty_count ?? 0,
+  );
   const withdrawalThreshold = formatWithdrawalThreshold(match.late_withdrawal_threshold);
   const headerTop = insets.top + 16;
 
@@ -810,6 +857,7 @@ export default function MatchDetailScreen() {
               index={0}
               host
               ratingLabel={hostRatingLabel}
+              reliabilityLabel={hostReliabilityLabel}
             />
             {match.offlineConfirmedCount > 0 ? (
               <>
@@ -827,6 +875,10 @@ export default function MatchDetailScreen() {
                 profile?.rating_avg ?? null,
                 profile?.rating_count ?? null,
               );
+              const reliabilityLabel = formatPublicReliabilityScore(
+                profile?.reliability_score ?? null,
+                profile?.penalty_count ?? 0,
+              );
               return (
                 <View key={participant.id}>
                   <View style={styles.rosterDivider} />
@@ -835,6 +887,7 @@ export default function MatchDetailScreen() {
                     index={match.offlineConfirmedCount + index + 1}
                     you={participant.profile_id === match.currentUserId}
                     ratingLabel={ratingLabel}
+                    reliabilityLabel={reliabilityLabel}
                     onRemove={
                       hostManagesRoster
                         ? () => void handleParticipantStatus(participant.id, 'removed')
@@ -940,6 +993,8 @@ export default function MatchDetailScreen() {
           }}
           onMessageHost={() => void openHostContact()}
           onCancelMatch={handleCancelMatch}
+          needsRating={needsRating}
+          onRatePlayers={openRateMatch}
         />
       </View>
 

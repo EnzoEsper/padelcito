@@ -12,6 +12,9 @@ export type ProfileRow = {
   bio: string | null;
   rating_avg: number | null;
   rating_count: number;
+  reliability_score: number | null;
+  penalty_count: number;
+  commitment_count: number;
 };
 
 export type ProfileSport = {
@@ -33,7 +36,9 @@ async function fetchCurrentUserId(): Promise<string> {
 async function fetchProfile(userId: string): Promise<ProfileRow> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, display_name, avatar_url, bio, rating_avg, rating_count')
+    .select(
+      'id, username, display_name, avatar_url, bio, rating_avg, rating_count, reliability_score, penalty_count, commitment_count',
+    )
     .eq('id', userId)
     .single();
 

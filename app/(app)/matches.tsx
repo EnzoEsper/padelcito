@@ -4,6 +4,8 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { ScrollView, View, Text, Pressable } from "@/tw";
+import { NotificationBell } from "@/components/notification-bell";
+import { ReliabilityBadge } from "@/components/reliability-badge";
 import { formatMatchListDateTime } from "@/lib/match-time";
 import {
   useMyMatches,
@@ -12,6 +14,8 @@ import {
   type MatchSummary,
 } from "@/features/matches/use-matches";
 import { useMyMatchesRealtime } from "@/features/matches/use-match-realtime";
+import { buildRateMatchRoute } from "@/features/ratings/rating-display";
+import { usePendingRatingCount } from "@/features/ratings/use-ratings";
 import { SegmentedControl } from "@/features/matches/create-match/components/segmented-control";
 import {
   categoryToBadgeTier,
@@ -151,11 +155,15 @@ function MatchRow({
   tab,
   onPress,
   subtitle,
+  needsRating,
+  onRate,
 }: {
   match: MatchSummary;
   tab: MatchesTab;
   onPress: () => void;
   subtitle?: string;
+  needsRating?: boolean;
+  onRate?: () => void;
 }) {
   const variant = resolvePillVariant(match, tab);
   const level = categoryToBadgeTier(match.category_max);
@@ -198,11 +206,26 @@ function MatchRow({
             {match.totalFilled}/{match.capacity}
           </Text>
         </View>
-        <Ionicons
-          name="chevron-forward"
-          size={16}
-          color="rgba(228,228,228,0.20)"
-        />
+        <View className="flex-row items-center gap-2">
+          {needsRating === true && onRate !== undefined ? (
+            <Pressable
+              onPress={(event) => {
+                event.stopPropagation();
+                onRate();
+              }}
+              className="rounded-lg border border-primary-hi/30 bg-primary/20 px-2.5 py-1"
+            >
+              <Text className="font-mono text-[9.5px] tracking-[0.11em] uppercase font-bold text-primary-hi">
+                Rate
+              </Text>
+            </Pressable>
+          ) : null}
+          <Ionicons
+            name="chevron-forward"
+            size={16}
+            color="rgba(228,228,228,0.20)"
+          />
+        </View>
       </View>
     </Pressable>
   );
@@ -254,9 +277,16 @@ function RequestCard({
   return (
     <View className="bg-surface-1 border border-neutral/10 rounded-2xl mx-5 mb-3 px-4 py-4 gap-3">
       <View>
-        <Text className="font-grotesk font-bold text-base text-neutral">
-          {request.requester?.display_name ?? "Player"}
-        </Text>
+        <View className="flex-row items-center gap-2 flex-wrap">
+          <Text className="font-grotesk font-bold text-base text-neutral">
+            {request.requester?.display_name ?? "Player"}
+          </Text>
+          <ReliabilityBadge
+            reliabilityScore={request.requester?.reliability_score ?? null}
+            penaltyCount={request.requester?.penalty_count ?? 0}
+            compact
+          />
+        </View>
         <Text className="font-grotesk text-sm text-neutral/60 mt-1">
           wants to join {request.match.title}
         </Text>
@@ -310,6 +340,7 @@ export default function MatchesScreen() {
   const [pendingView, setPendingView] = useState<PendingView>("sent");
   const { data, isPending, error, refetch } = useMyMatches();
   useMyMatchesRealtime(data?.userId ?? null);
+  const { pendingMatchIds } = usePendingRatingCount();
   const updateStatus = useUpdateParticipantStatus("");
 
   async function handleStatus(
@@ -329,6 +360,10 @@ export default function MatchesScreen() {
 
   function openMatch(matchId: string) {
     router.push(`/(app)/match-detail?id=${matchId}`);
+  }
+
+  function openRateMatch(matchId: string) {
+    router.push(buildRateMatchRoute(matchId));
   }
 
   function renderTabContent() {
@@ -368,6 +403,10 @@ export default function MatchesScreen() {
           match={match}
           tab="history"
           onPress={() => openMatch(match.id)}
+          needsRating={
+            match.status === "finished" && pendingMatchIds.has(match.id)
+          }
+          onRate={() => openRateMatch(match.id)}
         />
       ));
     }
@@ -417,16 +456,22 @@ export default function MatchesScreen() {
       className="flex-1 bg-background"
       contentContainerClassName="pb-6"
     >
-      <View style={{ paddingTop: insets.top + 16 }} className="px-5 pb-5">
-        <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-1">
-          MATCHES
-        </Text>
-        <Text
-          className="font-grotesk font-extrabold text-[30px] text-neutral"
-          style={{ letterSpacing: -0.8 }}
-        >
-          Calendar
-        </Text>
+      <View
+        style={{ paddingTop: insets.top + 16 }}
+        className="px-5 pb-5 flex-row justify-between items-start"
+      >
+        <View>
+          <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-1">
+            MATCHES
+          </Text>
+          <Text
+            className="font-grotesk font-extrabold text-[30px] text-neutral"
+            style={{ letterSpacing: -0.8 }}
+          >
+            Calendar
+          </Text>
+        </View>
+        <NotificationBell />
       </View>
 
       <View className="mx-5 mb-4">

@@ -9,6 +9,7 @@ import { useDiscoverMatches, type MatchSummary } from '@/features/matches/use-ma
 import { formatDiscoverMatchWhen } from '@/lib/match-time';
 import { formatDistanceKm } from '@/features/matches/match-display';
 import { useDiscoverMatchesRealtime } from '@/features/matches/use-match-realtime';
+import { NotificationBell } from '@/components/notification-bell';
 import { SearchRadiusSlider } from '@/features/discover/components/search-radius-slider';
 import { SEARCH_RADIUS_DEFAULT_KM } from '@/features/discover/search-radius';
 import {
@@ -125,21 +126,6 @@ function playerInitials(name: string): string {
     .slice(0, 2)
     .join('')
     .toUpperCase();
-}
-
-function HeaderIcon({
-  name,
-  hasDot = false,
-}: {
-  name: keyof typeof Ionicons.glyphMap;
-  hasDot?: boolean;
-}) {
-  return (
-    <View style={styles.headerIcon}>
-      <Ionicons name={name} size={20} color={C.mist} />
-      {hasDot ? <View style={styles.headerDot} /> : null}
-    </View>
-  );
 }
 
 function FilterChips({
@@ -374,8 +360,10 @@ export default function DiscoverScreen() {
           <Text style={styles.title}>Discover</Text>
         </View>
         <View style={styles.headerActions}>
-          <HeaderIcon name="sunny-outline" />
-          <HeaderIcon name="notifications-outline" hasDot />
+          <View style={styles.headerIcon}>
+            <Ionicons name="sunny-outline" size={20} color={C.mist} />
+          </View>
+          <NotificationBell />
         </View>
       </View>
 
@@ -499,17 +487,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  headerDot: {
-    position: 'absolute',
-    top: 9,
-    right: 10,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: C.blueHi,
-    borderWidth: 2,
-    borderColor: C.background,
   },
   inline: {
     flexDirection: 'row',

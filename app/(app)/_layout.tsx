@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Tabs } from 'expo-router';
 import { TabBar } from '@/components/tab-bar';
+import { useNotificationsRealtime } from '@/features/notifications/use-notifications';
 import { ensurePadelSport } from '@/lib/padel-sport';
 
 function PadelSportPrefetch() {
@@ -14,10 +15,16 @@ function PadelSportPrefetch() {
   return null;
 }
 
+function NotificationsRealtime() {
+  useNotificationsRealtime();
+  return null;
+}
+
 export default function AppLayout() {
   return (
     <>
       <PadelSportPrefetch />
+      <NotificationsRealtime />
       <Tabs
         initialRouteName="profile"
         screenOptions={{ headerShown: false }}
@@ -32,6 +39,9 @@ export default function AppLayout() {
           options={{ href: null, tabBarStyle: { display: 'none' } }}
         />
         <Tabs.Screen name="match-detail" options={{ href: null }} />
+        <Tabs.Screen name="notifications" options={{ href: null }} />
+        <Tabs.Screen name="report-penalty" options={{ href: null }} />
+        <Tabs.Screen name="rate-match" options={{ href: null }} />
       </Tabs>
     </>
   );

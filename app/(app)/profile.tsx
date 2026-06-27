@@ -3,6 +3,12 @@ import { StyleSheet, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
+import { NotificationBell } from '@/components/notification-bell';
+import { ReliabilityBadge } from '@/components/reliability-badge';
+import {
+  formatReliabilityScore,
+  isLowReliability,
+} from '@/features/ratings/penalty-report';
 import { supabase } from '@/lib/supabase';
 import {
   useProfile,
@@ -223,6 +229,15 @@ export default function ProfileScreen() {
   const badge = sport ? skillLevelToBadge(sport.skill_level) : ('C' as const);
   const rating = profile?.rating_avg ?? 0;
   const ratingCount = profile?.rating_count ?? 0;
+  const reliabilityScore = profile?.reliability_score ?? null;
+  const penaltyCount = profile?.penalty_count ?? 0;
+  const commitmentCount = profile?.commitment_count ?? 0;
+  const reliabilityLabel = formatReliabilityScore(reliabilityScore, commitmentCount);
+  const showReliabilityWarning = isLowReliability(
+    reliabilityScore,
+    penaltyCount,
+    commitmentCount,
+  );
   const displayName = profile?.display_name ?? 'Player';
   const username = profile?.username ?? '';
   const bio = profile?.bio;
@@ -238,13 +253,16 @@ export default function ProfileScreen() {
           <Text style={styles.screenLabel}>PROFILE</Text>
           <Text style={styles.screenTitle}>You</Text>
         </View>
-        <Pressable
-          className="active:opacity-70"
-          style={styles.settingsBtn}
-          accessibilityLabel="Settings"
-        >
-          <Ionicons name="settings-outline" size={19} color={C.neutral} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <NotificationBell />
+          <Pressable
+            className="active:opacity-70"
+            style={styles.settingsBtn}
+            accessibilityLabel="Settings"
+          >
+            <Ionicons name="settings-outline" size={19} color={C.neutral} />
+          </Pressable>
+        </View>
       </View>
 
       {profilePending ? (
@@ -266,11 +284,22 @@ export default function ProfileScreen() {
             <TrustRing value={rating} />
           </View>
 
+          {showReliabilityWarning ? (
+            <View style={styles.penaltyNotice}>
+              <Ionicons name="warning-outline" size={16} color={C.warning} />
+              <Text style={styles.penaltyNoticeText}>
+                {penaltyCount > 0
+                  ? `You have ${penaltyCount} reliability report${penaltyCount === 1 ? '' : 's'}. Play fair to rebuild trust.`
+                  : 'Your reliability score is below the community average. Keep showing up on time.'}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Stats row */}
           <View style={styles.statsRow}>
             <StatCard label="PLAYED" value={String(ratingCount)} />
             <StatCard label="RATING" value={rating > 0 ? rating.toFixed(1) : '—'} />
-            <StatCard label="STREAK" value="—" showFlame />
+            <StatCard label="RELIABILITY" value={reliabilityLabel} />
           </View>
 
           {/* Preferences */}
@@ -313,6 +342,11 @@ const styles = StyleSheet.create({
     fontSize: 30,
     color: C.neutral,
     letterSpacing: -0.8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   settingsBtn: {
     width: 44,
@@ -389,6 +423,26 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginTop: 3,
+  },
+  penaltyNotice: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    backgroundColor: 'rgba(224,177,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(224,177,91,0.30)',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+  },
+  penaltyNoticeText: {
+    flex: 1,
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 13,
+    lineHeight: 18,
+    color: C.warning,
   },
   statsRow: {
     flexDirection: 'row',
