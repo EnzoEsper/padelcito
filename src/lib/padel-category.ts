@@ -114,3 +114,14 @@ export function clampCategoryRange(
   const min = Math.min(8, Math.max(1, categoryMin));
   return max <= min ? { categoryMax: max, categoryMin: min } : { categoryMax: min, categoryMin: max };
 }
+
+export const CATEGORY_TIER_LABEL: Record<PadelCategoryTier, string> = {
+  advanced: 'Advanced',
+  intermediate: 'Intermediate',
+  beginner: 'Beginner',
+};
+
+export function categoryToTier(categoryMax: number): PadelCategoryTier {
+  const category = PADEL_CATEGORIES.find((entry) => entry.number === categoryMax);
+  return category?.tier ?? 'intermediate';
+}

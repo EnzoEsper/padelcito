@@ -5,18 +5,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, View, Text, Pressable } from '@/tw';
 import { useDiscoverMatches, type MatchSummary } from '@/features/matches/use-matches';
-import { categoryToBadgeTier, type SkillBadgeTier } from '@/features/matches/match-display';
 import { MatchSummaryCard } from '@/features/matches/components/match-summary-card';
 import { useDiscoverMatchesRealtime } from '@/features/matches/use-match-realtime';
 import { NotificationBell } from '@/components/notification-bell';
 import { SearchRadiusSlider } from '@/features/discover/components/search-radius-slider';
 import { SEARCH_RADIUS_DEFAULT_KM } from '@/features/discover/search-radius';
 import {
+  CATEGORY_TIER_LABEL,
+  categoryToTier,
+  type PadelCategoryTier,
+} from '@/lib/padel-category';
+import {
   useDiscoverLocation,
   type LocationAccessStatus,
 } from '@/features/discover/use-discover-location';
 
-type SkillFilter = 'All' | 'A' | 'B' | 'C';
+type CategoryFilter = 'All' | PadelCategoryTier;
 type ViewMode = 'list' | 'map';
 
 const C = {
@@ -38,8 +42,8 @@ const C = {
 } as const;
 
 
-function skillBadge(match: MatchSummary): SkillBadgeTier {
-  return categoryToBadgeTier(match.category_max);
+function matchCategoryTier(match: MatchSummary): PadelCategoryTier {
+  return categoryToTier(match.category_max);
 }
 
 function headerLocationLabel(
@@ -95,10 +99,10 @@ function FilterChips({
   value,
   onChange,
 }: {
-  value: SkillFilter;
-  onChange: (value: SkillFilter) => void;
+  value: CategoryFilter;
+  onChange: (value: CategoryFilter) => void;
 }) {
-  const chips: SkillFilter[] = ['All', 'A', 'B', 'C'];
+  const chips: CategoryFilter[] = ['All', 'advanced', 'intermediate', 'beginner'];
 
   return (
     <ScrollView
@@ -119,7 +123,7 @@ function FilterChips({
             style={[styles.chip, active && styles.chipActive]}
           >
             <Text style={[styles.chipText, active && styles.chipTextActive]}>
-              {chip === 'All' ? 'All levels' : `Level ${chip}`}
+              {chip === 'All' ? 'All levels' : CATEGORY_TIER_LABEL[chip]}
             </Text>
           </Pressable>
         );
@@ -177,12 +181,14 @@ export default function DiscoverScreen() {
     locationReady ? coords : null,
     searchRadiusKm,
   );
-  const [skillFilter, setSkillFilter] = useState<SkillFilter>('All');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('All');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const filteredMatches = useMemo(() => {
     const source = matches ?? [];
-    return source.filter((match) => skillFilter === 'All' || skillBadge(match) === skillFilter);
-  }, [matches, skillFilter]);
+    return source.filter(
+      (match) => categoryFilter === 'All' || matchCategoryTier(match) === categoryFilter,
+    );
+  }, [matches, categoryFilter]);
 
   const locationLabel = headerLocationLabel(locationStatus, placeLabel);
 
@@ -200,9 +206,6 @@ export default function DiscoverScreen() {
           <Text style={styles.title}>Discover</Text>
         </View>
         <View style={styles.headerActions}>
-          <View style={styles.headerIcon}>
-            <Ionicons name="sunny-outline" size={20} color={C.mist} />
-          </View>
           <NotificationBell />
         </View>
       </View>
@@ -223,7 +226,7 @@ export default function DiscoverScreen() {
           ) : null}
 
           <SearchRadiusSlider radiusKm={searchRadiusKm} onRadiusCommit={setSearchRadiusKm} />
-          <FilterChips value={skillFilter} onChange={setSkillFilter} />
+          <FilterChips value={categoryFilter} onChange={setCategoryFilter} />
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
@@ -272,7 +275,7 @@ export default function DiscoverScreen() {
                 No matches in range
               </Text>
               <Text style={styles.emptyText}>
-                Widen your radius or switch skill level.
+                Widen your radius or switch category level.
               </Text>
             </View>
           )}
@@ -317,17 +320,6 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     gap: 10,
-  },
-  headerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: C.surface1,
-    borderWidth: 1,
-    borderColor: C.hair,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
   },
   chipRow: {
     paddingHorizontal: 20,

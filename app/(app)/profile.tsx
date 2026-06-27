@@ -4,7 +4,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import { NotificationBell } from '@/components/notification-bell';
-import { ReliabilityBadge } from '@/components/reliability-badge';
 import {
   formatReliabilityScore,
   isLowReliability,
@@ -13,8 +12,9 @@ import { supabase } from '@/lib/supabase';
 import {
   useProfile,
   useProfileSport,
-  skillLevelToBadge,
-  SKILL_LABEL,
+  SKILL_LEVEL_COLORS,
+  SKILL_LEVEL_LABEL,
+  type SkillLevel,
 } from '@/features/profile/use-profile';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -30,12 +30,6 @@ const C = {
   hair: 'rgba(228,228,228,0.10)',
   hair2: 'rgba(228,228,228,0.055)',
   warning: '#E0B15B',
-  skill: {
-    A: { bg: '#2B396D', fg: '#E4E4E4' },
-    B: { bg: 'rgba(68,88,166,0.18)', fg: '#A9B6E6' },
-    C: { bg: '#232429', fg: 'rgba(228,228,228,0.60)' },
-    D: { bg: '#232429', fg: 'rgba(228,228,228,0.38)' },
-  },
 } as const;
 
 const AV_TONES: [string, string][] = [
@@ -74,11 +68,13 @@ function Avatar({ name, size = 64 }: { name: string; size?: number }) {
   );
 }
 
-function SkillBadge({ level }: { level: 'A' | 'B' | 'C' | 'D' }) {
-  const s = C.skill[level];
+function SkillBadge({ skillLevel }: { skillLevel: SkillLevel }) {
+  const colors = SKILL_LEVEL_COLORS[skillLevel];
   return (
-    <View style={[styles.skillBadge, { backgroundColor: s.bg }]}>
-      <Text style={[styles.skillBadgeText, { color: s.fg }]}>{SKILL_LABEL[level]}</Text>
+    <View style={[styles.skillBadge, { backgroundColor: colors.bg }]}>
+      <Text style={[styles.skillBadgeText, { color: colors.fg }]}>
+        {SKILL_LEVEL_LABEL[skillLevel]}
+      </Text>
     </View>
   );
 }
@@ -163,7 +159,14 @@ function StatCard({
 }) {
   return (
     <View style={styles.statCard}>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text
+        style={styles.statLabel}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.72}
+      >
+        {label}
+      </Text>
       <View style={styles.statValueRow}>
         <Text style={styles.statValue}>{value}</Text>
         {sub !== undefined && <Text style={styles.statSub}>{sub}</Text>}
@@ -185,6 +188,7 @@ function ProfileSkeleton() {
         <View className="flex-1 gap-2">
           <View style={[styles.skeletonPill, { width: 140, height: 14 }]} />
           <View style={[styles.skeletonPill, { width: 100, height: 11 }]} />
+          <View style={[styles.skeletonPill, { width: 88, height: 16, alignSelf: 'flex-start' }]} />
         </View>
         <View style={[styles.skeletonPill, { width: 92, height: 92, borderRadius: 46 }]} />
       </View>
@@ -226,7 +230,7 @@ export default function ProfileScreen() {
   const { data: sport } = useProfileSport();
   const signOut = useSignOut();
 
-  const badge = sport ? skillLevelToBadge(sport.skill_level) : ('C' as const);
+  const skillLevel: SkillLevel = sport?.skill_level ?? 'intermediate';
   const rating = profile?.rating_avg ?? 0;
   const ratingCount = profile?.rating_count ?? 0;
   const reliabilityScore = profile?.reliability_score ?? null;
@@ -272,16 +276,20 @@ export default function ProfileScreen() {
           {/* Identity card */}
           <View style={[styles.identityCard, { marginHorizontal: 20, marginBottom: 16 }]}>
             <Avatar name={displayName} size={64} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.identityName}>{displayName}</Text>
-              <View style={styles.identityBadgeRow}>
-                <SkillBadge level={badge} />
-                {username.length > 0 && (
-                  <Text style={styles.username}>@{username}</Text>
-                )}
-              </View>
+            <View style={styles.identityMeta}>
+              <Text style={styles.identityName} numberOfLines={1}>
+                {displayName}
+              </Text>
+              {username.length > 0 && (
+                <Text style={styles.username} numberOfLines={1}>
+                  @{username}
+                </Text>
+              )}
+              <SkillBadge skillLevel={skillLevel} />
             </View>
-            <TrustRing value={rating} />
+            <View style={styles.trustRing}>
+              <TrustRing value={rating} />
+            </View>
           </View>
 
           {showReliabilityWarning ? (
@@ -306,7 +314,7 @@ export default function ProfileScreen() {
           <SectionLabel>PREFERENCES</SectionLabel>
           <View style={[styles.prefCard, { marginHorizontal: 20, marginBottom: 16 }]}>
             <PreferenceRow label="Bio" value={bio ?? undefined} isFirst />
-            <PreferenceRow label="Skill Level" value={SKILL_LABEL[badge]} />
+            <PreferenceRow label="Skill Level" value={SKILL_LEVEL_LABEL[skillLevel]} />
             <PreferenceRow label="Location" value="Set location" />
           </View>
 
@@ -378,32 +386,36 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   skillBadge: {
-    borderRadius: 7,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    alignSelf: 'flex-start',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   skillBadgeText: {
     fontFamily: 'SpaceMono-Bold',
-    fontSize: 10,
-    letterSpacing: 0.5,
+    fontSize: 9,
+    letterSpacing: 0.6,
     textTransform: 'uppercase',
+  },
+  identityMeta: {
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    gap: 5,
   },
   identityName: {
     fontFamily: 'HankenGrotesk-Bold',
     fontSize: 19,
     color: C.neutral,
-    marginBottom: 6,
-  },
-  identityBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   username: {
     fontFamily: 'Space Mono',
     fontSize: 11,
     color: C.dim,
     letterSpacing: 0.5,
+  },
+  trustRing: {
+    flexShrink: 0,
   },
   ringCenter: {
     flex: 1,
@@ -463,7 +475,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Space Mono',
     fontSize: 9.5,
     color: C.dim,
-    letterSpacing: 1.5,
+    letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 8,
   },

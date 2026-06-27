@@ -5,13 +5,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Pressable, View, Text } from '@/tw';
 import { formatDiscoverMatchWhen, formatMatchTimeRange } from '@/lib/match-time';
 import {
-  categoryToBadgeTier,
+  categoryAccentLevel,
   formatCategoryCompact,
   formatDifficultyLabel,
   formatDistanceKm,
   formatGenderLabel,
   formatMatchDurationHours,
-  type SkillBadgeTier,
+  type CategoryAccentLevel,
 } from '@/features/matches/match-display';
 import type { MatchSummary } from '@/features/matches/use-matches';
 
@@ -39,9 +39,9 @@ const AVATAR_TONES: [string, string][] = [
   ['#2A2B30', '#E4E4E4'],
 ];
 
-function accentColorsForTier(level: SkillBadgeTier): readonly [string, string] {
-  if (level === 'A') return [C.blueHi, C.blueMid];
-  if (level === 'B') return [C.blueMid, C.blue];
+function accentColorsForLevel(level: CategoryAccentLevel): readonly [string, string] {
+  if (level === 'high') return [C.blueHi, C.blueMid];
+  if (level === 'mid') return [C.blueMid, C.blue];
   return [C.surface3, 'rgba(228,228,228,0.18)'];
 }
 
@@ -139,7 +139,7 @@ export function MatchSummaryCard({
   const categoryLabel = formatCategoryCompact(match.category_max, match.category_min);
   const filled = match.totalFilled;
   const openSpots = match.joinSpotsRemaining;
-  const level = categoryToBadgeTier(match.category_max);
+  const accentLevel = categoryAccentLevel(match.category_max);
   const full = match.isJoinFull || match.status === 'full';
   const avatarNames = [hostName, match.sport?.name ?? 'Player', match.venue_name ?? 'Match'];
   const showDistance = distanceM !== undefined;
@@ -147,7 +147,7 @@ export function MatchSummaryCard({
   return (
     <Pressable onPress={onPress} style={[styles.card, muted && styles.cardMuted]}>
       <LinearGradient
-        colors={accentColorsForTier(level)}
+        colors={accentColorsForLevel(accentLevel)}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={styles.cardAccent}

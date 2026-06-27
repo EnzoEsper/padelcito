@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 
-type SkillLevel = Database['public']['Enums']['skill_level'];
+export type SkillLevel = Database['public']['Enums']['skill_level'];
 
 export type ProfileRow = {
   id: string;
@@ -90,27 +90,24 @@ export function useProfileSport() {
   });
 }
 
-// Skill level mapped to the A/B/C/D badge system from the design reference
-export function skillLevelToBadge(level: SkillLevel): 'A' | 'B' | 'C' | 'D' {
-  switch (level) {
-    case 'pro':
-      return 'A';
-    case 'expert':
-      return 'A';
-    case 'advanced':
-      return 'B';
-    case 'intermediate':
-      return 'C';
-    case 'beginner':
-      return 'D';
-    default:
-      return 'C';
-  }
-}
+/** Human-readable skill level from onboarding (beginner → pro). */
+export const SKILL_LEVEL_LABEL: Record<SkillLevel, string> = {
+  beginner: 'Beginner',
+  intermediate: 'Intermediate',
+  advanced: 'Advanced',
+  expert: 'Expert',
+  pro: 'Pro',
+};
 
-export const SKILL_LABEL: Record<'A' | 'B' | 'C' | 'D', string> = {
-  A: 'A · Pro',
-  B: 'B · Adv',
-  C: 'C · Int',
-  D: 'D · Beg',
+export type SkillLevelColors = {
+  bg: string;
+  fg: string;
+};
+
+export const SKILL_LEVEL_COLORS: Record<SkillLevel, SkillLevelColors> = {
+  pro: { bg: '#2B396D', fg: '#E4E4E4' },
+  expert: { bg: '#2B396D', fg: '#E4E4E4' },
+  advanced: { bg: 'rgba(68,88,166,0.18)', fg: '#A9B6E6' },
+  intermediate: { bg: '#232429', fg: 'rgba(228,228,228,0.60)' },
+  beginner: { bg: '#232429', fg: 'rgba(228,228,228,0.38)' },
 };

@@ -13,8 +13,7 @@ import {
 } from '@/lib/padel-court';
 import {
   formatCategoryLabel,
-  PADEL_CATEGORIES,
-  type PadelCategoryTier,
+  categoryToTier,
 } from '@/lib/padel-category';
 import { POSITION_PREFERENCE_OPTIONS } from '@/lib/padel-position';
 import { distanceMeters, parseGeographyPoint, type Coords } from '@/lib/location';
@@ -43,7 +42,8 @@ export type ParticipantStatusDisplay = {
   pulse: boolean;
 };
 
-export type SkillBadgeTier = 'A' | 'B' | 'C' | 'D';
+/** Card accent strength from the match's strongest accepted category (1ª = highest). */
+export type CategoryAccentLevel = 'high' | 'mid' | 'low';
 
 const ARS_DISPLAY = new Intl.NumberFormat('es-AR', {
   style: 'currency',
@@ -133,20 +133,12 @@ export function formatMatchDurationHours(minutes: number): string {
   return `${label} hr`;
 }
 
-export function categoryToBadgeTier(categoryMax: number): SkillBadgeTier {
-  const category = PADEL_CATEGORIES.find((entry) => entry.number === categoryMax);
-  const tier: PadelCategoryTier = category?.tier ?? 'intermediate';
-
-  switch (tier) {
-    case 'advanced':
-      return categoryMax <= 2 ? 'A' : 'B';
-    case 'intermediate':
-      return 'C';
-    case 'beginner':
-      return 'D';
-    default:
-      return 'C';
+export function categoryAccentLevel(categoryMax: number): CategoryAccentLevel {
+  const tier = categoryToTier(categoryMax);
+  if (tier === 'advanced') {
+    return categoryMax <= 2 ? 'high' : 'mid';
   }
+  return 'low';
 }
 
 export function formatGenderLabel(gender: GenderPreference): string {
