@@ -66,7 +66,8 @@ function combineDateAndTime(datePart: Date, timePart: Date): Date {
 export type CreateMatchFormState = {
   venueName: string;
   coords: Coords | null;
-  placeLabel: string | null;
+  formattedAddress: string | null;
+  placeId: string | null;
   datePart: Date;
   timePart: Date;
   durationMinutes: DurationOption;
@@ -93,7 +94,8 @@ export type CreateMatchFormState = {
 export type CreateMatchFormActions = {
   setVenueName: (value: string) => void;
   setCoords: (value: Coords | null) => void;
-  setPlaceLabel: (value: string | null) => void;
+  setFormattedAddress: (value: string | null) => void;
+  setPlaceId: (value: string | null) => void;
   setDatePart: (value: Date) => void;
   setTimePart: (value: Date) => void;
   setDurationMinutes: (value: DurationOption) => void;
@@ -116,7 +118,8 @@ export type CreateMatchFormActions = {
 export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActions {
   const [venueName, setVenueName] = useState('');
   const [coords, setCoords] = useState<Coords | null>(null);
-  const [placeLabel, setPlaceLabel] = useState<string | null>(null);
+  const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
+  const [placeId, setPlaceId] = useState<string | null>(null);
   const [datePart, setDatePart] = useState(defaultDatePart);
   const [timePart, setTimePart] = useState(defaultTimePart);
   const [durationMinutes, setDurationMinutes] = useState<DurationOption>(60);
@@ -231,6 +234,8 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
         title,
         description: notes.trim() || null,
         venueName: venueName.trim() || null,
+        formattedAddress: formattedAddress?.trim() || null,
+        placeId: placeId?.trim() || null,
         startsAt: startsAtDate.toISOString(),
         durationMinutes,
         capacity: totalPlayers,
@@ -264,6 +269,8 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
     genderPreference,
     notes,
     openSpots,
+    formattedAddress,
+    placeId,
     positionPreference,
     pricePerPlayer,
     timePart,
@@ -274,7 +281,8 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
   return {
     venueName,
     coords,
-    placeLabel,
+    formattedAddress,
+    placeId,
     datePart,
     timePart,
     durationMinutes,
@@ -298,7 +306,8 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
     confirmedCount,
     setVenueName,
     setCoords,
-    setPlaceLabel,
+    setFormattedAddress,
+    setPlaceId,
     setDatePart,
     setTimePart,
     setDurationMinutes,

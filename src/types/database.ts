@@ -453,6 +453,7 @@ export type Database = {
           difficulty: Database["public"]["Enums"]["match_difficulty"]
           duration_minutes: number
           finished_at: string | null
+          formatted_address: string | null
           gender_preference: Database["public"]["Enums"]["match_gender_preference"]
           host_id: string
           id: string
@@ -460,6 +461,7 @@ export type Database = {
           late_withdrawal_threshold: string
           location: unknown
           open_spots: number
+          place_id: string | null
           position_preference: Database["public"]["Enums"]["match_position_preference"]
           price_per_player: number | null
           skill_max: Database["public"]["Enums"]["skill_level"] | null
@@ -485,6 +487,7 @@ export type Database = {
           difficulty?: Database["public"]["Enums"]["match_difficulty"]
           duration_minutes?: number
           finished_at?: string | null
+          formatted_address?: string | null
           gender_preference?: Database["public"]["Enums"]["match_gender_preference"]
           host_id: string
           id?: string
@@ -492,6 +495,7 @@ export type Database = {
           late_withdrawal_threshold?: string
           location: unknown
           open_spots: number
+          place_id?: string | null
           position_preference?: Database["public"]["Enums"]["match_position_preference"]
           price_per_player?: number | null
           skill_max?: Database["public"]["Enums"]["skill_level"] | null
@@ -517,6 +521,7 @@ export type Database = {
           difficulty?: Database["public"]["Enums"]["match_difficulty"]
           duration_minutes?: number
           finished_at?: string | null
+          formatted_address?: string | null
           gender_preference?: Database["public"]["Enums"]["match_gender_preference"]
           host_id?: string
           id?: string
@@ -524,6 +529,7 @@ export type Database = {
           late_withdrawal_threshold?: string
           location?: unknown
           open_spots?: number
+          place_id?: string | null
           position_preference?: Database["public"]["Enums"]["match_position_preference"]
           price_per_player?: number | null
           skill_max?: Database["public"]["Enums"]["skill_level"] | null

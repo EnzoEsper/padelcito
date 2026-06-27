@@ -25,6 +25,8 @@ export type CreateMatchInput = {
   title: string;
   description: string | null;
   venueName: string | null;
+  formattedAddress: string | null;
+  placeId: string | null;
   startsAt: string;
   durationMinutes: number;
   capacity: number;
@@ -479,6 +481,8 @@ export function useCreateMatch() {
         title: input.title.trim(),
         description: input.description,
         venue_name: input.venueName,
+        formatted_address: input.formattedAddress,
+        place_id: input.placeId,
         starts_at: input.startsAt,
         duration_minutes: input.durationMinutes,
         capacity: input.capacity,

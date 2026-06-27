@@ -44,6 +44,7 @@ import { formatPublicReliabilityScore } from '@/features/ratings/penalty-report'
 import { RosterInfoButton, RosterInfoSheet } from '@/features/matches/roster-info-sheet';
 import type { CourtConfig } from '@/lib/padel-court';
 import { formatMatchScheduleLabel } from '@/lib/match-time';
+import { resolveMatchLocationSubtitle } from '@/lib/match-location';
 import { UnsupportedSportError } from '@/lib/padel-sport';
 import type { Database } from '@/types/database';
 
@@ -718,11 +719,7 @@ export default function MatchDetailScreen() {
     queryClient,
   });
   const hostNote = match.description?.trim() ?? '';
-  const showSubtitle =
-    match.venue_name !== null &&
-    match.venue_name.trim().length > 0 &&
-    match.title.trim().length > 0 &&
-    match.venue_name.trim() !== match.title.trim();
+  const locationSubtitle = resolveMatchLocationSubtitle(match);
   const acceptedParticipants = match.visibleParticipants.filter(
     (participant) => participant.status === 'accepted',
   );
@@ -809,9 +806,9 @@ export default function MatchDetailScreen() {
               ) : null}
             </View>
           </View>
-          {showSubtitle ? (
+          {locationSubtitle !== null ? (
             <Text style={styles.matchSubtitle} numberOfLines={2}>
-              {match.title}
+              {locationSubtitle}
             </Text>
           ) : null}
           <View style={styles.dateRow}>

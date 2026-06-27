@@ -6,7 +6,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { ScrollView, View, Text, Pressable } from "@/tw";
 import { NotificationBell } from "@/components/notification-bell";
 import { ReliabilityBadge } from "@/components/reliability-badge";
-import { formatMatchListDateTime } from "@/lib/match-time";
 import {
   useMyMatches,
   useUpdateParticipantStatus,
@@ -14,18 +13,18 @@ import {
   type MatchSummary,
 } from "@/features/matches/use-matches";
 import { useMyMatchesRealtime } from "@/features/matches/use-match-realtime";
+import { MatchSummaryCard } from "@/features/matches/components/match-summary-card";
+import {
+  MatchCalendarHeaderBadge,
+  MatchCalendarMembershipLabel,
+  resolveParticipantMembership,
+} from "@/features/matches/components/match-status-badge";
 import { buildRateMatchRoute } from "@/features/ratings/rating-display";
 import { usePendingRatingCount } from "@/features/ratings/use-ratings";
 import { SegmentedControl } from "@/features/matches/create-match/components/segmented-control";
-import {
-  categoryToBadgeTier,
-  type SkillBadgeTier,
-} from "@/features/matches/match-display";
-import { SKILL_LABEL } from "@/features/profile/use-profile";
 
 type MatchesTab = "upcoming" | "history" | "pending";
 type PendingView = "sent" | "inbox";
-type PillVariant = "confirmed" | "pending" | "completed" | "host" | "cancelled";
 
 const C = {
   surface1: "#141417",
@@ -35,199 +34,38 @@ const C = {
   hair: "rgba(228,228,228,0.10)",
 } as const;
 
-const SKILL_BADGE_CLASS: Record<
-  SkillBadgeTier,
-  { container: string; text: string }
-> = {
-  A: { container: "bg-primary", text: "text-neutral" },
-  B: { container: "bg-primary/20", text: "text-primary-hi" },
-  C: { container: "bg-surface-3", text: "text-neutral/60" },
-  D: { container: "bg-surface-3", text: "text-neutral/38" },
-};
-
-const PILL_CLASS: Record<PillVariant, { container: string; text: string }> = {
-  confirmed: {
-    container: "bg-[rgba(91,224,166,0.1)] border-[rgba(91,224,166,0.3)]",
-    text: "text-[#5BE0A6]",
-  },
-  pending: {
-    container: "bg-warning/10 border-warning/30",
-    text: "text-warning",
-  },
-  completed: {
-    container: "bg-surface-3 border-neutral/10",
-    text: "text-neutral/60",
-  },
-  host: {
-    container: "bg-primary/20 border-primary-hi/30",
-    text: "text-primary-hi",
-  },
-  cancelled: {
-    container: "bg-neutral/10 border-neutral/20",
-    text: "text-neutral/60",
-  },
-};
-
-function resolvePillVariant(match: MatchSummary, tab: MatchesTab): PillVariant {
-  if (match.status === "cancelled") return "cancelled";
-  if (tab === "history") return "completed";
-  if (match.currentUserParticipant?.status === "pending") return "pending";
-  if (match.isHostedByCurrentUser) return "host";
-  return "confirmed";
-}
-
-function resolvePillLabel(variant: PillVariant): string {
-  switch (variant) {
-    case "confirmed":
-      return "Confirmed";
-    case "pending":
-      return "Pending";
-    case "completed":
-      return "Completed";
-    case "host":
-      return "Host";
-    case "cancelled":
-      return "Cancelled";
-    default:
-      return "Confirmed";
-  }
-}
-
-function StatePill({ variant }: { variant: PillVariant }) {
-  const styles = PILL_CLASS[variant];
-  return (
-    <View
-      className={[
-        "rounded-lg border px-2.5 py-1 flex-row items-center gap-1.5",
-        styles.container,
-      ].join(" ")}
-    >
-      {variant === "pending" ? (
-        <View className="w-[5px] h-[5px] rounded-full bg-warning" />
-      ) : null}
-      <Text
-        className={[
-          "font-mono text-[9.5px] tracking-[0.11em] uppercase font-bold",
-          styles.text,
-        ].join(" ")}
-      >
-        {resolvePillLabel(variant)}
-      </Text>
-    </View>
-  );
-}
-
-function SkillBadge({ level }: { level: SkillBadgeTier }) {
-  const styles = SKILL_BADGE_CLASS[level];
-  return (
-    <View className={["rounded-lg px-2 py-1", styles.container].join(" ")}>
-      <Text
-        className={[
-          "font-mono text-[9.5px] tracking-[0.08em] font-bold",
-          styles.text,
-        ].join(" ")}
-      >
-        {SKILL_LABEL[level]}
-      </Text>
-    </View>
-  );
-}
-
-function FillMeter({ filled, total }: { filled: number; total: number }) {
-  const slots = Math.min(total, 4);
-  return (
-    <View className="flex-row items-center gap-1">
-      {Array.from({ length: slots }).map((_, index) => (
-        <View
-          key={index}
-          className={[
-            "w-[7px] h-[7px] rounded-full",
-            index < filled ? "bg-primary-hi" : "bg-neutral/20",
-          ].join(" ")}
-        />
-      ))}
-    </View>
-  );
-}
-
-function MatchRow({
+function MyMatchCard({
   match,
   tab,
   onPress,
-  subtitle,
   needsRating,
   onRate,
 }: {
   match: MatchSummary;
   tab: MatchesTab;
   onPress: () => void;
-  subtitle?: string;
   needsRating?: boolean;
   onRate?: () => void;
 }) {
-  const variant = resolvePillVariant(match, tab);
-  const level = categoryToBadgeTier(match.category_max);
-  const muted = tab === "history";
+  const membership = resolveParticipantMembership(match);
 
   return (
-    <Pressable
+    <MatchSummaryCard
+      match={match}
       onPress={onPress}
-      className={[
-        "bg-surface-1 border border-neutral/10 rounded-[18px] mx-5 mb-3 px-4 py-4 active:opacity-80",
-        muted ? "opacity-90" : "",
-      ].join(" ")}
-    >
-      <View className="flex-row items-center justify-between mb-3">
-        <StatePill variant={variant} />
-        <SkillBadge level={level} />
-      </View>
-
-      <Text
-        className="font-grotesk font-bold text-base text-neutral mb-1.5"
-        style={{ letterSpacing: -0.2 }}
-      >
-        {match.venue_name ?? match.title}
-      </Text>
-
-      <Text className="font-grotesk text-[13.5px] text-neutral/60 mb-1">
-        {formatMatchListDateTime(match.starts_at)}
-      </Text>
-
-      {subtitle !== undefined ? (
-        <Text className="font-grotesk text-sm text-warning/90 mb-2">
-          {subtitle}
-        </Text>
-      ) : null}
-
-      <View className="flex-row items-center justify-between mt-1">
-        <View className="flex-row items-center gap-2">
-          <FillMeter filled={match.totalFilled} total={match.capacity} />
-          <Text className="font-mono text-[10px] tracking-[0.12em] uppercase text-neutral/38">
-            {match.totalFilled}/{match.capacity}
-          </Text>
-        </View>
-        <View className="flex-row items-center gap-2">
-          {needsRating === true && onRate !== undefined ? (
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation();
-                onRate();
-              }}
-              className="rounded-lg border border-primary-hi/30 bg-primary/20 px-2.5 py-1"
-            >
-              <Text className="font-mono text-[9.5px] tracking-[0.11em] uppercase font-bold text-primary-hi">
-                Rate
-              </Text>
-            </Pressable>
-          ) : null}
-          <Ionicons
-            name="chevron-forward"
-            size={16}
-            color="rgba(228,228,228,0.20)"
-          />
-        </View>
-      </View>
-    </Pressable>
+      muted={tab === "history"}
+      headerBadge={<MatchCalendarHeaderBadge match={match} />}
+      footerMembership={
+        membership !== null ? (
+          <MatchCalendarMembershipLabel match={match} />
+        ) : undefined
+      }
+      rateAction={
+        needsRating === true && onRate !== undefined
+          ? { onPress: onRate }
+          : undefined
+      }
+    />
   );
 }
 
@@ -379,7 +217,7 @@ export default function MatchesScreen() {
         );
       }
       return data.upcoming.map((match) => (
-        <MatchRow
+        <MyMatchCard
           key={match.id}
           match={match}
           tab="upcoming"
@@ -398,7 +236,7 @@ export default function MatchesScreen() {
         );
       }
       return data.history.map((match) => (
-        <MatchRow
+        <MyMatchCard
           key={match.id}
           match={match}
           tab="history"
@@ -421,11 +259,10 @@ export default function MatchesScreen() {
         );
       }
       return data.pendingOutgoing.map((match) => (
-        <MatchRow
+        <MyMatchCard
           key={match.id}
           match={match}
           tab="pending"
-          subtitle="Awaiting host approval"
           onPress={() => openMatch(match.id)}
         />
       ));

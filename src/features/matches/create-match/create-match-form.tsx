@@ -68,8 +68,8 @@ export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
           onVenueNameChange={form.setVenueName}
           coords={form.coords}
           onCoordsChange={form.setCoords}
-          placeLabel={form.placeLabel}
-          onPlaceLabelChange={form.setPlaceLabel}
+          onFormattedAddressChange={form.setFormattedAddress}
+          onPlaceIdChange={form.setPlaceId}
         />
 
         <View>

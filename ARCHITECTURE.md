@@ -114,7 +114,7 @@ A single `tournaments` table serves both worlds, switched by `is_local`:
 - `generate_single_elimination_bracket()` — next-power-of-two sizing, classic seeding (seed _j_ vs seed _size−j+1_), automatic byes resolved as walkovers.
 - `generate_round_robin()` — circle-method scheduling with bye handling for odd counts.
 - `handle_bracket_advance` trigger — winners flow into `next_match_id/next_match_slot` automatically.
-- `recompute_stage_standings()` — full leaderboard recomputation (wins, sets, games, points, rank) on every completed match. Standings are **client-read-only**; only the SECURITY DEFINER trigger writes them.
+- `recompute_stage_standings()` — full leaderboard recomputation (wins, sets, games, points, rank) on every finished tournament match. Standings are **client-read-only**; only the SECURITY DEFINER trigger writes them.
 
 ### Geospatial discovery
 

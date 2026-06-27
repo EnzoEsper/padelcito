@@ -4,12 +4,12 @@ function StatePill({ state }) {
   const map = {
     confirmed: { t: 'CONFIRMED', c: C.win, bg: 'rgba(91,224,166,0.1)', bd: 'rgba(91,224,166,0.3)' },
     pending:   { t: 'PENDING',   c: C.warn, bg: 'rgba(224,177,91,0.1)', bd: 'rgba(224,177,91,0.3)' },
-    completed: { t: 'COMPLETED', c: C.dim,  bg: C.s3, bd: C.hair },
+    finished: { t: 'FINISHED', c: C.dim,  bg: C.s3, bd: C.hair },
   }[state];
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: map.bg,
       border: `1px solid ${map.bd}`, borderRadius: 8, padding: '4px 9px' }}>
-      {state !== 'completed' && <span style={{ width: 5, height: 5, borderRadius: '50%', background: map.c,
+      {state !== 'finished' && <span style={{ width: 5, height: 5, borderRadius: '50%', background: map.c,
         animation: state === 'pending' ? 'pd-pulse 1.2s infinite' : 'none' }} />}
       <Mono size={9.5} color={map.c} ls={1} weight={700}>{map.t}</Mono>
     </span>
@@ -17,8 +17,8 @@ function StatePill({ state }) {
 }
 
 function ScreenMatches({ tab, setTab, onOpenMatch }) {
-  const upcoming = MY_MATCHES.filter(m => m.state !== 'completed');
-  const history = MY_MATCHES.filter(m => m.state === 'completed');
+  const upcoming = MY_MATCHES.filter(m => m.state !== 'finished');
+  const history = MY_MATCHES.filter(m => m.state === 'finished');
   const list = tab === 'upcoming' ? upcoming : history;
   const linkMap = { my1: 'mx1', my2: 'mx3' };
 
@@ -42,13 +42,13 @@ function ScreenMatches({ tab, setTab, onOpenMatch }) {
       </div>
 
       {list.map((m, i) => {
-        const completed = m.state === 'completed';
+        const finished = m.state === 'finished';
         const tappable = linkMap[m.id];
         return (
           <Press key={m.id} onClick={() => tappable && onOpenMatch(tappable)} scale={tappable ? 0.985 : 1}
             style={{ animation: `pd-fade-up .4s ${i * 0.05}s both` }}>
             <div style={{ margin: '0 20px 12px', background: C.s1, border: `1px solid ${C.hair}`,
-              borderRadius: rad(18), padding: 16, opacity: completed ? 0.92 : 1 }}>
+              borderRadius: rad(18), padding: 16, opacity: finished ? 0.92 : 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <StatePill state={m.state} />
                 <SkillBadge level={m.skill} size="sm" />
@@ -59,7 +59,7 @@ function ScreenMatches({ tab, setTab, onOpenMatch }) {
                   <Ico.calendar size={13} color={C.faint} />
                   <span style={{ fontSize: 13.5, fontWeight: 500 }}>{m.when} · {m.time}</span>
                 </span>
-                {completed ? (
+                {finished ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Mono size={12} color={C.dim} ls={0.5} weight={700}>{m.score}</Mono>
                     <span style={{ width: 24, height: 24, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center',

@@ -49,8 +49,8 @@ const MATCHES = [
 const MY_MATCHES = [
   { id: 'my1', state: 'confirmed', club: 'Club Norte · Cancha 3', when: 'Today', time: '19:30', filled: 4, total: 4, skill: 'B' },
   { id: 'my2', state: 'pending',   club: 'Riverside Padel · Cancha 1', when: 'Tomorrow', time: '08:00', filled: 4, total: 4, skill: 'A' },
-  { id: 'my3', state: 'completed', club: 'Padel District · Court A', when: 'Jun 2', time: '21:00', result: 'W', score: '6–3 · 6–4', skill: 'B' },
-  { id: 'my4', state: 'completed', club: 'Sunset Sports · Court 2', when: 'May 28', time: '10:00', result: 'L', score: '4–6 · 6–7', skill: 'B' },
+  { id: 'my3', state: 'finished', club: 'Padel District · Court A', when: 'Jun 2', time: '21:00', result: 'W', score: '6–3 · 6–4', skill: 'B' },
+  { id: 'my4', state: 'finished', club: 'Sunset Sports · Court 2', when: 'May 28', time: '10:00', result: 'L', score: '4–6 · 6–7', skill: 'B' },
 ];
 
 // Live tournament bracket — 8-player single elimination

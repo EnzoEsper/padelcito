@@ -1,26 +1,29 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
-import * as Location from 'expo-location';
+import { Modal, Pressable as RNPressable, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View, Text, TextInput } from '@/tw';
-import {
-  formatCoordsLabel,
-  parseCoordsFromText,
-  resolvePlaceLabel,
-  type Coords,
-} from '@/lib/location';
+import { type Coords } from '@/lib/location';
+import { PRESET_MATCH_LOCATIONS, type PresetLocation } from '../preset-locations';
 import { SectionLabel } from './section-label';
 
 const PLACEHOLDER_COLOR = 'rgba(228,228,228,0.20)';
+
+function coordsMatch(a: Coords, b: Coords): boolean {
+  return a.lat === b.lat && a.lng === b.lng;
+}
+
+function findSelectedPreset(coords: Coords | null): PresetLocation | null {
+  if (coords === null) return null;
+  return PRESET_MATCH_LOCATIONS.find((preset) => coordsMatch(preset.coords, coords)) ?? null;
+}
 
 type LocationFieldProps = {
   venueName: string;
   onVenueNameChange: (value: string) => void;
   coords: Coords | null;
   onCoordsChange: (coords: Coords | null) => void;
-  placeLabel: string | null;
-  onPlaceLabelChange: (label: string | null) => void;
+  onFormattedAddressChange: (value: string | null) => void;
+  onPlaceIdChange: (value: string | null) => void;
 };
 
 export function LocationField({
@@ -28,91 +31,115 @@ export function LocationField({
   onVenueNameChange,
   coords,
   onCoordsChange,
-  placeLabel,
-  onPlaceLabelChange,
+  onFormattedAddressChange,
+  onPlaceIdChange,
 }: LocationFieldProps) {
-  const [pasteError, setPasteError] = useState<string | null>(null);
-  const [isPasting, setIsPasting] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const selectedPreset = findSelectedPreset(coords);
 
-  const applyCoords = useCallback(
-    async (nextCoords: Coords): Promise<void> => {
-      onCoordsChange(nextCoords);
-      try {
-        const results = await Location.reverseGeocodeAsync({
-          latitude: nextCoords.lat,
-          longitude: nextCoords.lng,
-        });
-        onPlaceLabelChange(resolvePlaceLabel(results[0], nextCoords));
-      } catch {
-        onPlaceLabelChange(formatCoordsLabel(nextCoords));
-      }
+  const handleSelectPreset = useCallback(
+    (preset: PresetLocation): void => {
+      onCoordsChange(preset.coords);
+      onVenueNameChange(preset.venueName);
+      onFormattedAddressChange(preset.formattedAddress);
+      onPlaceIdChange(preset.placeId);
+      setPickerOpen(false);
     },
-    [onCoordsChange, onPlaceLabelChange],
+    [onCoordsChange, onFormattedAddressChange, onPlaceIdChange, onVenueNameChange],
   );
-
-  const handlePasteCoordinates = useCallback(async (): Promise<void> => {
-    setPasteError(null);
-    setIsPasting(true);
-    try {
-      const text = await Clipboard.getStringAsync();
-      const parsed = parseCoordsFromText(text);
-      if (!parsed.ok) {
-        setPasteError(parsed.message);
-        return;
-      }
-      await applyCoords(parsed.coords);
-    } catch {
-      setPasteError('Could not read clipboard.');
-    } finally {
-      setIsPasting(false);
-    }
-  }, [applyCoords]);
 
   return (
     <View>
       <SectionLabel>Location</SectionLabel>
+
+      <Pressable
+        onPress={() => setPickerOpen(true)}
+        className="h-14 rounded-xl bg-surface-1 border border-neutral/10 px-4 flex-row items-center justify-between gap-2 mb-3"
+      >
+        <Text
+          className={[
+            'font-grotesk text-base flex-1',
+            selectedPreset !== null ? 'text-neutral' : 'text-neutral/40',
+          ].join(' ')}
+          numberOfLines={1}
+        >
+          {selectedPreset?.venueName ?? 'Pick a venue'}
+        </Text>
+        <Ionicons name="chevron-down" size={16} color="rgba(228,228,228,0.38)" />
+      </Pressable>
+
       <TextInput
         value={venueName}
         onChangeText={onVenueNameChange}
         placeholder="Club Norte · Court 3"
         placeholderTextColor={PLACEHOLDER_COLOR}
-        className="h-14 rounded-xl bg-surface-1 border border-neutral/10 px-4 font-grotesk text-base text-neutral mb-3"
+        className="h-14 rounded-xl bg-surface-1 border border-neutral/10 px-4 font-grotesk text-base text-neutral"
       />
 
-      <View className="rounded-xl bg-surface-1 border border-neutral/10 px-4 py-3 mb-3">
-        {isPasting ? (
-          <View className="flex-row items-center gap-3">
-            <ActivityIndicator color="#E4E4E4" size="small" />
-            <Text className="font-grotesk text-sm text-neutral/60">Reading coordinates…</Text>
-          </View>
-        ) : coords !== null ? (
-          <View>
-            {placeLabel !== null ? (
-              <Text className="font-grotesk text-sm text-neutral mb-1">{placeLabel}</Text>
-            ) : null}
-            <Text className="font-mono text-[11px] tracking-[0.08em] text-neutral/60">
-              {formatCoordsLabel(coords)}
-            </Text>
-          </View>
-        ) : (
-          <Text className="font-grotesk text-sm text-neutral/60">
-            Paste coordinates so players can find this match.
-          </Text>
-        )}
-      </View>
-
-      <Pressable
-        onPress={() => void handlePasteCoordinates()}
-        disabled={isPasting}
-        className="h-11 rounded-xl bg-surface-2 border border-neutral/10 items-center justify-center flex-row gap-2"
+      <Modal
+        transparent
+        animationType="fade"
+        visible={pickerOpen}
+        onRequestClose={() => setPickerOpen(false)}
       >
-        <Ionicons name="clipboard-outline" size={16} color="rgba(228,228,228,0.60)" />
-        <Text className="font-grotesk text-sm text-neutral/60">Paste coords</Text>
-      </Pressable>
-
-      {pasteError !== null ? (
-        <Text className="font-grotesk text-sm text-warning mt-2">{pasteError}</Text>
-      ) : null}
+        <RNPressable style={styles.scrim} onPress={() => setPickerOpen(false)}>
+          <RNPressable style={styles.sheet} onPress={() => undefined}>
+            <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-3 px-1">
+              Venue
+            </Text>
+            <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
+              {PRESET_MATCH_LOCATIONS.map((preset) => {
+                const selected = selectedPreset?.id === preset.id;
+                return (
+                  <Pressable
+                    key={preset.id}
+                    onPress={() => handleSelectPreset(preset)}
+                    className={[
+                      'rounded-xl px-4 py-3 flex-row items-center gap-3 mb-2',
+                      selected ? 'bg-primary' : 'bg-surface-3',
+                    ].join(' ')}
+                  >
+                    <View className="flex-1 min-w-0">
+                      <Text
+                        className={[
+                          'font-grotesk text-base mb-1',
+                          selected ? 'text-neutral font-semibold' : 'text-neutral/75',
+                        ].join(' ')}
+                      >
+                        {preset.venueName}
+                      </Text>
+                      <Text className="font-grotesk text-sm text-neutral/50" numberOfLines={2}>
+                        {preset.formattedAddress}
+                      </Text>
+                    </View>
+                    {selected ? <Ionicons name="checkmark" size={18} color="#E4E4E4" /> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </RNPressable>
+        </RNPressable>
+      </Modal>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  scrim: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  sheet: {
+    backgroundColor: '#141417',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+    maxHeight: '60%',
+  },
+  list: {
+    flexGrow: 0,
+  },
+});

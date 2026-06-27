@@ -3,11 +3,10 @@ import { ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { ScrollView, View, Text, Pressable } from '@/tw';
 import { useDiscoverMatches, type MatchSummary } from '@/features/matches/use-matches';
-import { formatDiscoverMatchWhen } from '@/lib/match-time';
-import { formatDistanceKm } from '@/features/matches/match-display';
+import { categoryToBadgeTier, type SkillBadgeTier } from '@/features/matches/match-display';
+import { MatchSummaryCard } from '@/features/matches/components/match-summary-card';
 import { useDiscoverMatchesRealtime } from '@/features/matches/use-match-realtime';
 import { NotificationBell } from '@/components/notification-bell';
 import { SearchRadiusSlider } from '@/features/discover/components/search-radius-slider';
@@ -38,36 +37,9 @@ const C = {
   warning: '#E0B15B',
 } as const;
 
-const SKILL_LABEL: Record<'A' | 'B' | 'C' | 'D', string> = {
-  A: 'A · Pro',
-  B: 'B · Adv',
-  C: 'C · Int',
-  D: 'D · Beg',
-};
 
-const AVATAR_TONES: [string, string][] = [
-  ['#2B396D', '#E4E4E4'],
-  ['#3A4A86', '#E4E4E4'],
-  ['#202126', '#E4E4E4'],
-  ['#4458A6', '#0B0B0B'],
-  ['#2A2B30', '#E4E4E4'],
-];
-
-function skillBadge(match: MatchSummary): 'A' | 'B' | 'C' | 'D' {
-  const level = match.skill_max ?? match.skill_min;
-  switch (level) {
-    case 'pro':
-    case 'expert':
-      return 'A';
-    case 'advanced':
-      return 'B';
-    case 'intermediate':
-      return 'C';
-    case 'beginner':
-      return 'D';
-    default:
-      return 'B';
-  }
+function skillBadge(match: MatchSummary): SkillBadgeTier {
+  return categoryToBadgeTier(match.category_max);
 }
 
 function headerLocationLabel(
@@ -117,15 +89,6 @@ function LocationGate({
       </Pressable>
     </View>
   );
-}
-
-function playerInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
 }
 
 function FilterChips({
@@ -191,129 +154,6 @@ function ViewToggle({
         );
       })}
     </View>
-  );
-}
-
-function AvatarBubble({
-  name,
-  index,
-}: {
-  name: string;
-  index: number;
-}) {
-  const tone = AVATAR_TONES[index % AVATAR_TONES.length] ?? AVATAR_TONES[0];
-
-  return (
-    <View
-      style={[
-        styles.avatarBubble,
-        {
-          backgroundColor: tone[0],
-          marginLeft: index === 0 ? 0 : -10,
-        },
-      ]}
-    >
-      <Text style={[styles.avatarText, { color: tone[1] }]}>{playerInitials(name)}</Text>
-    </View>
-  );
-}
-
-function EmptySpot({ index }: { index: number }) {
-  return (
-    <View style={[styles.emptySpot, { marginLeft: index === 0 ? 0 : -10 }]}>
-      <Ionicons name="add" size={13} color={C.faint} />
-    </View>
-  );
-}
-
-function SkillBadge({ level }: { level: 'A' | 'B' | 'C' | 'D' }) {
-  const isPrimary = level === 'A' || level === 'B';
-  return (
-    <View style={[styles.skillBadge, isPrimary ? styles.skillBadgePrimary : styles.skillBadgeMuted]}>
-      <Text style={[styles.skillBadgeText, isPrimary ? styles.skillBadgeTextPrimary : styles.skillBadgeTextMuted]}>
-        {SKILL_LABEL[level]}
-      </Text>
-    </View>
-  );
-}
-
-function MatchCard({ match, onPress }: { match: MatchSummary; onPress: () => void }) {
-  const hostName = match.host?.display_name ?? 'Player';
-  const { day, time } = formatDiscoverMatchWhen(match.starts_at);
-  const filled = match.totalFilled;
-  const openSpots = match.joinSpotsRemaining;
-  const level = skillBadge(match);
-  const full = match.isJoinFull || match.status === 'full';
-  const avatarNames = [hostName, match.sport?.name ?? 'Player', match.venue_name ?? 'Match'];
-  const accentColors =
-    level === 'A'
-      ? ([C.blueHi, C.blueMid] as const)
-      : level === 'B'
-        ? ([C.blueMid, C.blue] as const)
-        : ([C.surface3, 'rgba(228,228,228,0.18)'] as const);
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={styles.card}
-    >
-      <LinearGradient
-        colors={accentColors}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={styles.cardAccent}
-      />
-
-      <View style={styles.cardHeader}>
-        <View style={styles.cardTitleWrap}>
-          <Text style={styles.cardTitle} numberOfLines={1}>
-            {match.venue_name ?? match.title}
-          </Text>
-          <View style={styles.metaRow}>
-            <View style={styles.inline}>
-              <Ionicons name="calendar-outline" size={13} color={C.faint} />
-              <Text style={styles.metaText}>{day} · {time}</Text>
-            </View>
-            <View style={styles.inline}>
-              <Ionicons name="time-outline" size={13} color={C.faint} />
-              <Text style={styles.metaMono}>{match.duration_minutes}M</Text>
-            </View>
-          </View>
-        </View>
-        <View style={styles.distancePill}>
-          <Ionicons name="location-outline" size={12} color={C.blueHi} />
-          <Text style={styles.distanceText}>
-            {match.distanceM !== undefined ? formatDistanceKm(match.distanceM) : '—'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.cardDivider} />
-
-      <View style={styles.cardFooter}>
-        <View style={styles.playersWrap}>
-          <View style={styles.avatarStack}>
-            {avatarNames.slice(0, Math.min(filled, 3)).map((name, index) => (
-              <AvatarBubble key={`${match.id}-${name}-${index}`} name={name} index={index} />
-            ))}
-            {Array.from({ length: Math.min(openSpots, 2) }).map((_, index) => (
-              <EmptySpot key={`${match.id}-empty-${index}`} index={filled + index} />
-            ))}
-          </View>
-          <View>
-            <Text style={[styles.playerCount, full && styles.playerCountFull]}>
-              {filled}<Text style={styles.playerTotal}>/{match.capacity}</Text>
-            </Text>
-            <Text style={styles.playerLabel}>{full ? 'Full' : 'Players'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.footerRight}>
-          <SkillBadge level={level} />
-          <Ionicons name="chevron-forward" size={18} color={C.ghost} />
-        </View>
-      </View>
-    </Pressable>
   );
 }
 
@@ -418,9 +258,10 @@ export default function DiscoverScreen() {
             </View>
           ) : filteredMatches.length > 0 ? (
             filteredMatches.map((match) => (
-              <MatchCard
+              <MatchSummaryCard
                 key={match.id}
                 match={match}
+                distanceM={match.distanceM}
                 onPress={() => router.push(`/(app)/match-detail?id=${match.id}`)}
               />
             ))
@@ -487,11 +328,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  inline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
   },
   chipRow: {
     paddingHorizontal: 20,
@@ -566,165 +402,6 @@ const styles = StyleSheet.create({
   },
   viewToggleItemActive: {
     backgroundColor: C.blue,
-  },
-  card: {
-    marginHorizontal: 20,
-    marginBottom: 14,
-    backgroundColor: C.surface1,
-    borderWidth: 1,
-    borderColor: C.hair,
-    borderRadius: 22,
-    padding: 18,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  cardAccent: {
-    position: 'absolute',
-    left: 0,
-    top: 18,
-    bottom: 18,
-    width: 3,
-    borderRadius: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  cardTitleWrap: {
-    flex: 1,
-    paddingLeft: 4,
-  },
-  cardTitle: {
-    fontFamily: 'HankenGrotesk-Bold',
-    fontSize: 16.5,
-    color: C.mist,
-    letterSpacing: -0.2,
-    marginBottom: 5,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  metaText: {
-    fontFamily: 'HankenGrotesk-Medium',
-    fontSize: 13,
-    color: C.dim,
-  },
-  metaMono: {
-    fontFamily: 'Space Mono',
-    fontSize: 11,
-    letterSpacing: 0.5,
-    color: C.dim,
-    textTransform: 'uppercase',
-  },
-  distancePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: C.surface3,
-    borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  distanceText: {
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 11,
-    letterSpacing: 0.5,
-    color: C.mist,
-  },
-  cardDivider: {
-    height: 1,
-    backgroundColor: C.hair2,
-    marginVertical: 14,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingLeft: 4,
-  },
-  playersWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  avatarStack: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarBubble: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: C.surface1,
-  },
-  avatarText: {
-    fontFamily: 'HankenGrotesk-Bold',
-    fontSize: 10,
-    letterSpacing: 0.2,
-  },
-  emptySpot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: C.ghost,
-    backgroundColor: C.surface1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playerCount: {
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 13,
-    color: C.mist,
-  },
-  playerCountFull: {
-    color: C.dim,
-  },
-  playerTotal: {
-    color: C.dim,
-  },
-  playerLabel: {
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 9.5,
-    letterSpacing: 1,
-    color: C.dim,
-    textTransform: 'uppercase',
-  },
-  footerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  skillBadge: {
-    borderRadius: 7,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  skillBadgePrimary: {
-    backgroundColor: 'rgba(68,88,166,0.18)',
-  },
-  skillBadgeMuted: {
-    backgroundColor: C.surface3,
-  },
-  skillBadgeText: {
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 11,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  skillBadgeTextPrimary: {
-    color: '#A9B6E6',
-  },
-  skillBadgeTextMuted: {
-    color: C.dim,
   },
   centerState: {
     alignItems: 'center',

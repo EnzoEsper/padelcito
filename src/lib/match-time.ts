@@ -42,6 +42,13 @@ export function formatDiscoverMatchWhen(startsAt: string): { day: string; time: 
   };
 }
 
+/** Compact 24h window for list cards, e.g. "19:30 – 21:00". */
+export function formatMatchTimeRange(startsAt: string, durationMinutes: number): string {
+  const start = new Date(startsAt);
+  const end = new Date(start.getTime() + durationMinutes * 60_000);
+  return `${formatMatchTime(start)} – ${formatMatchTime(end)}`;
+}
+
 /** e.g. "Today, 19:30 – 21:30" or cross-midnight "Today, 23:00 – Tomorrow, 01:00". */
 export function formatMatchScheduleLabel(startsAt: string, durationMinutes: number): string {
   const start = new Date(startsAt);
