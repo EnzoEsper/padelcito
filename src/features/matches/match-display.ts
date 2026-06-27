@@ -124,6 +124,9 @@ export function formatCategoryCompact(categoryMax: number, categoryMin: number):
 
 /** UI-only duration label for match cards (hours, not minutes). */
 export function formatMatchDurationHours(minutes: number): string {
+  if (minutes < 60) {
+    return minutes === 1 ? '1 min' : `${minutes} min`;
+  }
   if (minutes % 60 === 0) {
     const hours = minutes / 60;
     return hours === 1 ? '1 hr' : `${hours} hr`;

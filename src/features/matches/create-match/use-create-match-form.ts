@@ -23,13 +23,16 @@ export { derivedConfirmedCount, maxOpenSpots };
 type MatchDifficulty = Database['public']['Enums']['match_difficulty'];
 type MatchGenderPreference = Database['public']['Enums']['match_gender_preference'];
 
-/** 30-minute steps from 1 h through 8 h (inclusive). */
+/** TEMP: includes 5 min for testing — restore 30-minute steps from 1 h through 8 h. */
 export const DURATION_OPTIONS = [
-  60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480,
+  5, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330, 360, 390, 420, 450, 480,
 ] as const;
 export type DurationOption = (typeof DURATION_OPTIONS)[number];
 
 export function formatDurationLabel(minutes: number): string {
+  if (minutes < 60) {
+    return minutes === 1 ? '1 min' : `${minutes} min`;
+  }
   if (minutes % 60 === 0) {
     const hours = minutes / 60;
     return hours === 1 ? '1 hr' : `${hours} hr`;
