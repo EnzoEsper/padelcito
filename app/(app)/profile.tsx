@@ -1,5 +1,5 @@
 import { View, Text, ScrollView, Pressable } from '@/tw';
-import { StyleSheet, Alert } from 'react-native';
+import { StyleSheet, Alert, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
@@ -226,8 +226,14 @@ function useSignOut() {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { data: profile, isPending: profilePending } = useProfile();
-  const { data: sport } = useProfileSport();
+  const {
+    data: profile,
+    isPending: profilePending,
+    isRefetching: profileRefetching,
+    refetch: refetchProfile,
+  } = useProfile();
+  const { data: sport, isRefetching: sportRefetching, refetch: refetchSport } = useProfileSport();
+  const isRefetching = profileRefetching || sportRefetching;
   const signOut = useSignOut();
 
   const skillLevel: SkillLevel = sport?.skill_level ?? 'intermediate';
@@ -247,7 +253,17 @@ export default function ProfileScreen() {
   const bio = profile?.bio;
 
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerClassName="pb-8">
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerClassName="pb-8"
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefetching}
+          onRefresh={() => void Promise.all([refetchProfile(), refetchSport()])}
+          tintColor={C.neutral}
+        />
+      }
+    >
       {/* Header */}
       <View
         style={{ paddingTop: insets.top + 16 }}

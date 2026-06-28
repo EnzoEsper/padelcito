@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -192,10 +192,27 @@ export default function DiscoverScreen() {
 
   const locationLabel = headerLocationLabel(locationStatus, placeLabel);
 
+  function handleRefresh() {
+    if (locationReady) {
+      void refetch();
+      return;
+    }
+    void retryLocation();
+  }
+
+  const isRefreshing = locationReady ? isRefetching : locationStatus === 'locating';
+
   return (
     <ScrollView
       className="flex-1 bg-background"
       contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          tintColor={C.mist}
+        />
+      }
     >
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View>

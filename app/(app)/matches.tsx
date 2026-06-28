@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet } from "react-native";
+import { ActivityIndicator, Alert, RefreshControl, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -176,7 +176,7 @@ export default function MatchesScreen() {
   const router = useRouter();
   const [tab, setTab] = useState<MatchesTab>("upcoming");
   const [pendingView, setPendingView] = useState<PendingView>("sent");
-  const { data, isPending, error, refetch } = useMyMatches();
+  const { data, isPending, isRefetching, error, refetch } = useMyMatches();
   useMyMatchesRealtime(data?.userId ?? null);
   const { pendingMatchIds } = usePendingRatingCount();
   const updateStatus = useUpdateParticipantStatus("");
@@ -292,6 +292,13 @@ export default function MatchesScreen() {
     <ScrollView
       className="flex-1 bg-background"
       contentContainerClassName="pb-6"
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefetching}
+          onRefresh={() => void refetch()}
+          tintColor={C.mist}
+        />
+      }
     >
       <View
         style={{ paddingTop: insets.top + 16 }}
