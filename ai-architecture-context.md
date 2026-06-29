@@ -110,7 +110,27 @@ Migrations: `20260622120000_block_actions_on_cancelled_matches`, `20260622140000
 
 - **Quality ratings are double-blind:** RLS allows each rater to read only their own `ratings` rows; aggregates are trigger-maintained on `profiles`. Never expose individual rating rows to ratees.
 - **Penalty contexts in `rating_context` enum are dead:** `validate_rating` rejects non-`standard` inserts. Penalties go through `reliability_reports` + `validate_reliability_report`.
-- **Reliability aggregates** (`penalty_count`, `commitment_count`, `reliability_score`) are trigger-maintained — never write them from client code.
+- **Reliability aggregates** (`penalty_count`, `commitment_count`, `reliability_score`) are trigger-maintained via `recompute_profile_commitments()` + `recompute_profile_reliability()` — never write them from client code.
+
+### Qualified commitments (anti-gaming)
+
+A **qualified commitment** counts only when another player was materially involved or a late penalty flag fired. `recompute_profile_commitments()` scans source tables (not blind increments):
+
+| Event | Who | Counts? |
+| ----- | --- | ------- |
+| Match → `finished` | Host | Only if ≥1 `accepted` participant |
+| Match → `finished` | Each `accepted` participant | Yes |
+| Match → `cancelled` | Host or `accepted` participant | Only if ≥1 `accepted` **and** late cancel (`cancelled_at >= starts_at - late_withdrawal_threshold`) |
+| `accepted` → `withdrawn` | Player | Only if `was_late_withdrawal` |
+| `accepted` → `removed` | Player | Only if `was_removed_by_host` |
+
+Empty host cancels, solo auto-`finished`, and early withdraw/remove do **not** increment commitments (prevents score dilution).
+
+**Penalties:** at most one `reliability_reports` row per `(match_id, subject_id, type)` — multiple reporters cannot pile-on one late cancel.
+
+**Public score:** `reliability_score` is `null` ("New") until `commitment_count >= 3`; `penalty_count` remains visible to the owner on their profile.
+
+**Deferred — rolling 90-day window:** future migration will filter commitments/penalties by recency in `recompute_profile_commitments()` (timestamps already stored on source rows); optional weekly `pg_cron` full recompute. Lifetime qualified model ships first in `20260625100000_reliability_qualified_commitments`.
 
 ### In-app notifications
 
@@ -134,7 +154,7 @@ Migrations: `20260622120000_block_actions_on_cancelled_matches`, `20260622140000
 
 ### M3 migrations
 
-`20260623140000_create_notifications`, `20260623150000_notification_triggers`, `20260623200000_match_cancellation_timestamp`, `20260623210000_reliability_reports`, `20260623220000_reliability_aggregates`, `20260624100000_post_match_ratings`, `20260624110000_schedule_match_finalizer`, `20260627230000_join_request_cancelled_notification`.
+`20260623140000_create_notifications`, `20260623150000_notification_triggers`, `20260623200000_match_cancellation_timestamp`, `20260623210000_reliability_reports`, `20260623220000_reliability_aggregates`, `20260624100000_post_match_ratings`, `20260624110000_schedule_match_finalizer`, `20260627230000_join_request_cancelled_notification`, `20260625100000_reliability_qualified_commitments`.
 
 ### Client mirrors (`src/features/matches/`)
 

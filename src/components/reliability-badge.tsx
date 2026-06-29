@@ -15,9 +15,9 @@ type ReliabilityBadgeProps = {
   compact?: boolean;
 };
 
-function formatLabel(reliabilityScore: number | null, penaltyCount: number): string {
+function formatLabel(reliabilityScore: number | null): string {
   if (reliabilityScore === null) {
-    return penaltyCount > 0 ? 'Low' : 'New';
+    return 'New';
   }
   return `${Math.round(reliabilityScore)}%`;
 }
@@ -28,7 +28,7 @@ export function ReliabilityBadge({
   compact = false,
 }: ReliabilityBadgeProps) {
   const penalties = penaltyCount ?? 0;
-  const label = formatLabel(reliabilityScore, penalties);
+  const label = formatLabel(reliabilityScore);
   const isLow =
     penalties > 0 || (reliabilityScore !== null && reliabilityScore < 85);
 

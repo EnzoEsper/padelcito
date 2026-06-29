@@ -1460,6 +1460,10 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: boolean
       }
+      is_late_match_cancellation: {
+        Args: { p_match: Database["public"]["Tables"]["matches"]["Row"] }
+        Returns: boolean
+      }
       is_listing_open: { Args: { p_listing_id: string }; Returns: boolean }
       is_listing_owner: { Args: { p_listing_id: string }; Returns: boolean }
       is_match_active: { Args: { p_match_id: string }; Returns: boolean }
@@ -1489,6 +1493,7 @@ export type Database = {
         Args: { p_tournament_id: string }
         Returns: boolean
       }
+      match_accepted_count: { Args: { p_match_id: string }; Returns: number }
       match_contact_details: {
         Args: { p_match_id: string }
         Returns: {
@@ -1564,6 +1569,11 @@ export type Database = {
           status: Database["public"]["Enums"]["tournament_status"]
         }[]
       }
+      recompute_all_profile_reliability: { Args: never; Returns: undefined }
+      recompute_profile_commitments: {
+        Args: { p_profile_id: string }
+        Returns: undefined
+      }
       recompute_profile_reliability: {
         Args: { p_profile_id: string }
         Returns: undefined
@@ -1593,11 +1603,11 @@ export type Database = {
         | "join_request"
         | "join_accepted"
         | "join_rejected"
-        | "join_request_cancelled"
         | "participant_withdrawn"
         | "participant_removed"
         | "match_cancelled"
         | "rating_request"
+        | "join_request_cancelled"
       participant_status:
         | "pending"
         | "accepted"

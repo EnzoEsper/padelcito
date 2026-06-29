@@ -92,11 +92,13 @@ Client helpers in `src/features/matches/use-matches.ts` mirror these rules; `use
 
 **Quality (stars):** `ratings` table with `context = 'standard'`. Mutual optional 1–5 star ratings after a match is **`finished`**, within 14 days of `finished_at`. Double-blind RLS (rater reads own rows only); `rating_avg` / `rating_count` denormalized on `profiles` by trigger.
 
-**Reliability (penalties):** `reliability_reports` table — optional wronged-party confirmations for `late_withdrawal`, `host_removal`, and `late_cancellation`. Separate from stars. `reliability_score`, `penalty_count`, and `commitment_count` on `profiles` are trigger-maintained.
+**Reliability (penalties):** `reliability_reports` table — optional wronged-party confirmations for `late_withdrawal`, `host_removal`, and `late_cancellation`. Separate from stars. `reliability_score`, `penalty_count`, and `commitment_count` on `profiles` are recomputed from source events (qualified commitment rules — see `ai-architecture-context.md` §9). Public `reliability_score` requires ≥3 qualified commitments; one penalty strike max per `(match, subject, event type)`.
 
 The participant state machine sets eligibility flags (`was_late_withdrawal`, `was_removed_by_host`); late cancellation uses `matches.cancelled_at` vs `late_withdrawal_threshold`. In-app notifications deep-link to optional report/rating screens — nothing is applied automatically.
 
 Legacy `rating_context` penalty values (`late_withdrawal`, `host_removal`) remain in the enum but `validate_rating` rejects them; use `reliability_reports` instead.
+
+**Deferred — rolling reliability window:** a future migration will limit commitments and penalties to a rolling window (e.g. 90 days) inside `recompute_profile_commitments()` / penalty counts, with optional periodic `pg_cron` recompute. Not shipped in M3 hardening (`20260625100000_reliability_qualified_commitments`).
 
 ### Non-expiring listings by construction
 

@@ -33,3 +33,9 @@ Penalty behavior uses `reliability_reports` (optional wronged-party confirmation
 ## Deterministic match finishing + post-match ratings (2026-06-24 — M3)
 
 `sync_match_lifecycle()` alone was insufficient — matches only finished when someone opened detail. Added `matches.finished_at`, `finalize_due_matches()` scheduled via pg_cron every 2 minutes, and `rating_request` notifications fan-out through `emit_rating_requests_for_match()`. Standard quality ratings allowed within 14 days of `finished_at`. Migrations `20260624100000_post_match_ratings` and `20260624110000_schedule_match_finalizer`. Client: `app/(app)/rate-match.tsx`, `src/features/ratings/use-ratings.ts`.
+
+---
+
+## Reliability qualified commitments (2026-06-25 — M3 hardening)
+
+The initial reliability model incremented `commitment_count` on every host cancel/finish and every withdraw/remove, allowing score dilution (empty cancels, early withdraw spam) and pile-on (multiple `late_cancellation` reports for one cancel). Migration `20260625100000_reliability_qualified_commitments` replaces blind increments with `recompute_profile_commitments()` scanning source tables: host finish/cancel only with ≥1 accepted player; cancel commitments only when late; withdraw/remove only when penalty flags set; unique `(match_id, subject_id, type)` on reports; public `reliability_score` null until ≥3 qualified commitments. Full backfill via `recompute_all_profile_reliability()`. Client: `MIN_RELIABILITY_COMMITMENTS` in `penalty-report.ts`.

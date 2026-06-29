@@ -85,11 +85,17 @@ export function parseReliabilityEventType(value: string | undefined): Reliabilit
   return null;
 }
 
+export const MIN_RELIABILITY_COMMITMENTS = 3;
+
+export function hasPublicReliabilitySample(commitmentCount: number): boolean {
+  return commitmentCount >= MIN_RELIABILITY_COMMITMENTS;
+}
+
 export function formatReliabilityScore(
   score: number | null,
   commitmentCount: number,
 ): string {
-  if (commitmentCount === 0 || score === null) {
+  if (!hasPublicReliabilitySample(commitmentCount) || score === null) {
     return 'New';
   }
   return `${Math.round(score)}%`;
@@ -99,12 +105,8 @@ export function formatPublicReliabilityScore(
   score: number | null,
   penaltyCount: number | null = 0,
 ): string | null {
-  const penalties = penaltyCount ?? 0;
   if (score !== null) {
     return `${Math.round(score)}% reliable`;
-  }
-  if (penalties > 0) {
-    return 'Low reliability';
   }
   return null;
 }
@@ -115,6 +117,6 @@ export function isLowReliability(
   commitmentCount: number,
 ): boolean {
   if (penaltyCount > 0) return true;
-  if (commitmentCount === 0 || score === null) return false;
+  if (!hasPublicReliabilitySample(commitmentCount) || score === null) return false;
   return score < 85;
 }
