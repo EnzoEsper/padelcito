@@ -1,8 +1,9 @@
 import { View, Text, ScrollView, Pressable } from '@/tw';
-import { StyleSheet, Alert, RefreshControl } from 'react-native';
+import { StyleSheet, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
+import { useAppAlert } from '@/components/app-alert-dialog';
 import { NotificationBell } from '@/components/notification-bell';
 import {
   formatReliabilityScore,
@@ -207,8 +208,10 @@ function ProfileSkeleton() {
 // ── Sign-out ──────────────────────────────────────────────────────────────────
 
 function useSignOut() {
+  const appAlert = useAppAlert();
+
   return function confirmSignOut() {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
+    appAlert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign Out',

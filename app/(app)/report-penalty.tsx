@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   TextInput,
 } from 'react-native';
@@ -10,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, View, Text, Pressable } from '@/tw';
+import { useAppAlert } from '@/components/app-alert-dialog';
 import {
   getPenaltyReportCopy,
   parseReliabilityEventType,
@@ -39,6 +39,7 @@ function toggleTag(selected: string[], tag: string): string[] {
 export default function ReportPenaltyScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const appAlert = useAppAlert();
   const params = useLocalSearchParams<{
     matchId?: string;
     subjectId?: string;
@@ -90,14 +91,14 @@ export default function ReportPenaltyScreen() {
       },
       {
         onSuccess: () => {
-          Alert.alert('Report submitted', 'Thank you. This helps keep matches reliable.', [
+          appAlert('Report submitted', 'Thank you. This helps keep matches reliable.', [
             { text: 'OK', onPress: () => router.back() },
           ]);
         },
         onError: (error) => {
           const message =
             error instanceof Error ? error.message : 'Could not submit report. Please try again.';
-          Alert.alert('Report failed', message);
+          appAlert('Report failed', message);
         },
       },
     );

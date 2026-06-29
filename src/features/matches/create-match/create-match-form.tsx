@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, Pressable as RNPressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, View as RNView } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { AppBottomSheet } from '@/components/app-bottom-sheet';
+import { useAppAlert } from '@/components/app-alert-dialog';
 import { View, Text, Pressable } from '@/tw';
 import { formatMatchTime } from '@/lib/match-time';
 import { useCreateMatch } from '@/features/matches/use-matches';
@@ -183,20 +185,18 @@ export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
 
       {showDatePicker ? (
         Platform.OS === 'ios' ? (
-          <Modal transparent animationType="fade" visible={showDatePicker}>
-            <RNPressable style={styles.modalScrim} onPress={() => setShowDatePicker(false)}>
-              <View style={styles.pickerSheet}>
-                <DateTimePicker
-                  value={form.datePart}
-                  mode="date"
-                  display="spinner"
-                  minimumDate={new Date()}
-                  onChange={handleDateChange}
-                  themeVariant="dark"
-                />
-              </View>
-            </RNPressable>
-          </Modal>
+          <AppBottomSheet visible={showDatePicker} onClose={() => setShowDatePicker(false)} title="Date">
+            <RNView style={styles.pickerBody}>
+              <DateTimePicker
+                value={form.datePart}
+                mode="date"
+                display="spinner"
+                minimumDate={new Date()}
+                onChange={handleDateChange}
+                themeVariant="dark"
+              />
+            </RNView>
+          </AppBottomSheet>
         ) : (
           <DateTimePicker
             value={form.datePart}
@@ -210,20 +210,18 @@ export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
 
       {showTimePicker ? (
         Platform.OS === 'ios' ? (
-          <Modal transparent animationType="fade" visible={showTimePicker}>
-            <RNPressable style={styles.modalScrim} onPress={() => setShowTimePicker(false)}>
-              <View style={styles.pickerSheet}>
-                <DateTimePicker
-                  value={form.timePart}
-                  mode="time"
-                  display="spinner"
-                  is24Hour
-                  onChange={handleTimeChange}
-                  themeVariant="dark"
-                />
-              </View>
-            </RNPressable>
-          </Modal>
+          <AppBottomSheet visible={showTimePicker} onClose={() => setShowTimePicker(false)} title="Time">
+            <RNView style={styles.pickerBody}>
+              <DateTimePicker
+                value={form.timePart}
+                mode="time"
+                display="spinner"
+                is24Hour
+                onChange={handleTimeChange}
+                themeVariant="dark"
+              />
+            </RNView>
+          </AppBottomSheet>
         ) : (
           <DateTimePicker
             value={form.timePart}
@@ -245,11 +243,12 @@ type CreateMatchPublishFooterProps = {
 export function CreateMatchPublishFooter({ form }: CreateMatchPublishFooterProps) {
   const router = useRouter();
   const createMatch = useCreateMatch();
+  const appAlert = useAppAlert();
 
   async function handlePublish(): Promise<void> {
     const result = form.buildSubmitInput();
     if (!result.ok) {
-      Alert.alert('Cannot publish', result.message);
+      appAlert('Cannot publish', result.message);
       return;
     }
 
@@ -258,7 +257,7 @@ export function CreateMatchPublishFooter({ form }: CreateMatchPublishFooterProps
       router.replace(`/(app)/match-detail?id=${matchId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not create match.';
-      Alert.alert('Create match failed', message);
+      appAlert('Create match failed', message);
     }
   }
 
@@ -290,15 +289,7 @@ export function CreateMatchForm() {
 }
 
 const styles = StyleSheet.create({
-  modalScrim: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  pickerSheet: {
-    backgroundColor: '#141417',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 24,
+  pickerBody: {
+    paddingBottom: 8,
   },
 });

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { ActivityIndicator, Alert, RefreshControl, StyleSheet } from "react-native";
+import { ActivityIndicator, RefreshControl, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { ScrollView, View, Text, Pressable } from "@/tw";
+import { useAppAlert } from "@/components/app-alert-dialog";
 import { NotificationBell } from "@/components/notification-bell";
 import { ReliabilityBadge } from "@/components/reliability-badge";
 import {
@@ -174,6 +175,7 @@ function EmptyState({ title, message }: { title: string; message: string }) {
 export default function MatchesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const appAlert = useAppAlert();
   const [tab, setTab] = useState<MatchesTab>("upcoming");
   const [pendingView, setPendingView] = useState<PendingView>("sent");
   const { data, isPending, isRefetching, error, refetch } = useMyMatches();
@@ -192,7 +194,7 @@ export default function MatchesScreen() {
         statusError instanceof Error
           ? statusError.message
           : "Could not update request.";
-      Alert.alert("Update failed", message);
+      appAlert("Update failed", message);
     }
   }
 

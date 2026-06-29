@@ -15,10 +15,12 @@ import {
   SpaceMono_700Bold,
 } from '@expo-google-fonts/space-mono';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { applyRealtimeAuth, subscribeToAuthChanges } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { AppDialogProvider } from '@/components/app-alert-dialog';
 import { OnboardingContext } from '@/lib/onboarding-context';
 
 const queryClient = new QueryClient({
@@ -162,11 +164,15 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <OnboardingContext.Provider value={{ markProfileComplete }}>
-        <StatusBar style="light" />
-        <Stack screenOptions={{ headerShown: false }} />
-      </OnboardingContext.Provider>
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <AppDialogProvider>
+          <OnboardingContext.Provider value={{ markProfileComplete }}>
+            <StatusBar style="light" />
+            <Stack screenOptions={{ headerShown: false }} />
+          </OnboardingContext.Provider>
+        </AppDialogProvider>
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }

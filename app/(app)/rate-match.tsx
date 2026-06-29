@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   TextInput,
 } from 'react-native';
@@ -9,6 +8,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, View, Text, Pressable } from '@/tw';
+import { useAppAlert } from '@/components/app-alert-dialog';
 import {
   QUALITY_REASON_TAGS,
   RATING_SCREEN_COPY,
@@ -129,6 +129,7 @@ function MemberRatingCard({
 export default function RateMatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const appAlert = useAppAlert();
   const params = useLocalSearchParams<{ matchId?: string }>();
   const matchId = typeof params.matchId === 'string' ? params.matchId : '';
   const copy = RATING_SCREEN_COPY;
@@ -178,7 +179,7 @@ export default function RateMatchScreen() {
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
     if (entries.length === 0) {
-      Alert.alert('Select stars', 'Choose at least one star rating before submitting.');
+      appAlert('Select stars', 'Choose at least one star rating before submitting.');
       return;
     }
 
@@ -190,7 +191,7 @@ export default function RateMatchScreen() {
       },
       {
         onSuccess: () => {
-          Alert.alert(copy.successTitle, copy.successMessage, [
+          appAlert(copy.successTitle, copy.successMessage, [
             { text: 'OK', onPress: () => router.back() },
           ]);
         },
@@ -199,7 +200,7 @@ export default function RateMatchScreen() {
             submitError instanceof Error
               ? submitError.message
               : 'Could not submit ratings. Please try again.';
-          Alert.alert('Rating failed', message);
+          appAlert('Rating failed', message);
         },
       },
     );

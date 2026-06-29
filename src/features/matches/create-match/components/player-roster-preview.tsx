@@ -47,8 +47,8 @@ export function PlayerRosterPreview({
             if (slot === 'host') {
               return (
                 <View
-                  key={`slot-${index}`}
-                  className="w-10 h-10 rounded-full bg-neutral items-center justify-center"
+                  key={`slot-${index}-${slot}`}
+                  className="will-change-variable w-10 h-10 rounded-full bg-neutral items-center justify-center"
                 >
                   <Ionicons name="person" size={18} color="#0B0B0B" />
                 </View>
@@ -57,15 +57,15 @@ export function PlayerRosterPreview({
             if (slot === 'confirmed') {
               return (
                 <View
-                  key={`slot-${index}`}
-                  className="w-10 h-10 rounded-full bg-surface-3 border border-neutral/10"
+                  key={`slot-${index}-${slot}`}
+                  className="will-change-variable w-10 h-10 rounded-full bg-surface-3 border border-neutral/10"
                 />
               );
             }
             return (
               <View
-                key={`slot-${index}`}
-                className="w-10 h-10 rounded-full border border-dashed border-neutral/25 items-center justify-center bg-surface-2/40"
+                key={`slot-${index}-${slot}`}
+                className="will-change-variable w-10 h-10 rounded-full border border-dashed border-neutral/25 items-center justify-center bg-surface-2/40"
               >
                 <Ionicons name="add" size={16} color="rgba(228,228,228,0.45)" />
               </View>

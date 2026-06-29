@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
-import { Modal, Pressable as RNPressable, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AppBottomSheet } from '@/components/app-bottom-sheet';
 import { Pressable, View, Text, TextInput } from '@/tw';
 import { type Coords } from '@/lib/location';
 import { PRESET_MATCH_LOCATIONS, type PresetLocation } from '../preset-locations';
@@ -76,70 +77,43 @@ export function LocationField({
         className="h-14 rounded-xl bg-surface-1 border border-neutral/10 px-4 font-grotesk text-base text-neutral"
       />
 
-      <Modal
-        transparent
-        animationType="fade"
+      <AppBottomSheet
         visible={pickerOpen}
-        onRequestClose={() => setPickerOpen(false)}
+        onClose={() => setPickerOpen(false)}
+        title="Venue"
+        maxHeight="60%"
       >
-        <RNPressable style={styles.scrim} onPress={() => setPickerOpen(false)}>
-          <RNPressable style={styles.sheet} onPress={() => undefined}>
-            <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-3 px-1">
-              Venue
-            </Text>
-            <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
-              {PRESET_MATCH_LOCATIONS.map((preset) => {
-                const selected = selectedPreset?.id === preset.id;
-                return (
-                  <Pressable
-                    key={preset.id}
-                    onPress={() => handleSelectPreset(preset)}
+        <ScrollView style={{ flexGrow: 0 }} keyboardShouldPersistTaps="handled">
+          {PRESET_MATCH_LOCATIONS.map((preset) => {
+            const selected = selectedPreset?.id === preset.id;
+            return (
+              <Pressable
+                key={preset.id}
+                onPress={() => handleSelectPreset(preset)}
+                className={[
+                  'rounded-xl px-4 py-3 flex-row items-center gap-3 mb-2',
+                  selected ? 'bg-primary' : 'bg-surface-3',
+                ].join(' ')}
+              >
+                <View className="flex-1 min-w-0">
+                  <Text
                     className={[
-                      'rounded-xl px-4 py-3 flex-row items-center gap-3 mb-2',
-                      selected ? 'bg-primary' : 'bg-surface-3',
+                      'font-grotesk text-base mb-1',
+                      selected ? 'text-neutral font-semibold' : 'text-neutral/75',
                     ].join(' ')}
                   >
-                    <View className="flex-1 min-w-0">
-                      <Text
-                        className={[
-                          'font-grotesk text-base mb-1',
-                          selected ? 'text-neutral font-semibold' : 'text-neutral/75',
-                        ].join(' ')}
-                      >
-                        {preset.venueName}
-                      </Text>
-                      <Text className="font-grotesk text-sm text-neutral/50" numberOfLines={2}>
-                        {preset.formattedAddress}
-                      </Text>
-                    </View>
-                    {selected ? <Ionicons name="checkmark" size={18} color="#E4E4E4" /> : null}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </RNPressable>
-        </RNPressable>
-      </Modal>
+                    {preset.venueName}
+                  </Text>
+                  <Text className="font-grotesk text-sm text-neutral/50" numberOfLines={2}>
+                    {preset.formattedAddress}
+                  </Text>
+                </View>
+                {selected ? <Ionicons name="checkmark" size={18} color="#E4E4E4" /> : null}
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </AppBottomSheet>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  scrim: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  sheet: {
-    backgroundColor: '#141417',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 28,
-    maxHeight: '60%',
-  },
-  list: {
-    flexGrow: 0,
-  },
-});

@@ -1,11 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Linking, StyleSheet } from 'react-native';
+import { ActivityIndicator, Linking, RefreshControl, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { ScrollView, View, Text, Pressable } from '@/tw';
+import { showAppAlert, useAppAlert } from '@/components/app-alert-dialog';
 import { useDiscoverLocation } from '@/features/discover/use-discover-location';
 import {
   canHostCancelMatch,
@@ -66,7 +67,7 @@ async function openContactForProfile(
   const contact = contacts?.find((row) => row.profile_id === profileId);
   const link = contact?.whatsapp_link;
   if (link === undefined || link === null) {
-    Alert.alert('No WhatsApp link', 'This player has not added a WhatsApp number yet.');
+    showAppAlert('No WhatsApp link', 'This player has not added a WhatsApp number yet.');
     return;
   }
   const url =
@@ -552,11 +553,12 @@ function FooterAction({
 export default function MatchDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const appAlert = useAppAlert();
   const queryClient = useQueryClient();
   const { coords: userCoords } = useDiscoverLocation();
   const params = useLocalSearchParams<{ id?: string }>();
   const matchId = typeof params.id === 'string' ? params.id : null;
-  const { data: match, isPending, error, refetch } = useMatchDetail(matchId);
+  const { data: match, isPending, isRefetching: matchRefetching, error, refetch } = useMatchDetail(matchId);
   useMatchRealtime(matchId);
   const scheduleNow = useMatchScheduleClock(
     matchId,
@@ -574,9 +576,11 @@ export default function MatchDetailScreen() {
     match !== undefined &&
     match.status === 'finished' &&
     (match.isHost || match.currentUserParticipant?.status === 'accepted');
-  const { data: ratableMatch } = useRatableMatch(
-    canLoadRatings && matchId !== null ? matchId : null,
-  );
+  const {
+    data: ratableMatch,
+    isRefetching: ratableRefetching,
+    refetch: refetchRatableMatch,
+  } = useRatableMatch(canLoadRatings && matchId !== null ? matchId : null);
   const needsRating =
     ratableMatch?.ratingWindowOpen === true &&
     ratableMatch.allRated === false &&
@@ -598,6 +602,20 @@ export default function MatchDetailScreen() {
     match !== undefined && canHostManageRoster(match, scheduleNow);
   const hostEditsRoster =
     match !== undefined && canHostEditRoster(match, scheduleNow);
+
+  function handleRefresh() {
+    const refreshes: Array<Promise<unknown>> = [refetch()];
+    if (canViewContacts) {
+      refreshes.push(contactsQuery.refetch());
+    }
+    if (canLoadRatings && matchId !== null) {
+      refreshes.push(refetchRatableMatch());
+    }
+    void Promise.all(refreshes);
+  }
+
+  const isRefreshing =
+    matchRefetching || contactsQuery.isRefetching || ratableRefetching;
 
   async function resolveContactList(): Promise<ContactRow[] | undefined> {
     if (contactsQuery.data !== undefined && contactsQuery.data.length > 0) {
@@ -623,10 +641,10 @@ export default function MatchDetailScreen() {
 
     try {
       await requestToJoin.mutateAsync({ message, existingParticipantId });
-      Alert.alert('Request sent', 'The host can now accept or reject your request.');
+      appAlert('Request sent', 'The host can now accept or reject your request.');
     } catch (requestError) {
       const text = requestError instanceof Error ? requestError.message : 'Could not send request.';
-      Alert.alert('Request failed', text);
+      appAlert('Request failed', text);
     }
   }
 
@@ -638,7 +656,7 @@ export default function MatchDetailScreen() {
       await updateStatus.mutateAsync({ participantId, status });
     } catch (statusError) {
       const text = statusError instanceof Error ? statusError.message : 'Could not update request.';
-      Alert.alert('Update failed', text);
+      appAlert('Update failed', text);
     }
   }
 
@@ -647,7 +665,7 @@ export default function MatchDetailScreen() {
       await cancelPending.mutateAsync(participantId);
     } catch (cancelError) {
       const text = cancelError instanceof Error ? cancelError.message : 'Could not cancel request.';
-      Alert.alert('Cancel failed', text);
+      appAlert('Cancel failed', text);
     }
   }
 
@@ -656,10 +674,20 @@ export default function MatchDetailScreen() {
       return;
     }
 
-    Alert.alert(
-      'Cancel match?',
-      'Players will no longer be able to join. Accepted players will see that this match was cancelled.',
-      [
+    const thresholdLabel = formatWithdrawalThreshold(match.late_withdrawal_threshold);
+    const isLateCancel = isWithinLateWithdrawalWindow(
+      match.starts_at,
+      match.late_withdrawal_threshold,
+      scheduleNow,
+    );
+
+    const baseMessage =
+      'Players will no longer be able to join. Accepted players will see that this match was cancelled.';
+    const message = isLateCancel
+      ? `${baseMessage}\n\nCancelling within ${thresholdLabel} of start time affects your trust score and may incur a no-show penalty.`
+      : baseMessage;
+
+    appAlert('Cancel match?', message, [
         { text: 'Keep match', style: 'cancel' },
         {
           text: 'Cancel match',
@@ -671,7 +699,7 @@ export default function MatchDetailScreen() {
               } catch (cancelError) {
                 const text =
                   cancelError instanceof Error ? cancelError.message : 'Could not cancel match.';
-                Alert.alert('Cancel failed', text);
+                appAlert('Cancel failed', text);
               }
             })();
           },
@@ -691,10 +719,10 @@ export default function MatchDetailScreen() {
     );
 
     const message = isLate
-      ? `${playerName} will be removed within ${thresholdLabel} of start time. Their spot will reopen, but this may affect your trust score and they can report unfair removal.`
-      : `${playerName} will be removed from the roster and their spot will reopen for others to join.`;
+      ? `${playerName} will be removed within ${thresholdLabel} of start time. Their spot will reopen, but they will not be able to rejoin this match. This may affect your trust score and they can report unfair removal.`
+      : `${playerName} will be removed from the roster. Their spot will reopen for others to join, but they will not be able to rejoin this match.`;
 
-    Alert.alert('Remove player?', message, [
+    appAlert('Remove player?', message, [
       { text: 'Keep player', style: 'cancel' },
       {
         text: 'Remove',
@@ -720,10 +748,10 @@ export default function MatchDetailScreen() {
     );
 
     const message = isLate
-      ? `You're withdrawing within ${thresholdLabel} of start time. This affects your trust score and may incur a no-show penalty.`
-      : 'Your spot will reopen for others. You can request to join again if spots remain.';
+      ? `You're withdrawing within ${thresholdLabel} of start time. Your spot will reopen, but you will not be able to rejoin this match. This affects your trust score and may incur a no-show penalty.`
+      : 'Your spot will reopen for others to join, but you will not be able to rejoin this match.';
 
-    Alert.alert('Withdraw from match?', message, [
+    appAlert('Withdraw from match?', message, [
       { text: 'Stay in match', style: 'cancel' },
       {
         text: 'Withdraw',
@@ -741,7 +769,7 @@ export default function MatchDetailScreen() {
     const participant = match.currentUserParticipant;
     if (participant?.status !== 'pending') return;
 
-    Alert.alert(
+    appAlert(
       'Cancel request?',
       'Your join request will be withdrawn and the host will no longer review it. You can send a new request if spots remain.',
       [
@@ -869,6 +897,13 @@ export default function MatchDetailScreen() {
           },
         ]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={C.mist}
+          />
+        }
       >
         {/*
           Future club hero image (venue photo + court caption overlay).

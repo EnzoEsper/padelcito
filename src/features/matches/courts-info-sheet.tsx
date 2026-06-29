@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Modal, Pressable as RNPressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AppBottomSheet } from '@/components/app-bottom-sheet';
 import { Pressable, Text } from '@/tw';
 import {
   formatCourtConfigDescription,
@@ -39,27 +40,18 @@ export function CourtsInfoChip({ courtCount, configs }: CourtsInfoChipProps) {
         <Ionicons name="information-circle-outline" size={16} color={C.blueHi} />
       </Pressable>
 
-      <Modal transparent animationType="fade" visible={open} onRequestClose={() => setOpen(false)}>
-        <RNPressable style={styles.scrim} onPress={() => setOpen(false)}>
-          <RNPressable style={styles.sheet} onPress={() => undefined}>
-            <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-3 px-1">
-              {sheetTitle}
-            </Text>
-            <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
-              {resolvedConfigs.map((config, index) => (
-                <View key={index} style={styles.courtCard}>
-                  {resolvedConfigs.length > 1 ? (
-                    <Text style={styles.courtHeading}>Court {index + 1}</Text>
-                  ) : null}
-                  <Text style={styles.courtDescription}>
-                    {formatCourtConfigDescription(config)}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-          </RNPressable>
-        </RNPressable>
-      </Modal>
+      <AppBottomSheet visible={open} onClose={() => setOpen(false)} title={sheetTitle}>
+        <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
+          {resolvedConfigs.map((config, index) => (
+            <View key={index} style={styles.courtCard}>
+              {resolvedConfigs.length > 1 ? (
+                <Text style={styles.courtHeading}>Court {index + 1}</Text>
+              ) : null}
+              <Text style={styles.courtDescription}>{formatCourtConfigDescription(config)}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      </AppBottomSheet>
     </>
   );
 }
@@ -83,20 +75,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     color: C.dim,
-  },
-  scrim: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  sheet: {
-    backgroundColor: '#141417',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 28,
-    maxHeight: '52%',
   },
   list: {
     flexGrow: 0,
