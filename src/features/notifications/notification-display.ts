@@ -17,6 +17,8 @@ export type NotificationData = {
   was_late_withdrawal?: boolean;
   was_removed_by_host?: boolean;
   was_late_cancellation?: boolean;
+  flyer_title?: string;
+  rejection_reason?: string | null;
 };
 
 export type NotificationPresentation = {
@@ -49,6 +51,11 @@ export function parseNotificationData(data: NotificationRow['data']): Notificati
       typeof record.was_late_cancellation === 'boolean'
         ? record.was_late_cancellation
         : undefined,
+    flyer_title: typeof record.flyer_title === 'string' ? record.flyer_title : undefined,
+    rejection_reason:
+      typeof record.rejection_reason === 'string' || record.rejection_reason === null
+        ? record.rejection_reason
+        : undefined,
   };
 }
 
@@ -62,6 +69,14 @@ function actorName(data: NotificationData): string {
 
 function matchDetailRoute(matchId: string | null): string | null {
   return matchId !== null ? `/(app)/match-detail?id=${matchId}` : null;
+}
+
+function flyerDetailRoute(flyerId: string | null): string | null {
+  return flyerId !== null ? `/(app)/flyer-detail?id=${flyerId}` : null;
+}
+
+function flyerLabel(data: NotificationData): string {
+  return data.venue_name ?? data.flyer_title ?? 'your flyer';
 }
 
 export function isPenaltyEligibleNotification(notification: NotificationRow): boolean {
@@ -114,7 +129,10 @@ export function resolveNotificationPresentation(
   const actor = actorName(data);
   const penaltyEligible = isPenaltyEligibleNotification(notification);
   const penaltyRoute = resolvePenaltyReportRoute(notification);
-  const fallbackRoute = matchDetailRoute(notification.match_id);
+  const fallbackRoute =
+    notification.flyer_id !== null
+      ? flyerDetailRoute(notification.flyer_id)
+      : matchDetailRoute(notification.match_id);
   const route = penaltyRoute ?? fallbackRoute;
 
   const base = {
@@ -201,6 +219,29 @@ export function resolveNotificationPresentation(
             ? buildRateMatchRoute(notification.match_id)
             : fallbackRoute,
         actionLabel: 'Rate',
+      };
+    case 'flyer_approved':
+      return {
+        ...base,
+        icon: 'checkmark-circle-outline',
+        accent: 'success',
+        title: 'Flyer approved',
+        body: `Your flyer for ${flyerLabel(data)} is now public on Community.`,
+        route: flyerDetailRoute(notification.flyer_id),
+        actionLabel: 'View',
+      };
+    case 'flyer_rejected':
+      return {
+        ...base,
+        icon: 'close-circle-outline',
+        accent: 'warning',
+        title: 'Flyer rejected',
+        body:
+          data.rejection_reason !== undefined && data.rejection_reason !== null
+            ? `Your flyer for ${flyerLabel(data)} was rejected: ${data.rejection_reason}`
+            : `Your flyer for ${flyerLabel(data)} was rejected. You can edit and resubmit.`,
+        route: flyerDetailRoute(notification.flyer_id),
+        actionLabel: 'Review',
       };
     default: {
       const _exhaustive: never = notification.type;

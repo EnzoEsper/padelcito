@@ -33,7 +33,14 @@
           "locationWhenInUsePermission": "Padelcito usa tu ubicación para encontrar partidos de padel cercanos."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Padelcito needs access to your photos so you can upload tournament and training flyers.",
+          "cameraPermission": "Padelcito needs camera access so you can photograph flyers to publish."
+        }
+      ]
     ],
     "extra": {
       "router": {},

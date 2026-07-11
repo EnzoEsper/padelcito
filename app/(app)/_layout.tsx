@@ -31,14 +31,17 @@ export default function AppLayout() {
         tabBar={(props) => <TabBar {...props} />}
       >
         <Tabs.Screen name="discover" />
-        <Tabs.Screen name="circuits" />
+        <Tabs.Screen name="community" />
         <Tabs.Screen name="matches" />
         <Tabs.Screen name="profile" />
         <Tabs.Screen
           name="create-match"
           options={{ href: null, tabBarStyle: { display: 'none' } }}
         />
+        <Tabs.Screen name="create-flyer" options={{ href: null, tabBarStyle: { display: 'none' } }} />
         <Tabs.Screen name="match-detail" options={{ href: null }} />
+        <Tabs.Screen name="flyer-detail" options={{ href: null }} />
+        <Tabs.Screen name="moderation" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="report-penalty" options={{ href: null }} />
         <Tabs.Screen name="rate-match" options={{ href: null }} />

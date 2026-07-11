@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 
 export type SkillLevel = Database['public']['Enums']['skill_level'];
+export type UserRole = Database['public']['Enums']['user_role'];
 
 export type ProfileRow = {
   id: string;
@@ -15,6 +16,10 @@ export type ProfileRow = {
   reliability_score: number | null;
   penalty_count: number;
   commitment_count: number;
+  role: UserRole;
+  banned_at: string | null;
+  whatsapp_phone: string | null;
+  whatsapp_verified_at: string | null;
 };
 
 export type ProfileSport = {
@@ -37,7 +42,7 @@ async function fetchProfile(userId: string): Promise<ProfileRow> {
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, username, display_name, avatar_url, bio, rating_avg, rating_count, reliability_score, penalty_count, commitment_count',
+      'id, username, display_name, avatar_url, bio, rating_avg, rating_count, reliability_score, penalty_count, commitment_count, role, banned_at, whatsapp_phone, whatsapp_verified_at',
     )
     .eq('id', userId)
     .single();
@@ -88,6 +93,10 @@ export function useProfileSport() {
     },
     staleTime: 1000 * 60 * 5,
   });
+}
+
+export function isModeratorRole(role: UserRole): boolean {
+  return role === 'moderator' || role === 'admin';
 }
 
 /** Human-readable skill level from onboarding (beginner → pro). */

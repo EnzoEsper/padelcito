@@ -25,7 +25,7 @@ type TabConfig = {
 
 const TABS: TabConfig[] = [
   { name: 'discover', label: 'Discover', icon: 'compass-outline', iconActive: 'compass' },
-  { name: 'circuits', label: 'Circuits', icon: 'trophy-outline', iconActive: 'trophy' },
+  { name: 'community', label: 'Community', icon: 'megaphone-outline', iconActive: 'megaphone' },
   { name: 'matches', label: 'Matches', icon: 'calendar-outline', iconActive: 'calendar' },
   { name: 'profile', label: 'You', icon: 'person-outline', iconActive: 'person' },
 ];
