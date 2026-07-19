@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
 import type { Database } from '@/types/database';
 import type { Coords } from '@/lib/location';
-import type { CreateFlyerInput } from '@/features/community/use-flyers';
+import type { CreatePostInput } from '@/features/community/use-posts';
 
-type FlyerType = Database['public']['Enums']['flyer_type'];
+type CommunityPostType = Database['public']['Enums']['community_post_type'];
 
 function defaultDatePart(): Date {
   const date = new Date();
@@ -17,17 +17,40 @@ function defaultTimePart(): Date {
   return date;
 }
 
+function createInitialFormState(): CreatePostFormState {
+  return {
+    type: 'tournament',
+    title: '',
+    description: '',
+    imageUri: null,
+    imageBase64: null,
+    imageMimeType: null,
+    venueName: '',
+    coords: null,
+    formattedAddress: null,
+    placeId: null,
+    hasEventDate: true,
+    datePart: defaultDatePart(),
+    timePart: defaultTimePart(),
+    hasEventEnd: false,
+    endDatePart: defaultDatePart(),
+    endTimePart: defaultTimePart(),
+  };
+}
+
 function combineDateAndTime(datePart: Date, timePart: Date): Date {
   const combined = new Date(datePart);
   combined.setHours(timePart.getHours(), timePart.getMinutes(), 0, 0);
   return combined;
 }
 
-export type CreateFlyerFormState = {
-  type: FlyerType;
+export type CreatePostFormState = {
+  type: CommunityPostType;
   title: string;
   description: string;
   imageUri: string | null;
+  imageBase64: string | null;
+  imageMimeType: string | null;
   venueName: string;
   coords: Coords | null;
   formattedAddress: string | null;
@@ -40,11 +63,13 @@ export type CreateFlyerFormState = {
   endTimePart: Date;
 };
 
-export type CreateFlyerFormActions = {
-  setType: (value: FlyerType) => void;
+export type CreatePostFormActions = {
+  setType: (value: CommunityPostType) => void;
   setTitle: (value: string) => void;
   setDescription: (value: string) => void;
   setImageUri: (value: string | null) => void;
+  setImageBase64: (value: string | null) => void;
+  setImageMimeType: (value: string | null) => void;
   setVenueName: (value: string) => void;
   setCoords: (value: Coords | null) => void;
   setFormattedAddress: (value: string | null) => void;
@@ -55,16 +80,19 @@ export type CreateFlyerFormActions = {
   setHasEventEnd: (value: boolean) => void;
   setEndDatePart: (value: Date) => void;
   setEndTimePart: (value: Date) => void;
+  reset: () => void;
   buildSubmitInput: (
     contactPhone: string,
-  ) => { ok: true; input: Omit<CreateFlyerInput, 'imagePath'> & { imageUri: string | null } } | { ok: false; message: string };
+  ) => { ok: true; input: Omit<CreatePostInput, 'imagePath'> & { imageUri: string | null } } | { ok: false; message: string };
 };
 
-export function useCreateFlyerForm(): CreateFlyerFormState & CreateFlyerFormActions {
-  const [type, setType] = useState<FlyerType>('tournament');
+export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions {
+  const [type, setType] = useState<CommunityPostType>('tournament');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imageMimeType, setImageMimeType] = useState<string | null>(null);
   const [venueName, setVenueName] = useState('');
   const [coords, setCoords] = useState<Coords | null>(null);
   const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
@@ -76,11 +104,31 @@ export function useCreateFlyerForm(): CreateFlyerFormState & CreateFlyerFormActi
   const [endDatePart, setEndDatePart] = useState(defaultDatePart);
   const [endTimePart, setEndTimePart] = useState(defaultTimePart);
 
+  const reset = useCallback(() => {
+    const initial = createInitialFormState();
+    setType(initial.type);
+    setTitle(initial.title);
+    setDescription(initial.description);
+    setImageUri(initial.imageUri);
+    setImageBase64(initial.imageBase64);
+    setImageMimeType(initial.imageMimeType);
+    setVenueName(initial.venueName);
+    setCoords(initial.coords);
+    setFormattedAddress(initial.formattedAddress);
+    setPlaceId(initial.placeId);
+    setHasEventDate(initial.hasEventDate);
+    setDatePart(initial.datePart);
+    setTimePart(initial.timePart);
+    setHasEventEnd(initial.hasEventEnd);
+    setEndDatePart(initial.endDatePart);
+    setEndTimePart(initial.endTimePart);
+  }, []);
+
   const buildSubmitInput = useCallback(
     (
       contactPhone: string,
     ):
-      | { ok: true; input: Omit<CreateFlyerInput, 'imagePath'> & { imageUri: string | null } }
+      | { ok: true; input: Omit<CreatePostInput, 'imagePath'> & { imageUri: string | null } }
       | { ok: false; message: string } => {
       const trimmedTitle = title.trim();
       if (trimmedTitle.length < 3) {
@@ -152,6 +200,8 @@ export function useCreateFlyerForm(): CreateFlyerFormState & CreateFlyerFormActi
     title,
     description,
     imageUri,
+    imageBase64,
+    imageMimeType,
     venueName,
     coords,
     formattedAddress,
@@ -166,6 +216,8 @@ export function useCreateFlyerForm(): CreateFlyerFormState & CreateFlyerFormActi
     setTitle,
     setDescription,
     setImageUri,
+    setImageBase64,
+    setImageMimeType,
     setVenueName,
     setCoords,
     setFormattedAddress,
@@ -176,6 +228,7 @@ export function useCreateFlyerForm(): CreateFlyerFormState & CreateFlyerFormActi
     setHasEventEnd,
     setEndDatePart,
     setEndTimePart,
+    reset,
     buildSubmitInput,
   };
 }

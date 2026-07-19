@@ -8,11 +8,11 @@ alter table public.profiles
   add column whatsapp_verified_at timestamptz;
 
 comment on column public.profiles.role is
-  'Platform role. Moderators review community flyers; admins are reserved for future use.';
+  'Platform role. Moderators review community posts; admins are reserved for future use.';
 comment on column public.profiles.banned_at is
-  'When set, the user cannot publish community flyers.';
+  'When set, the user cannot publish community posts.';
 comment on column public.profiles.whatsapp_verified_at is
-  'Set when phone OTP verification ships. Drives verified-contact badges on flyers.';
+  'Set when phone OTP verification ships. Drives verified-contact badges on community posts.';
 
 create index idx_profiles_role on public.profiles (role) where role <> 'member';
 

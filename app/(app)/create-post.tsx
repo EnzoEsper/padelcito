@@ -1,23 +1,30 @@
+import { useEffect } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, Text, View } from '@/tw';
 import {
-  CreateFlyerFormBody,
-  CreateFlyerPublishFooter,
-} from '@/features/community/create-flyer/create-flyer-form';
-import { useCreateFlyerForm } from '@/features/community/create-flyer/use-create-flyer-form';
+  CreatePostFormBody,
+  CreatePostPublishFooter,
+} from '@/features/community/create-post/create-post-form';
+import { useCreatePostForm } from '@/features/community/create-post/use-create-post-form';
 
 const SCREEN_PADDING = 20;
 const BACK_BUTTON_SIZE = 44;
 const BACK_TEXT_INSET = BACK_BUTTON_SIZE + 12;
 
-export default function CreateFlyerScreen() {
+export default function CreatePostScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const form = useCreateFlyerForm();
+  const { fresh } = useLocalSearchParams<{ fresh?: string | string[] }>();
+  const freshKey = Array.isArray(fresh) ? fresh[0] : fresh;
+  const form = useCreatePostForm();
+
+  useEffect(() => {
+    form.reset();
+  }, [freshKey, form.reset]);
 
   const scrollBottomInset = 112 + insets.bottom;
   const headerTop = insets.top + 16;
@@ -57,14 +64,14 @@ export default function CreateFlyerScreen() {
             </Text>
           </View>
           <Text className="font-grotesk font-extrabold text-[30px] text-neutral" style={styles.headerTitle}>
-            Publish flyer
+            Publish post
           </Text>
           <Text className="font-grotesk text-sm text-neutral/60 mt-2 leading-5">
-            Share a tournament or training session. Contact uses your profile WhatsApp and every flyer is reviewed before going public.
+            Share a tournament or training session. Contact uses your profile WhatsApp and every post is reviewed before going public.
           </Text>
         </View>
 
-        <CreateFlyerFormBody form={form} />
+        <CreatePostFormBody form={form} />
       </ScrollView>
 
       <LinearGradient
@@ -73,7 +80,7 @@ export default function CreateFlyerScreen() {
         pointerEvents="none"
       />
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <CreateFlyerPublishFooter form={form} />
+        <CreatePostPublishFooter form={form} />
       </View>
     </KeyboardAvoidingView>
   );

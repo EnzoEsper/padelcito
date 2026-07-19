@@ -5,6 +5,7 @@ import {
   notificationTypeToReliabilityEvent,
   type ReliabilityEventType,
 } from '@/features/ratings/penalty-report';
+import { buildModerationRoute } from '@/features/community/post-display';
 import { buildRateMatchRoute } from '@/features/ratings/rating-display';
 
 export type NotificationRow = Database['public']['Tables']['notifications']['Row'];
@@ -17,7 +18,7 @@ export type NotificationData = {
   was_late_withdrawal?: boolean;
   was_removed_by_host?: boolean;
   was_late_cancellation?: boolean;
-  flyer_title?: string;
+  post_title?: string;
   rejection_reason?: string | null;
 };
 
@@ -51,7 +52,7 @@ export function parseNotificationData(data: NotificationRow['data']): Notificati
       typeof record.was_late_cancellation === 'boolean'
         ? record.was_late_cancellation
         : undefined,
-    flyer_title: typeof record.flyer_title === 'string' ? record.flyer_title : undefined,
+    post_title: typeof record.post_title === 'string' ? record.post_title : undefined,
     rejection_reason:
       typeof record.rejection_reason === 'string' || record.rejection_reason === null
         ? record.rejection_reason
@@ -71,12 +72,12 @@ function matchDetailRoute(matchId: string | null): string | null {
   return matchId !== null ? `/(app)/match-detail?id=${matchId}` : null;
 }
 
-function flyerDetailRoute(flyerId: string | null): string | null {
-  return flyerId !== null ? `/(app)/flyer-detail?id=${flyerId}` : null;
+function postDetailRoute(postId: string | null): string | null {
+  return postId !== null ? `/(app)/post-detail?id=${postId}` : null;
 }
 
-function flyerLabel(data: NotificationData): string {
-  return data.venue_name ?? data.flyer_title ?? 'your flyer';
+function postLabel(data: NotificationData): string {
+  return data.venue_name ?? data.post_title ?? 'your post';
 }
 
 export function isPenaltyEligibleNotification(notification: NotificationRow): boolean {
@@ -130,8 +131,8 @@ export function resolveNotificationPresentation(
   const penaltyEligible = isPenaltyEligibleNotification(notification);
   const penaltyRoute = resolvePenaltyReportRoute(notification);
   const fallbackRoute =
-    notification.flyer_id !== null
-      ? flyerDetailRoute(notification.flyer_id)
+    notification.community_post_id !== null
+      ? postDetailRoute(notification.community_post_id)
       : matchDetailRoute(notification.match_id);
   const route = penaltyRoute ?? fallbackRoute;
 
@@ -220,27 +221,37 @@ export function resolveNotificationPresentation(
             : fallbackRoute,
         actionLabel: 'Rate',
       };
-    case 'flyer_approved':
+    case 'community_post_approved':
       return {
         ...base,
         icon: 'checkmark-circle-outline',
         accent: 'success',
-        title: 'Flyer approved',
-        body: `Your flyer for ${flyerLabel(data)} is now public on Community.`,
-        route: flyerDetailRoute(notification.flyer_id),
+        title: 'Post approved',
+        body: `Your post for ${postLabel(data)} is now public on Community.`,
+        route: postDetailRoute(notification.community_post_id),
         actionLabel: 'View',
       };
-    case 'flyer_rejected':
+    case 'community_post_rejected':
       return {
         ...base,
         icon: 'close-circle-outline',
         accent: 'warning',
-        title: 'Flyer rejected',
+        title: 'Post rejected',
         body:
           data.rejection_reason !== undefined && data.rejection_reason !== null
-            ? `Your flyer for ${flyerLabel(data)} was rejected: ${data.rejection_reason}`
-            : `Your flyer for ${flyerLabel(data)} was rejected. You can edit and resubmit.`,
-        route: flyerDetailRoute(notification.flyer_id),
+            ? `Your post for ${postLabel(data)} was rejected: ${data.rejection_reason}`
+            : `Your post for ${postLabel(data)} was rejected. You can edit and resubmit.`,
+        route: postDetailRoute(notification.community_post_id),
+        actionLabel: 'Review',
+      };
+    case 'community_post_submitted':
+      return {
+        ...base,
+        icon: 'shield-outline',
+        accent: 'primary',
+        title: 'Post to review',
+        body: `${actor} submitted a post for ${postLabel(data)}.`,
+        route: buildModerationRoute(),
         actionLabel: 'Review',
       };
     default: {

@@ -10,19 +10,22 @@ import { Pressable, View, Text, TextInput } from '@/tw';
 import { LocationField } from '@/features/matches/create-match/components/location-field';
 import { SectionLabel } from '@/features/matches/create-match/components/section-label';
 import { SegmentedControl } from '@/features/matches/create-match/components/segmented-control';
+import { getErrorMessage } from '@/lib/error-message';
+import { logger } from '@/lib/logger';
 import {
-  useCreateFlyer,
+  useAttachPostImage,
+  useCreatePost,
   useProfileContactGate,
-} from '@/features/community/use-flyers';
-import { uploadFlyerImage } from '@/lib/flyer-storage';
-import type { useCreateFlyerForm } from '@/features/community/create-flyer/use-create-flyer-form';
+} from '@/features/community/use-posts';
+import { uploadPostImage } from '@/lib/post-storage';
+import type { useCreatePostForm } from '@/features/community/create-post/use-create-post-form';
 
 const PLACEHOLDER_COLOR = 'rgba(228,228,228,0.20)';
 
-type CreateFlyerForm = ReturnType<typeof useCreateFlyerForm>;
+type CreatePostForm = ReturnType<typeof useCreatePostForm>;
 
-type CreateFlyerFormBodyProps = {
-  form: CreateFlyerForm;
+type CreatePostFormBodyProps = {
+  form: CreatePostForm;
 };
 
 function formatDateLabel(date: Date): string {
@@ -41,7 +44,7 @@ function formatTimeLabel(date: Date): string {
   }).format(date);
 }
 
-export function CreateFlyerFormBody({ form }: CreateFlyerFormBodyProps) {
+export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
@@ -58,10 +61,14 @@ export function CreateFlyerFormBody({ form }: CreateFlyerFormBodyProps) {
       allowsEditing: true,
       aspect: [4, 5],
       quality: 0.85,
+      base64: true,
     });
 
     if (!result.canceled && result.assets[0] !== undefined) {
-      form.setImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      form.setImageUri(asset.uri);
+      form.setImageBase64(asset.base64 ?? null);
+      form.setImageMimeType(asset.mimeType ?? 'image/jpeg');
     }
   }
 
@@ -115,7 +122,7 @@ export function CreateFlyerFormBody({ form }: CreateFlyerFormBodyProps) {
             ) : (
               <View style={styles.imagePlaceholder}>
                 <Ionicons name="image-outline" size={28} color="rgba(228,228,228,0.38)" />
-                <Text className="font-grotesk text-sm text-neutral/55 mt-2">Upload flyer image</Text>
+                <Text className="font-grotesk text-sm text-neutral/55 mt-2">Upload post image</Text>
               </View>
             )}
           </Pressable>
@@ -334,19 +341,22 @@ export function CreateFlyerFormBody({ form }: CreateFlyerFormBodyProps) {
   );
 }
 
-type CreateFlyerPublishFooterProps = {
-  form: CreateFlyerForm;
+type CreatePostPublishFooterProps = {
+  form: CreatePostForm;
 };
 
-export function CreateFlyerPublishFooter({ form }: CreateFlyerPublishFooterProps) {
+export function CreatePostPublishFooter({ form }: CreatePostPublishFooterProps) {
   const router = useRouter();
-  const createFlyer = useCreateFlyer();
+  const createPost = useCreatePost();
+  const attachPostImage = useAttachPostImage();
   const contactGate = useProfileContactGate();
   const appAlert = useAppAlert();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handlePublish(): Promise<void> {
+    if (isSubmitting) return;
     if (contactGate.data?.isBanned === true) {
-      appAlert('Cannot publish', 'Your account cannot publish community flyers.');
+      appAlert('Cannot publish', 'Your account cannot publish community posts.');
       return;
     }
 
@@ -354,7 +364,7 @@ export function CreateFlyerPublishFooter({ form }: CreateFlyerPublishFooterProps
     if (phone.length === 0) {
       appAlert(
         'WhatsApp required',
-        'Add your WhatsApp number to your profile before publishing a flyer.',
+        'Add your WhatsApp number to your profile before publishing a post.',
         [
           { text: 'Cancel', style: 'cancel' },
           {
@@ -372,21 +382,18 @@ export function CreateFlyerPublishFooter({ form }: CreateFlyerPublishFooterProps
       return;
     }
 
-    try {
-      let imagePath: string | null = null;
-      if (result.input.imageUri !== null) {
-        const userId = contactGate.data?.userId;
-        if (userId === undefined) {
-          throw new Error('Not authenticated');
-        }
-        imagePath = await uploadFlyerImage(userId, result.input.imageUri);
-      }
+    if (form.imageUri !== null && form.imageBase64 === null) {
+      appAlert('Image upload issue', 'Re-select your post image and try again.');
+      return;
+    }
 
-      const flyerId = await createFlyer.mutateAsync({
+    setIsSubmitting(true);
+    try {
+      const postId = await createPost.mutateAsync({
         type: result.input.type,
         title: result.input.title,
         description: result.input.description,
-        imagePath,
+        imagePath: null,
         venueName: result.input.venueName,
         formattedAddress: result.input.formattedAddress,
         coords: result.input.coords,
@@ -395,26 +402,45 @@ export function CreateFlyerPublishFooter({ form }: CreateFlyerPublishFooterProps
         contactPhone: phone,
       });
 
+      if (form.imageBase64 !== null && form.imageMimeType !== null) {
+        const userId = contactGate.data?.userId;
+        if (userId === undefined) {
+          throw new Error('Not authenticated');
+        }
+
+        const imagePath = await uploadPostImage(
+          userId,
+          form.imageBase64,
+          form.imageMimeType,
+        );
+        await attachPostImage.mutateAsync({ postId, imagePath });
+      }
+
+      form.reset();
+
       appAlert(
         'Submitted for review',
-        'Your flyer was sent to moderation. You will be notified when it is approved.',
-        [{ text: 'OK', onPress: () => router.replace(`/(app)/flyer-detail?id=${flyerId}`) }],
+        'Your post was sent to moderation. You will be notified when it is approved.',
+        [{ text: 'OK', onPress: () => router.replace(`/(app)/post-detail?id=${postId}`) }],
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not publish flyer.';
+      logger.error('publish post failed', error);
+      const message = getErrorMessage(error, 'Could not publish post.');
       appAlert('Publish failed', message);
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
   return (
     <Pressable
       onPress={() => void handlePublish()}
-      disabled={createFlyer.isPending}
+      disabled={isSubmitting}
       className="h-14 rounded-2xl bg-primary border border-primary-hi items-center justify-center"
-      style={{ opacity: createFlyer.isPending ? 0.7 : 1 }}
+      style={{ opacity: isSubmitting ? 0.7 : 1 }}
     >
       <Text className="font-grotesk text-base font-bold text-neutral">
-        {createFlyer.isPending ? 'Submitting…' : 'Submit for review'}
+        {isSubmitting ? 'Submitting…' : 'Submit for review'}
       </Text>
     </Pressable>
   );

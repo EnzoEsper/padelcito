@@ -6,18 +6,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View, Text, TextInput } from '@/tw';
 import { useAppAlert } from '@/components/app-alert-dialog';
 import {
-  FLYER_STATUS_LABELS,
-  FLYER_TYPE_LABELS,
-  buildFlyerDetailRoute,
-  formatFlyerEventSchedule,
-} from '@/features/community/flyer-display';
+  POST_STATUS_LABELS,
+  POST_TYPE_LABELS,
+  buildPostDetailRoute,
+  formatPostEventSchedule,
+} from '@/features/community/post-display';
 import {
-  useBanFlyerAuthor,
-  useModerateFlyer,
+  useBanPostAuthor,
+  useModeratePost,
   useModerationQueue,
   useProfileContactGate,
-} from '@/features/community/use-flyers';
-import { buildFlyerImageUrl } from '@/lib/flyer-storage';
+} from '@/features/community/use-posts';
+import { buildPostImageUrl } from '@/lib/post-storage';
 
 const C = {
   background: '#0B0B0B',
@@ -36,30 +36,30 @@ export default function ModerationScreen() {
   const appAlert = useAppAlert();
   const contactGate = useProfileContactGate();
   const queueQuery = useModerationQueue();
-  const moderateFlyer = useModerateFlyer();
-  const banAuthor = useBanFlyerAuthor();
+  const moderatePost = useModeratePost();
+  const banAuthor = useBanPostAuthor();
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
   const isModerator = contactGate.data?.isModerator === true;
-  const flyers = queueQuery.data ?? [];
+  const posts = queueQuery.data ?? [];
 
-  const sortedFlyers = useMemo(
-    () => [...flyers].sort((a, b) => b.report_count - a.report_count || a.created_at.localeCompare(b.created_at)),
-    [flyers],
+  const sortedPosts = useMemo(
+    () => [...posts].sort((a, b) => b.report_count - a.report_count || a.created_at.localeCompare(b.created_at)),
+    [posts],
   );
 
-  async function handleApprove(flyerId: string): Promise<void> {
+  async function handleApprove(postId: string): Promise<void> {
     try {
-      await moderateFlyer.mutateAsync({ flyerId, status: 'approved' });
-      appAlert('Approved', 'The flyer is now public.');
+      await moderatePost.mutateAsync({ postId, status: 'approved' });
+      appAlert('Approved', 'The post is now public.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not approve flyer.';
+      const message = error instanceof Error ? error.message : 'Could not approve post.';
       appAlert('Approve failed', message);
     }
   }
 
-  async function handleReject(flyerId: string): Promise<void> {
+  async function handleReject(postId: string): Promise<void> {
     const reason = rejectReason.trim();
     if (reason.length === 0) {
       appAlert('Reason required', 'Add a short rejection reason for the author.');
@@ -67,8 +67,8 @@ export default function ModerationScreen() {
     }
 
     try {
-      await moderateFlyer.mutateAsync({
-        flyerId,
+      await moderatePost.mutateAsync({
+        postId,
         status: 'rejected',
         rejectionReason: reason,
       });
@@ -76,13 +76,13 @@ export default function ModerationScreen() {
       setRejectReason('');
       appAlert('Rejected', 'The author was notified.');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Could not reject flyer.';
+      const message = error instanceof Error ? error.message : 'Could not reject post.';
       appAlert('Reject failed', message);
     }
   }
 
   function handleBan(authorId: string, authorName: string): void {
-    appAlert('Ban author', `Ban ${authorName} from publishing flyers?`, [
+    appAlert('Ban author', `Ban ${authorName} from publishing posts?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Ban',
@@ -90,7 +90,7 @@ export default function ModerationScreen() {
         onPress: () => {
           void banAuthor
             .mutateAsync({ userId: authorId, banned: true })
-            .then(() => appAlert('Banned', 'The author can no longer publish flyers.'))
+            .then(() => appAlert('Banned', 'The author can no longer publish posts.'))
             .catch((error: unknown) => {
               const message = error instanceof Error ? error.message : 'Could not ban user.';
               appAlert('Ban failed', message);
@@ -155,42 +155,42 @@ export default function ModerationScreen() {
           <View style={styles.centerState}>
             <ActivityIndicator color={C.mist} />
           </View>
-        ) : sortedFlyers.length === 0 ? (
+        ) : sortedPosts.length === 0 ? (
           <View style={styles.centerState}>
-            <Text style={styles.emptyText}>No flyers waiting for review.</Text>
+            <Text style={styles.emptyText}>No posts waiting for review.</Text>
           </View>
         ) : (
-          sortedFlyers.map((flyer) => {
-            const imageUrl = buildFlyerImageUrl(flyer.image_path);
-            const isRejecting = rejectingId === flyer.id;
+          sortedPosts.map((post) => {
+            const imageUrl = buildPostImageUrl(post.image_path);
+            const isRejecting = rejectingId === post.id;
 
             return (
-              <View key={flyer.id} style={styles.card}>
+              <View key={post.id} style={styles.card}>
                 {imageUrl !== null ? (
                   <Image source={{ uri: imageUrl }} style={styles.cardImage} resizeMode="cover" />
                 ) : null}
 
                 <View style={styles.cardBody}>
                   <View style={styles.cardMetaRow}>
-                    <Text style={styles.typeChip}>{FLYER_TYPE_LABELS[flyer.type]}</Text>
-                    <Text style={styles.statusChip}>{FLYER_STATUS_LABELS[flyer.status]}</Text>
-                    {flyer.report_count > 0 ? (
-                      <Text style={styles.reportChip}>{flyer.report_count} reports</Text>
+                    <Text style={styles.typeChip}>{POST_TYPE_LABELS[post.type]}</Text>
+                    <Text style={styles.statusChip}>{POST_STATUS_LABELS[post.status]}</Text>
+                    {post.report_count > 0 ? (
+                      <Text style={styles.reportChip}>{post.report_count} reports</Text>
                     ) : null}
                   </View>
 
-                  <Text style={styles.cardTitle}>{flyer.title}</Text>
+                  <Text style={styles.cardTitle}>{post.title}</Text>
                   <Text style={styles.cardSub}>
-                    {formatFlyerEventSchedule(flyer.event_start, flyer.event_end)}
+                    {formatPostEventSchedule(post.event_start, post.event_end)}
                   </Text>
                   <Text style={styles.cardSub}>
-                    {flyer.venue_name ?? flyer.formatted_address ?? 'No venue label'}
+                    {post.venue_name ?? post.formatted_address ?? 'No venue label'}
                   </Text>
                   <Text style={styles.cardSub}>
-                    By {flyer.author?.display_name ?? 'Player'}
+                    By {post.author?.display_name ?? 'Player'}
                   </Text>
 
-                  <Pressable onPress={() => router.push(buildFlyerDetailRoute(flyer.id))}>
+                  <Pressable onPress={() => router.push(buildPostDetailRoute(post.id))}>
                     <Text style={styles.previewLink}>Open preview</Text>
                   </Pressable>
 
@@ -215,7 +215,7 @@ export default function ModerationScreen() {
                           <Text style={styles.secondaryActionText}>Cancel</Text>
                         </Pressable>
                         <Pressable
-                          onPress={() => void handleReject(flyer.id)}
+                          onPress={() => void handleReject(post.id)}
                           style={styles.rejectAction}
                         >
                           <Text style={styles.rejectActionText}>Confirm reject</Text>
@@ -225,14 +225,14 @@ export default function ModerationScreen() {
                   ) : (
                     <View style={styles.actionRow}>
                       <Pressable
-                        onPress={() => void handleApprove(flyer.id)}
+                        onPress={() => void handleApprove(post.id)}
                         style={styles.approveAction}
                       >
                         <Text style={styles.approveActionText}>Approve</Text>
                       </Pressable>
                       <Pressable
                         onPress={() => {
-                          setRejectingId(flyer.id);
+                          setRejectingId(post.id);
                           setRejectReason('');
                         }}
                         style={styles.rejectAction}
@@ -241,7 +241,7 @@ export default function ModerationScreen() {
                       </Pressable>
                       <Pressable
                         onPress={() =>
-                          handleBan(flyer.author_id, flyer.author?.display_name ?? 'author')
+                          handleBan(post.author_id, post.author?.display_name ?? 'author')
                         }
                         style={styles.secondaryAction}
                       >

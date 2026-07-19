@@ -37,8 +37,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Padelcito needs access to your photos so you can upload tournament and training flyers.",
-          "cameraPermission": "Padelcito needs camera access so you can photograph flyers to publish."
+          "photosPermission": "Padelcito needs access to your photos so you can upload tournament and training posts.",
+          "cameraPermission": "Padelcito needs camera access so you can photograph posts to publish."
         }
       ]
     ],

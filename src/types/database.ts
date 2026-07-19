@@ -147,6 +147,169 @@ export type Database = {
           },
         ]
       }
+      community_post_reports: {
+        Row: {
+          comment: string | null
+          community_post_id: string
+          created_at: string
+          id: string
+          reason: Database["public"]["Enums"]["community_post_report_reason"]
+          reporter_id: string
+        }
+        Insert: {
+          comment?: string | null
+          community_post_id: string
+          created_at?: string
+          id?: string
+          reason: Database["public"]["Enums"]["community_post_report_reason"]
+          reporter_id: string
+        }
+        Update: {
+          comment?: string | null
+          community_post_id?: string
+          created_at?: string
+          id?: string
+          reason?: Database["public"]["Enums"]["community_post_report_reason"]
+          reporter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_post_reports_community_post_id_fkey"
+            columns: ["community_post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_post_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_post_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_posts: {
+        Row: {
+          author_id: string
+          contact_phone: string
+          contact_verified_at: string | null
+          created_at: string
+          description: string | null
+          details: Json
+          event_end: string | null
+          event_start: string | null
+          formatted_address: string | null
+          id: string
+          image_path: string | null
+          location: unknown
+          published_at: string | null
+          rejection_reason: string | null
+          report_count: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sport_id: string
+          status: Database["public"]["Enums"]["community_post_status"]
+          title: string
+          type: Database["public"]["Enums"]["community_post_type"]
+          updated_at: string
+          venue_name: string | null
+        }
+        Insert: {
+          author_id: string
+          contact_phone: string
+          contact_verified_at?: string | null
+          created_at?: string
+          description?: string | null
+          details?: Json
+          event_end?: string | null
+          event_start?: string | null
+          formatted_address?: string | null
+          id?: string
+          image_path?: string | null
+          location: unknown
+          published_at?: string | null
+          rejection_reason?: string | null
+          report_count?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sport_id: string
+          status?: Database["public"]["Enums"]["community_post_status"]
+          title: string
+          type: Database["public"]["Enums"]["community_post_type"]
+          updated_at?: string
+          venue_name?: string | null
+        }
+        Update: {
+          author_id?: string
+          contact_phone?: string
+          contact_verified_at?: string | null
+          created_at?: string
+          description?: string | null
+          details?: Json
+          event_end?: string | null
+          event_start?: string | null
+          formatted_address?: string | null
+          id?: string
+          image_path?: string | null
+          location?: unknown
+          published_at?: string | null
+          rejection_reason?: string | null
+          report_count?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sport_id?: string
+          status?: Database["public"]["Enums"]["community_post_status"]
+          title?: string
+          type?: Database["public"]["Enums"]["community_post_type"]
+          updated_at?: string
+          venue_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "community_posts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_posts_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_posts_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_posts_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "community_posts_sport_id_fkey"
+            columns: ["sport_id"]
+            isOneToOne: false
+            referencedRelation: "sports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_members: {
         Row: {
           conversation_id: string
@@ -248,169 +411,6 @@ export type Database = {
             columns: ["tournament_id"]
             isOneToOne: false
             referencedRelation: "tournaments"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      flyer_reports: {
-        Row: {
-          comment: string | null
-          created_at: string
-          flyer_id: string
-          id: string
-          reason: Database["public"]["Enums"]["flyer_report_reason"]
-          reporter_id: string
-        }
-        Insert: {
-          comment?: string | null
-          created_at?: string
-          flyer_id: string
-          id?: string
-          reason: Database["public"]["Enums"]["flyer_report_reason"]
-          reporter_id: string
-        }
-        Update: {
-          comment?: string | null
-          created_at?: string
-          flyer_id?: string
-          id?: string
-          reason?: Database["public"]["Enums"]["flyer_report_reason"]
-          reporter_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "flyer_reports_flyer_id_fkey"
-            columns: ["flyer_id"]
-            isOneToOne: false
-            referencedRelation: "flyers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "flyer_reports_reporter_id_fkey"
-            columns: ["reporter_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "flyer_reports_reporter_id_fkey"
-            columns: ["reporter_id"]
-            isOneToOne: false
-            referencedRelation: "public_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      flyers: {
-        Row: {
-          author_id: string
-          contact_phone: string
-          contact_verified_at: string | null
-          created_at: string
-          description: string | null
-          details: Json
-          event_end: string | null
-          event_start: string | null
-          formatted_address: string | null
-          id: string
-          image_path: string | null
-          location: unknown
-          published_at: string | null
-          rejection_reason: string | null
-          report_count: number
-          reviewed_at: string | null
-          reviewed_by: string | null
-          sport_id: string
-          status: Database["public"]["Enums"]["flyer_status"]
-          title: string
-          type: Database["public"]["Enums"]["flyer_type"]
-          updated_at: string
-          venue_name: string | null
-        }
-        Insert: {
-          author_id: string
-          contact_phone: string
-          contact_verified_at?: string | null
-          created_at?: string
-          description?: string | null
-          details?: Json
-          event_end?: string | null
-          event_start?: string | null
-          formatted_address?: string | null
-          id?: string
-          image_path?: string | null
-          location: unknown
-          published_at?: string | null
-          rejection_reason?: string | null
-          report_count?: number
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          sport_id: string
-          status?: Database["public"]["Enums"]["flyer_status"]
-          title: string
-          type: Database["public"]["Enums"]["flyer_type"]
-          updated_at?: string
-          venue_name?: string | null
-        }
-        Update: {
-          author_id?: string
-          contact_phone?: string
-          contact_verified_at?: string | null
-          created_at?: string
-          description?: string | null
-          details?: Json
-          event_end?: string | null
-          event_start?: string | null
-          formatted_address?: string | null
-          id?: string
-          image_path?: string | null
-          location?: unknown
-          published_at?: string | null
-          rejection_reason?: string | null
-          report_count?: number
-          reviewed_at?: string | null
-          reviewed_by?: string | null
-          sport_id?: string
-          status?: Database["public"]["Enums"]["flyer_status"]
-          title?: string
-          type?: Database["public"]["Enums"]["flyer_type"]
-          updated_at?: string
-          venue_name?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "flyers_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "flyers_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "public_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "flyers_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "flyers_reviewed_by_fkey"
-            columns: ["reviewed_by"]
-            isOneToOne: false
-            referencedRelation: "public_profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "flyers_sport_id_fkey"
-            columns: ["sport_id"]
-            isOneToOne: false
-            referencedRelation: "sports"
             referencedColumns: ["id"]
           },
         ]
@@ -777,9 +777,9 @@ export type Database = {
       notifications: {
         Row: {
           actor_id: string | null
+          community_post_id: string | null
           created_at: string
           data: Json
-          flyer_id: string | null
           id: string
           match_id: string | null
           participant_id: string | null
@@ -789,9 +789,9 @@ export type Database = {
         }
         Insert: {
           actor_id?: string | null
+          community_post_id?: string | null
           created_at?: string
           data?: Json
-          flyer_id?: string | null
           id?: string
           match_id?: string | null
           participant_id?: string | null
@@ -801,9 +801,9 @@ export type Database = {
         }
         Update: {
           actor_id?: string | null
+          community_post_id?: string | null
           created_at?: string
           data?: Json
-          flyer_id?: string | null
           id?: string
           match_id?: string | null
           participant_id?: string | null
@@ -813,10 +813,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "notifications_flyer_id_fkey"
-            columns: ["flyer_id"]
+            foreignKeyName: "notifications_community_post_id_fkey"
+            columns: ["community_post_id"]
             isOneToOne: false
-            referencedRelation: "flyers"
+            referencedRelation: "community_posts"
             referencedColumns: ["id"]
           },
           {
@@ -1596,11 +1596,11 @@ export type Database = {
         Args: { p_tournament_match_id: string }
         Returns: boolean
       }
-      emit_flyer_notification: {
+      emit_community_post_notification: {
         Args: {
           p_actor_id: string
+          p_community_post_id: string
           p_extra?: Json
-          p_flyer_id: string
           p_recipient_id: string
           p_type: Database["public"]["Enums"]["notification_type"]
         }
@@ -1646,6 +1646,10 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_banned: { Args: never; Returns: boolean }
       is_circuit_organizer: { Args: { p_circuit_id: string }; Returns: boolean }
+      is_community_post_author: {
+        Args: { p_community_post_id: string }
+        Returns: boolean
+      }
       is_conversation_creator: {
         Args: { p_conversation_id: string }
         Returns: boolean
@@ -1654,7 +1658,6 @@ export type Database = {
         Args: { p_conversation_id: string }
         Returns: boolean
       }
-      is_flyer_author: { Args: { p_flyer_id: string }; Returns: boolean }
       is_late_match_cancellation: {
         Args: { p_match: Database["public"]["Tables"]["matches"]["Row"] }
         Returns: boolean
@@ -1707,13 +1710,13 @@ export type Database = {
         Args: { p_configs: Json; p_court_count: number }
         Returns: boolean
       }
-      nearby_flyers: {
+      nearby_community_posts: {
         Args: {
           p_lat: number
           p_lng: number
           p_radius_m?: number
           p_sport_id?: string
-          p_type?: Database["public"]["Enums"]["flyer_type"]
+          p_type?: Database["public"]["Enums"]["community_post_type"]
         }
         Returns: {
           author_id: string
@@ -1724,7 +1727,7 @@ export type Database = {
           image_path: string
           sport_id: string
           title: string
-          type: Database["public"]["Enums"]["flyer_type"]
+          type: Database["public"]["Enums"]["community_post_type"]
           venue_name: string
         }[]
       }
@@ -1809,19 +1812,23 @@ export type Database = {
       }
     }
     Enums: {
-      conversation_type: "match" | "direct" | "tournament"
-      court_format: "singles" | "doubles"
-      court_structure: "glass" | "panoramic" | "concrete"
-      court_surface: "grass" | "concrete"
-      court_type: "indoor" | "outdoor" | "semi_indoor"
-      flyer_report_reason:
+      community_post_report_reason:
         | "spam"
         | "inappropriate"
         | "scam"
         | "misleading"
         | "other"
-      flyer_status: "pending_review" | "approved" | "rejected" | "archived"
-      flyer_type: "tournament" | "training"
+      community_post_status:
+        | "pending_review"
+        | "approved"
+        | "rejected"
+        | "archived"
+      community_post_type: "tournament" | "training"
+      conversation_type: "match" | "direct" | "tournament"
+      court_format: "singles" | "doubles"
+      court_structure: "glass" | "panoramic" | "concrete"
+      court_surface: "grass" | "concrete"
+      court_type: "indoor" | "outdoor" | "semi_indoor"
       listing_status: "open" | "closed" | "archived"
       listing_type: "training_partner" | "team_search" | "coaching_offer"
       match_difficulty: "friendly" | "competitive"
@@ -1837,8 +1844,9 @@ export type Database = {
         | "match_cancelled"
         | "rating_request"
         | "join_request_cancelled"
-        | "flyer_approved"
-        | "flyer_rejected"
+        | "community_post_approved"
+        | "community_post_rejected"
+        | "community_post_submitted"
       participant_status:
         | "pending"
         | "accepted"
@@ -2008,20 +2016,25 @@ export const Constants = {
   },
   public: {
     Enums: {
-      conversation_type: ["match", "direct", "tournament"],
-      court_format: ["singles", "doubles"],
-      court_structure: ["glass", "panoramic", "concrete"],
-      court_surface: ["grass", "concrete"],
-      court_type: ["indoor", "outdoor", "semi_indoor"],
-      flyer_report_reason: [
+      community_post_report_reason: [
         "spam",
         "inappropriate",
         "scam",
         "misleading",
         "other",
       ],
-      flyer_status: ["pending_review", "approved", "rejected", "archived"],
-      flyer_type: ["tournament", "training"],
+      community_post_status: [
+        "pending_review",
+        "approved",
+        "rejected",
+        "archived",
+      ],
+      community_post_type: ["tournament", "training"],
+      conversation_type: ["match", "direct", "tournament"],
+      court_format: ["singles", "doubles"],
+      court_structure: ["glass", "panoramic", "concrete"],
+      court_surface: ["grass", "concrete"],
+      court_type: ["indoor", "outdoor", "semi_indoor"],
       listing_status: ["open", "closed", "archived"],
       listing_type: ["training_partner", "team_search", "coaching_offer"],
       match_difficulty: ["friendly", "competitive"],
@@ -2037,8 +2050,9 @@ export const Constants = {
         "match_cancelled",
         "rating_request",
         "join_request_cancelled",
-        "flyer_approved",
-        "flyer_rejected",
+        "community_post_approved",
+        "community_post_rejected",
+        "community_post_submitted",
       ],
       participant_status: [
         "pending",

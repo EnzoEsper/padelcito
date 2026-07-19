@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { View, Text, ScrollView, Pressable } from '@/tw';
 import { StyleSheet, RefreshControl } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
@@ -13,10 +15,16 @@ import { supabase } from '@/lib/supabase';
 import {
   useProfile,
   useProfileSport,
+  isModeratorRole,
   SKILL_LEVEL_COLORS,
   SKILL_LEVEL_LABEL,
   type SkillLevel,
 } from '@/features/profile/use-profile';
+import {
+  buildModerationRoute,
+  buildMyPostsRoute,
+} from '@/features/community/post-display';
+import { useModerationQueue } from '@/features/community/use-posts';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -125,9 +133,17 @@ interface PreferenceRowProps {
   isFirst?: boolean;
   onPress?: () => void;
   labelColor?: string;
+  badgeCount?: number;
 }
 
-function PreferenceRow({ label, value, isFirst = false, onPress, labelColor }: PreferenceRowProps) {
+function PreferenceRow({
+  label,
+  value,
+  isFirst = false,
+  onPress,
+  labelColor,
+  badgeCount,
+}: PreferenceRowProps) {
   return (
     <Pressable
       onPress={onPress}
@@ -141,6 +157,11 @@ function PreferenceRow({ label, value, isFirst = false, onPress, labelColor }: P
         {value !== undefined && value.length > 0 && (
           <Text style={styles.prefValue}>{value}</Text>
         )}
+        {badgeCount !== undefined && badgeCount > 0 ? (
+          <View style={styles.prefBadge}>
+            <Text style={styles.prefBadgeText}>{badgeCount > 99 ? '99+' : String(badgeCount)}</Text>
+          </View>
+        ) : null}
         <Ionicons name="chevron-forward" size={16} color={C.faint} />
       </View>
     </Pressable>
@@ -229,6 +250,7 @@ function useSignOut() {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const {
     data: profile,
     isPending: profilePending,
@@ -238,6 +260,14 @@ export default function ProfileScreen() {
   const { data: sport, isRefetching: sportRefetching, refetch: refetchSport } = useProfileSport();
   const isRefetching = profileRefetching || sportRefetching;
   const signOut = useSignOut();
+
+  const isModerator = profile !== undefined && isModeratorRole(profile.role);
+  const moderationQuery = useModerationQueue({ enabled: isModerator });
+  const pendingReviewCount = useMemo(
+    () =>
+      (moderationQuery.data ?? []).filter((post) => post.status === 'pending_review').length,
+    [moderationQuery.data],
+  );
 
   const skillLevel: SkillLevel = sport?.skill_level ?? 'intermediate';
   const rating = profile?.rating_avg ?? 0;
@@ -327,6 +357,23 @@ export default function ProfileScreen() {
             <StatCard label="PLAYED" value={String(ratingCount)} />
             <StatCard label="RATING" value={rating > 0 ? rating.toFixed(1) : '—'} />
             <StatCard label="RELIABILITY" value={reliabilityLabel} />
+          </View>
+
+          {/* Community */}
+          <SectionLabel>COMMUNITY</SectionLabel>
+          <View style={[styles.prefCard, { marginHorizontal: 20, marginBottom: 16 }]}>
+            <PreferenceRow
+              label="My publications"
+              isFirst
+              onPress={() => router.push(buildMyPostsRoute())}
+            />
+            {isModerator ? (
+              <PreferenceRow
+                label="Moderation queue"
+                badgeCount={pendingReviewCount}
+                onPress={() => router.push(buildModerationRoute())}
+              />
+            ) : null}
           </View>
 
           {/* Preferences */}
@@ -553,6 +600,20 @@ const styles = StyleSheet.create({
     fontFamily: 'HankenGrotesk-Medium',
     fontSize: 14,
     color: C.dim,
+  },
+  prefBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.warning,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  prefBadgeText: {
+    fontFamily: 'SpaceMono-Bold',
+    fontSize: 10,
+    color: '#0B0B0B',
   },
   skeletonPill: {
     backgroundColor: C.surface3,

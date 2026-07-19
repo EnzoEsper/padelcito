@@ -1,25 +1,32 @@
 import type { Database } from '@/types/database';
 
-export type FlyerType = Database['public']['Enums']['flyer_type'];
-export type FlyerStatus = Database['public']['Enums']['flyer_status'];
-export type FlyerReportReason = Database['public']['Enums']['flyer_report_reason'];
+export type CommunityPostType = Database['public']['Enums']['community_post_type'];
+export type CommunityPostStatus = Database['public']['Enums']['community_post_status'];
+export type CommunityPostReportReason = Database['public']['Enums']['community_post_report_reason'];
 export type UserRole = Database['public']['Enums']['user_role'];
 
-export const FLYER_DISCOVERY_RADIUS_M = 50_000;
+export const POST_DISCOVERY_RADIUS_M = 50_000;
 
-export const FLYER_TYPE_LABELS: Record<FlyerType, string> = {
+export const POST_TYPE_LABELS: Record<CommunityPostType, string> = {
   tournament: 'Tournament',
   training: 'Training',
 };
 
-export const FLYER_STATUS_LABELS: Record<FlyerStatus, string> = {
+export const POST_STATUS_LABELS: Record<CommunityPostStatus, string> = {
   pending_review: 'Pending review',
   approved: 'Published',
   rejected: 'Rejected',
   archived: 'Archived',
 };
 
-export const FLYER_REPORT_REASON_LABELS: Record<FlyerReportReason, string> = {
+export const POST_STATUS_COLORS: Record<CommunityPostStatus, { bg: string; fg: string }> = {
+  pending_review: { bg: 'rgba(224,177,91,0.18)', fg: '#E0B15B' },
+  approved: { bg: 'rgba(91,224,166,0.14)', fg: '#5BE0A6' },
+  rejected: { bg: 'rgba(224,91,91,0.14)', fg: '#E05B5B' },
+  archived: { bg: '#232429', fg: 'rgba(228,228,228,0.38)' },
+};
+
+export const POST_REPORT_REASON_LABELS: Record<CommunityPostReportReason, string> = {
   spam: 'Spam',
   inappropriate: 'Inappropriate content',
   scam: 'Scam or fraud',
@@ -27,7 +34,7 @@ export const FLYER_REPORT_REASON_LABELS: Record<FlyerReportReason, string> = {
   other: 'Other',
 };
 
-export function formatFlyerDistanceKm(distanceM: number | undefined): string | null {
+export function formatPostDistanceKm(distanceM: number | undefined): string | null {
   if (distanceM === undefined) return null;
   if (distanceM < 1000) return `${Math.round(distanceM)} m`;
   const km = distanceM / 1000;
@@ -35,7 +42,7 @@ export function formatFlyerDistanceKm(distanceM: number | undefined): string | n
   return `${Math.round(km)} km`;
 }
 
-export function formatFlyerEventSchedule(
+export function formatPostEventSchedule(
   eventStart: string | null,
   eventEnd: string | null,
 ): string {
@@ -70,18 +77,22 @@ export function formatFlyerEventSchedule(
   return sameDay ? `${startLabel} – ${endLabel}` : `${startLabel} – ${endLabel}`;
 }
 
-export function isFlyerContactVerified(contactVerifiedAt: string | null): boolean {
+export function isPostContactVerified(contactVerifiedAt: string | null): boolean {
   return contactVerifiedAt !== null;
 }
 
-export function buildFlyerDetailRoute(flyerId: string): string {
-  return `/(app)/flyer-detail?id=${flyerId}`;
+export function buildPostDetailRoute(postId: string): string {
+  return `/(app)/post-detail?id=${postId}`;
 }
 
-export function buildCreateFlyerRoute(): string {
-  return '/(app)/create-flyer';
+export function buildCreatePostRoute(): string {
+  return `/(app)/create-post?fresh=${Date.now()}`;
 }
 
 export function buildModerationRoute(): string {
   return '/(app)/moderation';
+}
+
+export function buildMyPostsRoute(): string {
+  return '/(app)/my-posts';
 }

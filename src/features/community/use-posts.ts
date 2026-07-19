@@ -6,31 +6,31 @@ import {
 } from '@/lib/padel-sport';
 import { roundCoordsForKey, type Coords } from '@/lib/location';
 import { supabase } from '@/lib/supabase';
-import { FLYER_DISCOVERY_RADIUS_M } from '@/features/community/flyer-display';
+import { POST_DISCOVERY_RADIUS_M } from '@/features/community/post-display';
 import type { Database } from '@/types/database';
 
-type FlyerRow = Database['public']['Tables']['flyers']['Row'];
-type FlyerInsert = Database['public']['Tables']['flyers']['Insert'];
-type FlyerType = Database['public']['Enums']['flyer_type'];
-type FlyerStatus = Database['public']['Enums']['flyer_status'];
-type FlyerReportReason = Database['public']['Enums']['flyer_report_reason'];
+type CommunityPostRow = Database['public']['Tables']['community_posts']['Row'];
+type CommunityPostInsert = Database['public']['Tables']['community_posts']['Insert'];
+type CommunityPostType = Database['public']['Enums']['community_post_type'];
+type CommunityPostStatus = Database['public']['Enums']['community_post_status'];
+type CommunityPostReportReason = Database['public']['Enums']['community_post_report_reason'];
 type PublicProfileRow = Database['public']['Views']['public_profiles']['Row'];
 type SportRow = Database['public']['Tables']['sports']['Row'];
 
-export type FlyerSummary = FlyerRow & {
+export type PostSummary = CommunityPostRow & {
   author: PublicProfileRow | null;
   sport: SportRow | null;
   distanceM?: number;
 };
 
-export type FlyerDetail = FlyerSummary & {
+export type PostDetail = PostSummary & {
   currentUserId: string;
   isAuthor: boolean;
   isModerator: boolean;
 };
 
-export type CreateFlyerInput = {
-  type: FlyerType;
+export type CreatePostInput = {
+  type: CommunityPostType;
   title: string;
   description: string | null;
   imagePath: string | null;
@@ -42,9 +42,9 @@ export type CreateFlyerInput = {
   contactPhone: string;
 };
 
-export type UpdateFlyerInput = {
-  flyerId: string;
-  type: FlyerType;
+export type UpdatePostInput = {
+  postId: string;
+  type: CommunityPostType;
   title: string;
   description: string | null;
   imagePath: string | null;
@@ -56,29 +56,29 @@ export type UpdateFlyerInput = {
   resubmit?: boolean;
 };
 
-export type ModerateFlyerInput = {
-  flyerId: string;
+export type ModeratePostInput = {
+  postId: string;
   status: 'approved' | 'rejected';
   rejectionReason?: string | null;
 };
 
-export type ReportFlyerInput = {
-  flyerId: string;
-  reason: FlyerReportReason;
+export type ReportPostInput = {
+  postId: string;
+  reason: CommunityPostReportReason;
   comment?: string | null;
 };
 
-export const flyerKeys = {
-  all: ['flyers'] as const,
-  nearbyPrefix: ['flyers', 'nearby', PADEL_SPORT_SLUG] as const,
-  nearby: (coords: Coords, typeFilter: FlyerType | 'all') =>
-    [...flyerKeys.nearbyPrefix, roundCoordsForKey(coords), typeFilter] as const,
-  allEventsPrefix: ['flyers', 'all-events', PADEL_SPORT_SLUG] as const,
-  allEvents: (typeFilter: FlyerType | 'all') =>
-    [...flyerKeys.allEventsPrefix, typeFilter] as const,
-  detail: (flyerId: string) => ['flyers', flyerId] as const,
-  mine: ['flyers', 'mine'] as const,
-  moderation: ['flyers', 'moderation'] as const,
+export const postKeys = {
+  all: ['community_posts'] as const,
+  nearbyPrefix: ['community_posts', 'nearby', PADEL_SPORT_SLUG] as const,
+  nearby: (coords: Coords, typeFilter: CommunityPostType | 'all') =>
+    [...postKeys.nearbyPrefix, roundCoordsForKey(coords), typeFilter] as const,
+  allEventsPrefix: ['community_posts', 'all-events', PADEL_SPORT_SLUG] as const,
+  allEvents: (typeFilter: CommunityPostType | 'all') =>
+    [...postKeys.allEventsPrefix, typeFilter] as const,
+  detail: (postId: string) => ['community_posts', postId] as const,
+  mine: ['community_posts', 'mine'] as const,
+  moderation: ['community_posts', 'moderation'] as const,
 };
 
 async function getCurrentUserId(): Promise<string> {
@@ -162,10 +162,10 @@ function isModeratorRole(role: Database['public']['Enums']['user_role']): boolea
   return role === 'moderator' || role === 'admin';
 }
 
-async function hydrateFlyerSummaries(
-  rows: FlyerRow[],
+async function hydratePostSummaries(
+  rows: CommunityPostRow[],
   distanceById?: Map<string, number>,
-): Promise<FlyerSummary[]> {
+): Promise<PostSummary[]> {
   const authorIds = rows.map((row) => row.author_id);
   const sportIds = rows.map((row) => row.sport_id);
   const [authors, sports] = await Promise.all([
@@ -181,32 +181,32 @@ async function hydrateFlyerSummaries(
   }));
 }
 
-function assertPadelFlyer(
-  flyer: FlyerRow,
+function assertPadelPost(
+  post: CommunityPostRow,
   padelSportId: string,
 ): void {
-  if (flyer.sport_id !== padelSportId) {
+  if (post.sport_id !== padelSportId) {
     throw new UnsupportedSportError();
   }
 }
 
-export function useNearbyFlyers(coords: Coords | null, typeFilter: FlyerType | 'all') {
+export function useNearbyPosts(coords: Coords | null, typeFilter: CommunityPostType | 'all') {
   const queryClient = useQueryClient();
 
   return useQuery({
     queryKey:
       coords !== null
-        ? flyerKeys.nearby(coords, typeFilter)
-        : flyerKeys.nearbyPrefix,
+        ? postKeys.nearby(coords, typeFilter)
+        : postKeys.nearbyPrefix,
     enabled: coords !== null,
-    queryFn: async (): Promise<FlyerSummary[]> => {
+    queryFn: async (): Promise<PostSummary[]> => {
       if (coords === null) return [];
 
       const padelSport = await ensurePadelSport(queryClient);
-      const { data: nearby, error: nearbyError } = await supabase.rpc('nearby_flyers', {
+      const { data: nearby, error: nearbyError } = await supabase.rpc('nearby_community_posts', {
         p_lat: coords.lat,
         p_lng: coords.lng,
-        p_radius_m: FLYER_DISCOVERY_RADIUS_M,
+        p_radius_m: POST_DISCOVERY_RADIUS_M,
         p_sport_id: padelSport.id,
         p_type: typeFilter === 'all' ? undefined : typeFilter,
       });
@@ -217,8 +217,8 @@ export function useNearbyFlyers(coords: Coords | null, typeFilter: FlyerType | '
       const ids = nearby.map((row) => row.id);
       const distanceById = new Map(nearby.map((row) => [row.id, row.distance_m]));
 
-      const { data: flyers, error } = await supabase
-        .from('flyers')
+      const { data: posts, error } = await supabase
+        .from('community_posts')
         .select('*')
         .in('id', ids)
         .eq('status', 'approved');
@@ -226,26 +226,26 @@ export function useNearbyFlyers(coords: Coords | null, typeFilter: FlyerType | '
       if (error !== null) throw error;
 
       const order = new Map(ids.map((id, index) => [id, index]));
-      const sorted = [...(flyers ?? [])].sort(
+      const sorted = [...(posts ?? [])].sort(
         (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
       );
 
-      return hydrateFlyerSummaries(sorted, distanceById);
+      return hydratePostSummaries(sorted, distanceById);
     },
   });
 }
 
-export function useAllFlyers(typeFilter: FlyerType | 'all') {
+export function useAllPosts(typeFilter: CommunityPostType | 'all') {
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: flyerKeys.allEvents(typeFilter),
-    queryFn: async (): Promise<FlyerSummary[]> => {
+    queryKey: postKeys.allEvents(typeFilter),
+    queryFn: async (): Promise<PostSummary[]> => {
       const padelSport = await ensurePadelSport(queryClient);
       const nowIso = new Date().toISOString();
 
       let query = supabase
-        .from('flyers')
+        .from('community_posts')
         .select('*')
         .eq('status', 'approved')
         .eq('sport_id', padelSport.id)
@@ -259,20 +259,22 @@ export function useAllFlyers(typeFilter: FlyerType | 'all') {
 
       const { data, error } = await query;
       if (error !== null) throw error;
-      return hydrateFlyerSummaries(data ?? []);
+      return hydratePostSummaries(data ?? []);
     },
   });
 }
 
-export function useFlyerDetail(flyerId: string | null) {
+export function usePostDetail(postId: string | null) {
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: flyerKeys.detail(flyerId ?? ''),
-    enabled: flyerId !== null && flyerId.length > 0,
-    queryFn: async (): Promise<FlyerDetail> => {
-      if (flyerId === null || flyerId.length === 0) {
-        throw new Error('Missing flyer id');
+    queryKey: postKeys.detail(postId ?? ''),
+    enabled: postId !== null && postId.length > 0,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 3000),
+    queryFn: async (): Promise<PostDetail> => {
+      if (postId === null || postId.length === 0) {
+        throw new Error('Missing post id');
       }
 
       const userId = await getCurrentUserId();
@@ -282,15 +284,15 @@ export function useFlyerDetail(flyerId: string | null) {
       ]);
 
       const { data, error } = await supabase
-        .from('flyers')
+        .from('community_posts')
         .select('*')
-        .eq('id', flyerId)
+        .eq('id', postId)
         .single();
 
       if (error !== null) throw error;
-      assertPadelFlyer(data, padelSport.id);
+      assertPadelPost(data, padelSport.id);
 
-      const [summary] = await hydrateFlyerSummaries([data]);
+      const [summary] = await hydratePostSummaries([data]);
 
       return {
         ...summary,
@@ -302,36 +304,37 @@ export function useFlyerDetail(flyerId: string | null) {
   });
 }
 
-export function useMyFlyers() {
+export function useMyPosts() {
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: flyerKeys.mine,
-    queryFn: async (): Promise<FlyerSummary[]> => {
+    queryKey: postKeys.mine,
+    queryFn: async (): Promise<PostSummary[]> => {
       const [userId, padelSport] = await Promise.all([
         getCurrentUserId(),
         ensurePadelSport(queryClient),
       ]);
 
       const { data, error } = await supabase
-        .from('flyers')
+        .from('community_posts')
         .select('*')
         .eq('author_id', userId)
         .eq('sport_id', padelSport.id)
         .order('created_at', { ascending: false });
 
       if (error !== null) throw error;
-      return hydrateFlyerSummaries(data ?? []);
+      return hydratePostSummaries(data ?? []);
     },
   });
 }
 
-export function useModerationQueue() {
+export function useModerationQueue(options?: { enabled?: boolean }) {
   const queryClient = useQueryClient();
 
   return useQuery({
-    queryKey: flyerKeys.moderation,
-    queryFn: async (): Promise<FlyerSummary[]> => {
+    queryKey: postKeys.moderation,
+    enabled: options?.enabled ?? true,
+    queryFn: async (): Promise<PostSummary[]> => {
       const userId = await getCurrentUserId();
       const [padelSport, roleInfo] = await Promise.all([
         ensurePadelSport(queryClient),
@@ -343,7 +346,7 @@ export function useModerationQueue() {
       }
 
       const { data, error } = await supabase
-        .from('flyers')
+        .from('community_posts')
         .select('*')
         .eq('sport_id', padelSport.id)
         .in('status', ['pending_review', 'rejected'])
@@ -351,7 +354,7 @@ export function useModerationQueue() {
         .order('created_at', { ascending: true });
 
       if (error !== null) throw error;
-      return hydrateFlyerSummaries(data ?? []);
+      return hydratePostSummaries(data ?? []);
     },
   });
 }
@@ -375,17 +378,43 @@ export function useProfileContactGate() {
   });
 }
 
-export function useCreateFlyer() {
+export function useAttachPostImage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: CreateFlyerInput) => {
+    mutationFn: async (input: { postId: string; imagePath: string }) => {
+      const { data, error } = await supabase
+        .from('community_posts')
+        .update({ image_path: input.imagePath })
+        .eq('id', input.postId)
+        .select('id')
+        .single();
+
+      if (error !== null) throw error;
+      return data.id;
+    },
+    onSuccess: async (_id, input) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: postKeys.detail(input.postId) }),
+        queryClient.invalidateQueries({ queryKey: postKeys.all }),
+        queryClient.invalidateQueries({ queryKey: postKeys.mine }),
+        queryClient.invalidateQueries({ queryKey: postKeys.moderation }),
+      ]);
+    },
+  });
+}
+
+export function useCreatePost() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: CreatePostInput) => {
       const [userId, padelSport] = await Promise.all([
         getCurrentUserId(),
         ensurePadelSport(queryClient),
       ]);
 
-      const insert: FlyerInsert = {
+      const insert: CommunityPostInsert = {
         author_id: userId,
         sport_id: padelSport.id,
         type: input.type,
@@ -402,7 +431,7 @@ export function useCreateFlyer() {
       };
 
       const { data, error } = await supabase
-        .from('flyers')
+        .from('community_posts')
         .insert(insert)
         .select('id')
         .single();
@@ -412,19 +441,19 @@ export function useCreateFlyer() {
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: flyerKeys.all }),
-        queryClient.invalidateQueries({ queryKey: flyerKeys.mine }),
-        queryClient.invalidateQueries({ queryKey: flyerKeys.moderation }),
+        queryClient.invalidateQueries({ queryKey: postKeys.all }),
+        queryClient.invalidateQueries({ queryKey: postKeys.mine }),
+        queryClient.invalidateQueries({ queryKey: postKeys.moderation }),
       ]);
     },
   });
 }
 
-export function useUpdateFlyer() {
+export function useUpdatePost() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: UpdateFlyerInput) => {
+    mutationFn: async (input: UpdatePostInput) => {
       await ensurePadelSport(queryClient);
 
       const patch = {
@@ -437,13 +466,13 @@ export function useUpdateFlyer() {
         location: geographyPoint(input.coords),
         event_start: input.eventStart,
         event_end: input.eventEnd,
-        ...(input.resubmit === true ? { status: 'pending_review' as FlyerStatus } : {}),
+        ...(input.resubmit === true ? { status: 'pending_review' as CommunityPostStatus } : {}),
       };
 
       const { data, error } = await supabase
-        .from('flyers')
+        .from('community_posts')
         .update(patch)
-        .eq('id', input.flyerId)
+        .eq('id', input.postId)
         .select('id')
         .single();
 
@@ -452,32 +481,32 @@ export function useUpdateFlyer() {
     },
     onSuccess: async (_id, input) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: flyerKeys.detail(input.flyerId) }),
-        queryClient.invalidateQueries({ queryKey: flyerKeys.all }),
-        queryClient.invalidateQueries({ queryKey: flyerKeys.mine }),
-        queryClient.invalidateQueries({ queryKey: flyerKeys.moderation }),
+        queryClient.invalidateQueries({ queryKey: postKeys.detail(input.postId) }),
+        queryClient.invalidateQueries({ queryKey: postKeys.all }),
+        queryClient.invalidateQueries({ queryKey: postKeys.mine }),
+        queryClient.invalidateQueries({ queryKey: postKeys.moderation }),
       ]);
     },
   });
 }
 
-export function useModerateFlyer() {
+export function useModeratePost() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: ModerateFlyerInput) => {
+    mutationFn: async (input: ModeratePostInput) => {
       const patch =
         input.status === 'approved'
-          ? { status: 'approved' as FlyerStatus, rejection_reason: null }
+          ? { status: 'approved' as CommunityPostStatus, rejection_reason: null }
           : {
-              status: 'rejected' as FlyerStatus,
+              status: 'rejected' as CommunityPostStatus,
               rejection_reason: input.rejectionReason?.trim() || 'Rejected by moderator',
             };
 
       const { data, error } = await supabase
-        .from('flyers')
+        .from('community_posts')
         .update(patch)
-        .eq('id', input.flyerId)
+        .eq('id', input.postId)
         .select('id')
         .single();
 
@@ -486,41 +515,41 @@ export function useModerateFlyer() {
     },
     onSuccess: async (_id, input) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: flyerKeys.detail(input.flyerId) }),
-        queryClient.invalidateQueries({ queryKey: flyerKeys.all }),
-        queryClient.invalidateQueries({ queryKey: flyerKeys.moderation }),
+        queryClient.invalidateQueries({ queryKey: postKeys.detail(input.postId) }),
+        queryClient.invalidateQueries({ queryKey: postKeys.all }),
+        queryClient.invalidateQueries({ queryKey: postKeys.moderation }),
       ]);
     },
   });
 }
 
-export function useReportFlyer() {
+export function useReportPost() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: ReportFlyerInput) => {
+    mutationFn: async (input: ReportPostInput) => {
       const userId = await getCurrentUserId();
 
-      const { error } = await supabase.from('flyer_reports').insert({
-        flyer_id: input.flyerId,
+      const { error } = await supabase.from('community_post_reports').insert({
+        community_post_id: input.postId,
         reporter_id: userId,
         reason: input.reason,
         comment: input.comment?.trim() || null,
       });
 
       if (error !== null) throw error;
-      return input.flyerId;
+      return input.postId;
     },
     onSuccess: async (_id, input) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: flyerKeys.detail(input.flyerId) }),
-        queryClient.invalidateQueries({ queryKey: flyerKeys.moderation }),
+        queryClient.invalidateQueries({ queryKey: postKeys.detail(input.postId) }),
+        queryClient.invalidateQueries({ queryKey: postKeys.moderation }),
       ]);
     },
   });
 }
 
-export function useBanFlyerAuthor() {
+export function useBanPostAuthor() {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -534,31 +563,31 @@ export function useBanFlyerAuthor() {
       return input.userId;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: flyerKeys.moderation });
+      await queryClient.invalidateQueries({ queryKey: postKeys.moderation });
     },
   });
 }
 
-export function useArchiveFlyer() {
+export function useArchivePost() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (flyerId: string) => {
+    mutationFn: async (postId: string) => {
       const { data, error } = await supabase
-        .from('flyers')
+        .from('community_posts')
         .update({ status: 'archived' })
-        .eq('id', flyerId)
+        .eq('id', postId)
         .select('id')
         .single();
 
       if (error !== null) throw error;
       return data.id;
     },
-    onSuccess: async (flyerId) => {
+    onSuccess: async (postId) => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: flyerKeys.detail(flyerId) }),
-        queryClient.invalidateQueries({ queryKey: flyerKeys.all }),
-        queryClient.invalidateQueries({ queryKey: flyerKeys.mine }),
+        queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) }),
+        queryClient.invalidateQueries({ queryKey: postKeys.all }),
+        queryClient.invalidateQueries({ queryKey: postKeys.mine }),
       ]);
     },
   });

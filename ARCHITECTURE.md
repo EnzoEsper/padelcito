@@ -30,6 +30,8 @@ auth.users ──1:1── profiles ──N:M── sports (via profile_sports)
      ratings                          ┌──────────┼──────────┐  messages
   reliability_reports                 │          │          │
   notifications                       │          │          │
+ community_posts                      │          │          │
+                                      │          │          │
                           tournament_courts  registrations  stages
                                       │          │          │
                                       └── tournament_matches ┘
@@ -38,14 +40,15 @@ auth.users ──1:1── profiles ──N:M── sports (via profile_sports)
                                        circuit_standings
 ```
 
-**21 tables across 6 domains** (includes `notifications` and `reliability_reports` added in M3):
+**22 tables across 7 domains** (includes `notifications`, `reliability_reports`, and `community_posts` added after MVP core):
 
 | Domain                 | Tables                                                                                                                                                             | Roadmap phase                      |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
 | Identity & catalog     | `sports`, `profiles`, `profile_sports`                                                                                                                             | MVP                                |
 | Core matchmaking       | `matches`, `match_participants`                                                                                                                                    | MVP                                |
 | Trust & penalties      | `ratings`, `reliability_reports`, `notifications`                                                                                                                  | Phase 2 (M3 — shipped)             |
-| Open listings          | `listings`, `listing_responses`                                                                                                                                    | Phase 3                            |
+| Community posts        | `community_posts`, `community_post_reports`                                                                                                                        | Phase 3 (M5 Community — shipped)   |
+| Open listings (dormant)| `listings`, `listing_responses`                                                                                                                                    | Deferred — response-inbox classifieds |
 | Tournaments & circuits | `circuits`, `tournaments`, `tournament_courts`, `tournament_registrations`, `tournament_stages`, `tournament_matches`, `tournament_standings`, `circuit_standings` | Phases 4–5                         |
 | Chat (dormant)         | `conversations`, `conversation_members`, `messages`                                                                                                                | Future — zero-migration activation |
 
@@ -100,9 +103,11 @@ Legacy `rating_context` penalty values (`late_withdrawal`, `host_removal`) remai
 
 **Deferred — rolling reliability window:** a future migration will limit commitments and penalties to a rolling window (e.g. 90 days) inside `recompute_profile_commitments()` / penalty counts, with optional periodic `pg_cron` recompute. Not shipped in M3 hardening (`20260625100000_reliability_qualified_commitments`).
 
-### Non-expiring listings by construction
+### Non-expiring listings by construction (deferred)
 
 `listings` deliberately has **no expiry column**. Status (`open / closed / archived`) is only mutable by the creator (RLS-enforced). `details jsonb` absorbs type-specific payloads (coaching package pricing, training schedule) without schema churn.
+
+**Current release:** the schema remains in place but **no client UI** ships for listings. The Community tab uses **`community_posts`** — moderated tournament/training publications with cover images, spatial discovery via `nearby_community_posts`, and WhatsApp contact on approved posts. Listings stay reserved for a future response-inbox classifieds flow (M5+ deferred).
 
 ### One tournament engine for official events AND on-the-fly play
 
@@ -196,12 +201,20 @@ Ordered strictly by **data dependency** so nothing is ever built on sand. Each m
 - Realtime subscriptions for match lifecycle and notifications are **already wired** (`useMatchRealtime`, `useNotificationsRealtime`). Remaining M4 work: map UI and any polling cleanup outside those paths.
 - **Exit criteria:** acceptance appears on the requester's device within ~1s, app backgrounded-then-resumed included.
 
-### M5 — Open Listings (≈ 1 week)
+### M5 — Community Posts (≈ 1 week) ✅ shipped
 
-- Create/browse listings (training partner, team search, coaching offer) with `nearby_listings`.
-- Respond flow + creator's response inbox (accept/decline → reveal contact via the same WhatsApp pattern or future chat).
-- Close/archive management screen.
-- **Exit criteria:** a coach publishes a package; a user responds; creator accepts.
+- Moderated tournament/training **publications** on the Community tab (`community_posts`, `community_post_reports`).
+- Create flow with cover image upload (`community-posts` Storage bucket), profile WhatsApp gate, and `pending_review → approved/rejected` moderation.
+- Spatial discovery via `nearby_community_posts`; global "All events" feed; author "My publications"; moderator queue with report counts.
+- Realtime on `community_posts` for discovery feed, detail status, moderation badge, and author list (`use-post-realtime.ts`).
+- In-app notifications: `community_post_submitted` (moderators), `community_post_approved` / `community_post_rejected` (authors).
+- **Exit criteria met:** author submits → moderator notified → approve → author sees live status; approved post reachable via WhatsApp CTA.
+
+### M5b — Open Listings (deferred)
+
+- Original plan: create/browse listings (training partner, team search, coaching offer) with `nearby_listings` and a response inbox.
+- **Deferred:** schema (`listings`, `listing_responses`) stays dormant; Community Posts cover the padel discovery need for tournaments/training. Revisit when classifieds/response-inbox UX is prioritized.
+- **Exit criteria (when built):** a coach publishes a package; a user responds; creator accepts.
 
 ### M6 — Official Tournaments (≈ 2–3 weeks)
 

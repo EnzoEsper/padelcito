@@ -6,23 +6,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View, Text } from '@/tw';
 import { useAppAlert } from '@/components/app-alert-dialog';
 import {
-  FLYER_REPORT_REASON_LABELS,
-  FLYER_STATUS_LABELS,
-  FLYER_TYPE_LABELS,
-  formatFlyerDistanceKm,
-  formatFlyerEventSchedule,
-  isFlyerContactVerified,
-} from '@/features/community/flyer-display';
-import { buildFlyerWhatsAppUrl } from '@/features/community/flyer-whatsapp';
+  POST_REPORT_REASON_LABELS,
+  POST_STATUS_LABELS,
+  POST_TYPE_LABELS,
+  formatPostDistanceKm,
+  formatPostEventSchedule,
+  isPostContactVerified,
+} from '@/features/community/post-display';
+import { buildPostWhatsAppUrl } from '@/features/community/post-whatsapp';
 import {
-  useArchiveFlyer,
-  useFlyerDetail,
-  useReportFlyer,
-} from '@/features/community/use-flyers';
-import { buildFlyerImageUrl } from '@/lib/flyer-storage';
+  useArchivePost,
+  usePostDetail,
+  useReportPost,
+} from '@/features/community/use-posts';
+import { usePostRealtime } from '@/features/community/use-post-realtime';
+import { buildPostImageUrl } from '@/lib/post-storage';
 import type { Database } from '@/types/database';
 
-type FlyerReportReason = Database['public']['Enums']['flyer_report_reason'];
+type CommunityPostReportReason = Database['public']['Enums']['community_post_report_reason'];
 
 const SCREEN_PADDING = 20;
 const HEADER_BUTTON_SIZE = 44;
@@ -39,7 +40,7 @@ const C = {
   warning: '#E0B15B',
 } as const;
 
-const REPORT_REASONS: FlyerReportReason[] = [
+const REPORT_REASONS: CommunityPostReportReason[] = [
   'spam',
   'inappropriate',
   'scam',
@@ -47,42 +48,45 @@ const REPORT_REASONS: FlyerReportReason[] = [
   'other',
 ];
 
-export default function FlyerDetailScreen() {
+export default function PostDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const appAlert = useAppAlert();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
-  const flyerId = useMemo(() => {
+  const postId = useMemo(() => {
     const raw = params.id;
     if (Array.isArray(raw)) return raw[0] ?? null;
     return raw ?? null;
   }, [params.id]);
 
-  const detailQuery = useFlyerDetail(flyerId);
-  const reportFlyer = useReportFlyer();
-  const archiveFlyer = useArchiveFlyer();
-  const flyer = detailQuery.data;
+  const detailQuery = usePostDetail(postId);
+  usePostRealtime(postId);
+  const reportPost = useReportPost();
+  const archivePost = useArchivePost();
+  const post = detailQuery.data;
+  const isLoadingPost =
+    detailQuery.isPending || (detailQuery.isFetching && post === undefined);
 
-  const imageUrl = flyer !== undefined ? buildFlyerImageUrl(flyer.image_path) : null;
+  const imageUrl = post !== undefined ? buildPostImageUrl(post.image_path) : null;
   const headerTop = insets.top + 16;
 
   async function openWhatsApp(): Promise<void> {
-    if (flyer === undefined || flyer.status !== 'approved') return;
-    const url = buildFlyerWhatsAppUrl(flyer.contact_phone, flyer);
+    if (post === undefined || post.status !== 'approved') return;
+    const url = buildPostWhatsAppUrl(post.contact_phone, post);
     await Linking.openURL(url);
   }
 
   function handleReport(): void {
-    if (flyer === undefined || flyer.isAuthor) return;
+    if (post === undefined || post.isAuthor) return;
 
-    appAlert('Report flyer', 'Why are you reporting this flyer?', [
+    appAlert('Report post', 'Why are you reporting this post?', [
       ...REPORT_REASONS.map((reason) => ({
-        text: FLYER_REPORT_REASON_LABELS[reason],
+        text: POST_REPORT_REASON_LABELS[reason],
         onPress: () => {
-          void reportFlyer
-            .mutateAsync({ flyerId: flyer.id, reason })
+          void reportPost
+            .mutateAsync({ postId: post.id, reason })
             .then(() => {
-              appAlert('Report submitted', 'Thanks — moderators will review this flyer.');
+              appAlert('Report submitted', 'Thanks — moderators will review this post.');
             })
             .catch((error: unknown) => {
               const message = error instanceof Error ? error.message : 'Could not submit report.';
@@ -95,18 +99,18 @@ export default function FlyerDetailScreen() {
   }
 
   function handleArchive(): void {
-    if (flyer === undefined) return;
-    appAlert('Archive flyer', 'This removes the flyer from the public feed.', [
+    if (post === undefined) return;
+    appAlert('Archive post', 'This removes the post from the public feed.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Archive',
         style: 'destructive',
         onPress: () => {
-          void archiveFlyer
-            .mutateAsync(flyer.id)
+          void archivePost
+            .mutateAsync(post.id)
             .then(() => router.back())
             .catch((error: unknown) => {
-              const message = error instanceof Error ? error.message : 'Could not archive flyer.';
+              const message = error instanceof Error ? error.message : 'Could not archive post.';
               appAlert('Archive failed', message);
             });
         },
@@ -126,16 +130,16 @@ export default function FlyerDetailScreen() {
         <Ionicons name="chevron-back" size={22} color={C.mist} />
       </Pressable>
 
-      {detailQuery.isLoading ? (
+      {isLoadingPost ? (
         <View style={styles.centerState}>
           <ActivityIndicator color={C.mist} />
         </View>
-      ) : detailQuery.isError || flyer === undefined ? (
+      ) : detailQuery.isError || post === undefined ? (
         <View style={styles.centerState}>
           <Text style={styles.errorText}>
             {detailQuery.error instanceof Error
               ? detailQuery.error.message
-              : 'Could not load flyer.'}
+              : 'Could not load post.'}
           </Text>
         </View>
       ) : (
@@ -154,19 +158,19 @@ export default function FlyerDetailScreen() {
         >
           <View style={styles.headerMetaRow}>
             <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38">
-              {FLYER_TYPE_LABELS[flyer.type].toUpperCase()}
+              {POST_TYPE_LABELS[post.type].toUpperCase()}
             </Text>
           </View>
 
           <Text className="font-grotesk font-extrabold text-[30px] text-neutral px-5" style={{ letterSpacing: -0.8 }}>
-            {flyer.title}
+            {post.title}
           </Text>
 
-          {flyer.status !== 'approved' ? (
+          {post.status !== 'approved' ? (
             <View style={styles.statusBanner}>
-              <Text style={styles.statusBannerTitle}>{FLYER_STATUS_LABELS[flyer.status]}</Text>
-              {flyer.rejection_reason !== null ? (
-                <Text style={styles.statusBannerText}>{flyer.rejection_reason}</Text>
+              <Text style={styles.statusBannerTitle}>{POST_STATUS_LABELS[post.status]}</Text>
+              {post.rejection_reason !== null ? (
+                <Text style={styles.statusBannerText}>{post.rejection_reason}</Text>
               ) : null}
             </View>
           ) : null}
@@ -178,34 +182,34 @@ export default function FlyerDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>When</Text>
             <Text style={styles.sectionValue}>
-              {formatFlyerEventSchedule(flyer.event_start, flyer.event_end)}
+              {formatPostEventSchedule(post.event_start, post.event_end)}
             </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Where</Text>
             <Text style={styles.sectionValue}>
-              {flyer.venue_name ?? flyer.formatted_address ?? 'See flyer image'}
+              {post.venue_name ?? post.formatted_address ?? 'See post image'}
             </Text>
-            {flyer.formatted_address !== null && flyer.venue_name !== null ? (
-              <Text style={styles.sectionHint}>{flyer.formatted_address}</Text>
+            {post.formatted_address !== null && post.venue_name !== null ? (
+              <Text style={styles.sectionHint}>{post.formatted_address}</Text>
             ) : null}
-            {flyer.distanceM !== undefined ? (
-              <Text style={styles.sectionHint}>{formatFlyerDistanceKm(flyer.distanceM)} away</Text>
+            {post.distanceM !== undefined ? (
+              <Text style={styles.sectionHint}>{formatPostDistanceKm(post.distanceM)} away</Text>
             ) : null}
           </View>
 
-          {flyer.description !== null && flyer.description.length > 0 ? (
+          {post.description !== null && post.description.length > 0 ? (
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Details</Text>
-              <Text style={styles.sectionBody}>{flyer.description}</Text>
+              <Text style={styles.sectionBody}>{post.description}</Text>
             </View>
           ) : null}
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Organizer</Text>
-            <Text style={styles.sectionValue}>{flyer.author?.display_name ?? 'Player'}</Text>
-            {isFlyerContactVerified(flyer.contact_verified_at) ? (
+            <Text style={styles.sectionValue}>{post.author?.display_name ?? 'Player'}</Text>
+            {isPostContactVerified(post.contact_verified_at) ? (
               <View style={styles.verifiedRow}>
                 <Ionicons name="shield-checkmark" size={14} color={C.success} />
                 <Text style={styles.verifiedText}>Verified contact</Text>
@@ -215,24 +219,24 @@ export default function FlyerDetailScreen() {
         </ScrollView>
       )}
 
-      {flyer !== undefined ? (
+      {post !== undefined ? (
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          {flyer.status === 'approved' && !flyer.isAuthor ? (
+          {post.status === 'approved' && !post.isAuthor ? (
             <Pressable onPress={handleReport} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Report flyer</Text>
+              <Text style={styles.secondaryButtonText}>Report post</Text>
             </Pressable>
           ) : null}
 
-          {flyer.status === 'approved' ? (
+          {post.status === 'approved' ? (
             <Pressable onPress={() => void openWhatsApp()} style={styles.primaryButton}>
               <Ionicons name="logo-whatsapp" size={18} color={C.mist} />
               <Text style={styles.primaryButtonText}>Contact on WhatsApp</Text>
             </Pressable>
           ) : null}
 
-          {flyer.isAuthor && flyer.status === 'approved' ? (
+          {post.isAuthor && post.status === 'approved' ? (
             <Pressable onPress={handleArchive} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Archive flyer</Text>
+              <Text style={styles.secondaryButtonText}>Archive post</Text>
             </Pressable>
           ) : null}
         </View>

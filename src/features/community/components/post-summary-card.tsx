@@ -2,13 +2,15 @@ import { Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View, Text } from '@/tw';
 import {
-  FLYER_TYPE_LABELS,
-  formatFlyerDistanceKm,
-  formatFlyerEventSchedule,
-  isFlyerContactVerified,
-} from '@/features/community/flyer-display';
-import { buildFlyerImageUrl } from '@/lib/flyer-storage';
-import type { FlyerSummary } from '@/features/community/use-flyers';
+  POST_STATUS_COLORS,
+  POST_STATUS_LABELS,
+  POST_TYPE_LABELS,
+  formatPostDistanceKm,
+  formatPostEventSchedule,
+  isPostContactVerified,
+} from '@/features/community/post-display';
+import { buildPostImageUrl } from '@/lib/post-storage';
+import type { PostSummary } from '@/features/community/use-posts';
 
 const C = {
   surface1: '#141417',
@@ -22,16 +24,18 @@ const C = {
   success: '#5BE0A6',
 } as const;
 
-type FlyerSummaryCardProps = {
-  flyer: FlyerSummary;
+type PostSummaryCardProps = {
+  post: PostSummary;
   onPress: () => void;
+  showStatus?: boolean;
 };
 
-export function FlyerSummaryCard({ flyer, onPress }: FlyerSummaryCardProps) {
-  const imageUrl = buildFlyerImageUrl(flyer.image_path);
-  const distanceLabel = formatFlyerDistanceKm(flyer.distanceM);
-  const scheduleLabel = formatFlyerEventSchedule(flyer.event_start, flyer.event_end);
-  const verified = isFlyerContactVerified(flyer.contact_verified_at);
+export function PostSummaryCard({ post, onPress, showStatus = false }: PostSummaryCardProps) {
+  const imageUrl = buildPostImageUrl(post.image_path);
+  const distanceLabel = formatPostDistanceKm(post.distanceM);
+  const scheduleLabel = formatPostEventSchedule(post.event_start, post.event_end);
+  const verified = isPostContactVerified(post.contact_verified_at);
+  const statusColors = POST_STATUS_COLORS[post.status];
 
   return (
     <Pressable onPress={onPress} style={styles.card}>
@@ -45,8 +49,17 @@ export function FlyerSummaryCard({ flyer, onPress }: FlyerSummaryCardProps) {
 
       <View style={styles.body}>
         <View style={styles.metaRow}>
-          <View style={styles.typeChip}>
-            <Text style={styles.typeChipText}>{FLYER_TYPE_LABELS[flyer.type]}</Text>
+          <View style={styles.metaLeft}>
+            <View style={styles.typeChip}>
+              <Text style={styles.typeChipText}>{POST_TYPE_LABELS[post.type]}</Text>
+            </View>
+            {showStatus ? (
+              <View style={[styles.statusChip, { backgroundColor: statusColors.bg }]}>
+                <Text style={[styles.statusChipText, { color: statusColors.fg }]}>
+                  {POST_STATUS_LABELS[post.status]}
+                </Text>
+              </View>
+            ) : null}
           </View>
           {distanceLabel !== null ? (
             <Text style={styles.distanceText}>{distanceLabel}</Text>
@@ -54,7 +67,7 @@ export function FlyerSummaryCard({ flyer, onPress }: FlyerSummaryCardProps) {
         </View>
 
         <Text style={styles.title} numberOfLines={2}>
-          {flyer.title}
+          {post.title}
         </Text>
 
         <Text style={styles.schedule} numberOfLines={1}>
@@ -62,12 +75,12 @@ export function FlyerSummaryCard({ flyer, onPress }: FlyerSummaryCardProps) {
         </Text>
 
         <Text style={styles.venue} numberOfLines={1}>
-          {flyer.venue_name ?? flyer.formatted_address ?? 'Location on flyer'}
+          {post.venue_name ?? post.formatted_address ?? 'Location on post'}
         </Text>
 
         <View style={styles.footerRow}>
           <Text style={styles.author} numberOfLines={1}>
-            {flyer.author?.display_name ?? 'Organizer'}
+            {post.author?.display_name ?? 'Organizer'}
           </Text>
           {verified ? (
             <View style={styles.verifiedChip}>
@@ -113,6 +126,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
+  metaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
+  },
   typeChip: {
     backgroundColor: 'rgba(94,112,184,0.18)',
     borderRadius: 999,
@@ -124,6 +143,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Space Mono',
     fontSize: 10,
     letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  statusChip: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  statusChipText: {
+    fontFamily: 'Space Mono',
+    fontSize: 9,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   distanceText: {

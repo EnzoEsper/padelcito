@@ -35,10 +35,10 @@
 ## 4. Supabase Client Patterns
 
 - Single client instance in `src/lib/supabase.ts`, typed with `Database` from generated types; session storage via `expo-secure-store` adapter. Only the **anon key** in the app — `service_role` never ships to a client.
-- **Spatial queries:** always through RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`). Never download rows and filter distance client-side. Pass `p_sport_id` from `fetchPadelSport()` for padel-scoped discovery.
+- **Spatial queries:** always through RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`, `nearby_community_posts`). Never download rows and filter distance client-side. Pass `p_sport_id` from `fetchPadelSport()` for padel-scoped discovery.
 - **Bracket operations:** always through RPCs (`generate_single_elimination_bracket`, `generate_round_robin`). Never construct brackets client-side.
-- **Realtime:** subscribe only to the published tables (`matches`, `match_participants`, `notifications`, `tournament_matches`, `tournament_standings`, `messages`). Channel naming: `match:{id}`, `notifications:{userId}`, `tournament:{id}`, `conversation:{id}`. Always `removeChannel` on unmount. Do not poll a table that has Realtime.
-- **Storage:** avatars → `avatars/{user_id}/...` (public); payment receipts → `receipts/{registration_id}/...` (private). Respect these path conventions — bucket policies depend on them.
+- **Realtime:** subscribe only to the published tables (`matches`, `match_participants`, `notifications`, `community_posts`, `tournament_matches`, `tournament_standings`, `messages`). Channel naming: `match:{id}`, `notifications:{userId}`, `post:{id}`, `moderation:posts`, `community:posts`, `my-posts:{userId}`, `tournament:{id}`, `conversation:{id}`. Always `removeChannel` on unmount. Do not poll a table that has Realtime.
+- **Storage:** avatars → `avatars/{user_id}/...` (public); payment receipts → `receipts/{registration_id}/...` (private); community post covers → `community-posts/{author_id}/...` (public). Respect these path conventions — bucket policies depend on them.
 - **Errors:** every Supabase call checks `error` explicitly; surface RLS denials as user-facing permission messages, never swallow them.
 
 ## 5. Expo / React Native Conventions
@@ -48,7 +48,7 @@
 - Prefer official Expo modules over community ones: `expo-location` (geo), `expo-secure-store` (tokens), `expo-image` (avatars), `expo-image-picker` (uploads), `expo-notifications` (push), `Linking.openURL` for `https://wa.me/<digits>` deep links.
 - State: TanStack Query for server state (query keys mirror table names: `['matches', id]`); avoid global stores for server data. Realtime events invalidate/patch the query cache.
 - Components: function components + hooks only; co-locate screen-specific components; shared UI in `src/components/`.
-- Folder layout: `app/` (routes), `src/lib/` (supabase, utils), `src/features/<domain>/` (hooks + components per domain: matches, ratings, listings, tournaments), `src/types/` (generated DB types).
+- Folder layout: `app/` (routes), `src/lib/` (supabase, utils), `src/features/<domain>/` (hooks + components per domain: matches, ratings, community, listings, tournaments), `src/types/` (generated DB types).
 
 ## 6. Linting & Code Quality (STRICT)
 
@@ -135,7 +135,7 @@ Empty host cancels, solo auto-`finished`, and early withdraw/remove do **not** i
 ### In-app notifications
 
 - Table: `notifications` (Realtime-enabled). Rows inserted only by `emit_notification()` (SECURITY DEFINER) from lifecycle triggers.
-- Types: `join_request`, `join_accepted`, `join_rejected`, `join_request_cancelled`, `participant_withdrawn`, `participant_removed`, `match_cancelled`, `rating_request`.
+- Types: `join_request`, `join_accepted`, `join_rejected`, `join_request_cancelled`, `participant_withdrawn`, `participant_removed`, `match_cancelled`, `rating_request`, `community_post_submitted`, `community_post_approved`, `community_post_rejected`.
 - Client: `src/features/notifications/` (`use-notifications.ts`, `notification-display.ts`), `NotificationBell`, `app/(app)/notifications.tsx`. Mount `useNotificationsRealtime()` once in `app/(app)/_layout.tsx`.
 - Penalty-eligible notifications deep-link to `app/(app)/report-penalty.tsx`; `rating_request` deep-links to `app/(app)/rate-match.tsx`.
 
@@ -154,7 +154,7 @@ Empty host cancels, solo auto-`finished`, and early withdraw/remove do **not** i
 
 ### M3 migrations
 
-`20260623140000_create_notifications`, `20260623150000_notification_triggers`, `20260623200000_match_cancellation_timestamp`, `20260623210000_reliability_reports`, `20260623220000_reliability_aggregates`, `20260624100000_post_match_ratings`, `20260624110000_schedule_match_finalizer`, `20260627230000_join_request_cancelled_notification`, `20260625100000_reliability_qualified_commitments`.
+`20260623140000_create_notifications`, `20260623150000_notification_triggers`, `20260623200000_match_cancellation_timestamp`, `20260623210000_reliability_reports`, `20260623220000_reliability_aggregates`, `20260624100000_post_match_ratings`, `20260624110000_schedule_match_finalizer`, `20260627230000_join_request_cancelled_notification`, `20260625100000_reliability_qualified_commitments`. Community post notification types added in `20260711040000_community_post_notifications` and `20260711060000_community_post_submitted_moderator_notifications`.
 
 ### Client mirrors (`src/features/matches/`)
 
@@ -166,7 +166,38 @@ Empty host cancels, solo auto-`finished`, and early withdraw/remove do **not** i
 - WhatsApp: accepted players get footer CTA to message **host** only; hosts get per-row WhatsApp on **accepted** roster entries only — never a group button. Links open with pre-filled match-context text via `match-whatsapp.ts`.
 - Match detail destructive actions (remove player, withdraw, cancel pending request) require confirmation alerts before mutating roster state.
 
-## 10. Canonical References
+## 10. Community Posts (M5 — shipped)
+
+### Domain model
+
+- **Table:** `community_posts` (not `listings`, not generic `posts`). Types: `community_post_type` (`tournament` | `training`); statuses: `pending_review` | `approved` | `rejected` | `archived`.
+- **Reports:** `community_post_reports` with `community_post_report_reason` enum.
+- **Discovery RPC:** `nearby_community_posts(p_lat, p_lng, p_radius_m, p_sport_id, p_type?)` — always pass padel `p_sport_id` from `fetchPadelSport()`.
+- **Listings schema is dormant:** `listings` / `listing_responses` remain for a future response-inbox classifieds flow; do not wire Community UI to listings.
+
+### Contact & moderation
+
+- Approved posts expose the author's profile WhatsApp via a public `contact_phone` column on the post row (set at publish time from profile). Client builds `wa.me` links in `src/features/community/post-whatsapp.ts` — same pattern as matches but **no RPC gate** (public approved content).
+- Every new post starts `pending_review`. Moderators (`profiles.role` = `moderator` | `admin`) approve/reject via RLS-scoped UPDATE; authors can archive approved posts.
+- **`profiles.role`** and **`profiles.banned_at`** gate publish; helper RPCs `is_moderator()`, `is_admin()`, `is_banned()` are SECURITY DEFINER — granted to `authenticated`.
+
+### Notifications
+
+Types: `community_post_submitted` (moderators), `community_post_approved`, `community_post_rejected` (author). FK: `notifications.community_post_id`. JSON payload key for title: `post_title`.
+
+### Realtime & client module
+
+- Table published to Realtime in migration `20260711070000_community_posts_realtime.sql`.
+- Client: `src/features/community/` — ergonomic **post** naming (`usePostDetail`, `postKeys`, `PostSummaryCard`) while DB calls use `community_posts`.
+- Routes: `app/(app)/community.tsx`, `create-post`, `post-detail`, `my-posts`, `moderation`.
+- Hooks: `use-posts.ts`, `use-post-realtime.ts`; mount `useModerationPostsRealtime` in `app/(app)/_layout.tsx` for moderator badge.
+- Storage: `src/lib/post-storage.ts` → bucket **`community-posts`** (hyphenated).
+
+### M5 migrations
+
+`20260711000000_add_user_role`, `20260711010000_create_community_posts`, `20260711020000_create_community_post_reports`, `20260711030000_create_community_posts_bucket`, `20260711040000_community_post_notifications`, `20260711050000_grant_role_helper_functions`, `20260711060000_community_post_submitted_moderator_notifications`, `20260711070000_community_posts_realtime`.
+
+## 11. Canonical References
 
 - Schema source of truth: the full `supabase/migrations/` chain (starting with `20260608050054_0001_initial_schema.sql` and all subsequent migrations).
 - Architecture rationale & roadmap: `ARCHITECTURE.md` (repo root).
