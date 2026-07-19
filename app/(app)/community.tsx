@@ -5,13 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ScrollView, View, Text, Pressable } from '@/tw';
 import { NotificationBell } from '@/components/notification-bell';
-import { SegmentedControl } from '@/features/matches/create-match/components/segmented-control';
 import { PostSummaryCard } from '@/features/community/components/post-summary-card';
 import {
   buildCreatePostRoute,
   buildPostDetailRoute,
   buildModerationRoute,
-  POST_DISCOVERY_RADIUS_M,
 } from '@/features/community/post-display';
 import {
   useAllPosts,
@@ -32,16 +30,31 @@ type TypeFilter = CommunityPostType | 'all';
 
 const C = {
   background: '#0B0B0B',
+  surface1: '#141417',
+  blue: '#2B396D',
+  blueHi: '#7488D8',
   mist: '#E4E4E4',
+  label: 'rgba(228,228,228,0.72)',
   dim: 'rgba(228,228,228,0.60)',
   faint: 'rgba(228,228,228,0.38)',
   hair: 'rgba(228,228,228,0.10)',
+  warning: '#E0B15B',
 } as const;
 
 function headerLocationLabel(status: LocationAccessStatus, placeLabel: string | null): string {
   if (status === 'ready' && placeLabel !== null) return placeLabel;
   if (status === 'locating' || status === 'idle') return 'Locating…';
   return 'Location unavailable';
+}
+
+function feedSubtitle(feedMode: FeedMode): string {
+  if (feedMode === 'nearby') return 'Events near you';
+  return 'All upcoming events';
+}
+
+function sectionTitle(feedMode: FeedMode, count: number): string {
+  if (feedMode === 'nearby') return `${count} Events Nearby`;
+  return `${count} Upcoming Events`;
 }
 
 function LocationGate({
@@ -60,7 +73,7 @@ function LocationGate({
       <View style={styles.centerState}>
         <ActivityIndicator color={C.mist} />
         <Text style={styles.gateTitle}>Finding your location…</Text>
-        <Text style={styles.gateText}>Nearby events use a fixed 50 km radius.</Text>
+        <Text style={styles.gateText}>We need your location to show nearby events.</Text>
       </View>
     );
   }
@@ -80,13 +93,61 @@ function LocationGate({
   );
 }
 
+function FilterChips<T extends string>({
+  options,
+  value,
+  onChange,
+  marginBottom = 7,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  marginBottom?: number;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={{ marginBottom }}
+      contentContainerStyle={styles.chipRow}
+    >
+      <View style={styles.filterIconChip}>
+        <Ionicons name="options-outline" size={17} color={C.dim} />
+      </View>
+      {options.map((option) => {
+        const active = value === option.value;
+        return (
+          <Pressable
+            key={option.value}
+            onPress={() => onChange(option.value)}
+            style={[styles.chip, active && styles.chipActive]}
+          >
+            <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [feedMode, setFeedMode] = useState<FeedMode>('nearby');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
 
-  const location = useDiscoverLocation();
+  const {
+    status: locationStatus,
+    coords,
+    placeLabel,
+    errorMessage,
+    saveWarning,
+    retry: retryLocation,
+    openSettings,
+  } = useDiscoverLocation();
+  const locationReady = locationStatus === 'ready' && coords !== null;
+  const locationLabel = headerLocationLabel(locationStatus, placeLabel);
+
   const contactGate = useProfileContactGate();
   useCommunityPostsRealtime();
   const isModerator = contactGate.data?.isModerator === true;
@@ -98,127 +159,143 @@ export default function CommunityScreen() {
   );
 
   const nearbyQuery = useNearbyPosts(
-    feedMode === 'nearby' ? location.coords : null,
+    feedMode === 'nearby' && locationReady ? coords : null,
     typeFilter,
   );
   const allQuery = useAllPosts(typeFilter);
 
   const activeQuery = feedMode === 'nearby' ? nearbyQuery : allQuery;
   const posts = activeQuery.data ?? [];
+  const showLocationGate = feedMode === 'nearby' && !locationReady;
 
-  const subtitle = useMemo(() => {
-    if (feedMode === 'nearby') {
-      return `Within ${POST_DISCOVERY_RADIUS_M / 1000} km · ${headerLocationLabel(location.status, location.placeLabel)}`;
+  function handleRefresh() {
+    if (feedMode === 'nearby' && !locationReady) {
+      void retryLocation();
+      return;
     }
-    return 'All upcoming events';
-  }, [feedMode, location.placeLabel, location.status]);
+    void activeQuery.refetch();
+  }
+
+  const isRefreshing =
+    feedMode === 'nearby' && !locationReady
+      ? locationStatus === 'locating'
+      : activeQuery.isRefetching;
 
   return (
     <View className="flex-1 bg-background">
       <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 96 }]}
         refreshControl={
-          <RefreshControl
-            refreshing={activeQuery.isRefetching}
-            onRefresh={() => void activeQuery.refetch()}
-            tintColor={C.mist}
-          />
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={C.mist} />
         }
       >
-        <View style={{ paddingTop: insets.top + 16 }} className="px-5 pb-5">
-          <View className="flex-row justify-between items-start mb-5">
-            <View className="flex-1 pr-3">
-              <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-1">
-                COMMUNITY
-              </Text>
-              <Text
-                className="font-grotesk font-extrabold text-[30px] text-neutral"
-                style={{ letterSpacing: -0.8 }}
-              >
-                Events
-              </Text>
-              <Text className="font-grotesk text-sm text-neutral/55 mt-2">{subtitle}</Text>
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+          <View className="flex-1 pr-3">
+            <View style={styles.locationRow}>
+              <Ionicons name="location-outline" size={13} color={C.blueHi} />
+              <Text style={styles.locationText}>{locationLabel}</Text>
             </View>
+            <Text style={styles.title}>Community</Text>
+            <Text style={styles.subtitle}>{feedSubtitle(feedMode)}</Text>
+          </View>
+          <View style={styles.headerActions}>
             <NotificationBell />
           </View>
-
-          <View className="gap-3 mb-5">
-            <SegmentedControl
-              options={[
-                { value: 'nearby' as const, label: 'Nearby' },
-                { value: 'all' as const, label: 'All events' },
-              ]}
-              value={feedMode}
-              onChange={setFeedMode}
-            />
-            <SegmentedControl
-              options={[
-                { value: 'all' as const, label: 'All' },
-                { value: 'tournament' as const, label: 'Tournaments' },
-                { value: 'training' as const, label: 'Training' },
-              ]}
-              value={typeFilter}
-              onChange={setTypeFilter}
-            />
-          </View>
-
-          {isModerator ? (
-            <Pressable
-              onPress={() => router.push(buildModerationRoute())}
-              className="mb-4 h-12 rounded-xl bg-surface-1 border border-neutral/10 px-4 flex-row items-center justify-between"
-            >
-              <Text className="font-grotesk text-sm font-semibold text-neutral">Moderation queue</Text>
-              <View className="flex-row items-center gap-2">
-                {pendingReviewCount > 0 ? (
-                  <View className="min-w-[22px] h-[22px] rounded-full bg-warning items-center justify-center px-1.5">
-                    <Text className="font-mono-bold text-[10px] text-background">
-                      {pendingReviewCount > 99 ? '99+' : String(pendingReviewCount)}
-                    </Text>
-                  </View>
-                ) : null}
-                <Ionicons name="shield-outline" size={18} color={C.dim} />
-              </View>
-            </Pressable>
-          ) : null}
         </View>
 
-        {feedMode === 'nearby' && location.status !== 'ready' ? (
+        {saveWarning !== null ? (
+          <View style={styles.saveWarningCard}>
+            <Text style={styles.saveWarningText}>{saveWarning}</Text>
+          </View>
+        ) : null}
+
+        <FilterChips
+          options={[
+            { value: 'nearby' as const, label: 'Nearby' },
+            { value: 'all' as const, label: 'All events' },
+          ]}
+          value={feedMode}
+          onChange={setFeedMode}
+          marginBottom={8}
+        />
+        <FilterChips
+          options={[
+            { value: 'all' as const, label: 'All types' },
+            { value: 'tournament' as const, label: 'Tournaments' },
+            { value: 'training' as const, label: 'Training' },
+          ]}
+          value={typeFilter}
+          onChange={setTypeFilter}
+        />
+
+        {isModerator ? (
+          <Pressable
+            onPress={() => router.push(buildModerationRoute())}
+            style={styles.moderationCard}
+          >
+            <Text style={styles.moderationLabel}>Moderation queue</Text>
+            <View style={styles.moderationRight}>
+              {pendingReviewCount > 0 ? (
+                <View style={styles.moderationBadge}>
+                  <Text style={styles.moderationBadgeText}>
+                    {pendingReviewCount > 99 ? '99+' : String(pendingReviewCount)}
+                  </Text>
+                </View>
+              ) : null}
+              <Ionicons name="shield-outline" size={18} color={C.dim} />
+            </View>
+          </Pressable>
+        ) : null}
+
+        {showLocationGate ? (
           <LocationGate
-            status={location.status}
-            message={location.errorMessage}
-            onRetry={() => void location.retry()}
-            onOpenSettings={() => void location.openSettings()}
+            status={locationStatus}
+            message={errorMessage}
+            onRetry={() => void retryLocation()}
+            onOpenSettings={() => void openSettings()}
           />
-        ) : activeQuery.isLoading ? (
-          <View style={styles.centerState}>
-            <ActivityIndicator color={C.mist} />
-          </View>
-        ) : activeQuery.isError ? (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>
-              {activeQuery.error instanceof Error
-                ? activeQuery.error.message
-                : 'Could not load community posts.'}
-            </Text>
-          </View>
-        ) : posts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="megaphone-outline" size={28} color={C.faint} />
-            <Text style={styles.emptyTitle}>No events yet</Text>
-            <Text style={styles.emptyText}>
-              {feedMode === 'nearby'
-                ? 'No approved posts nearby. Try All events or publish the first one.'
-                : 'No approved posts yet. Be the first to publish a tournament or training session.'}
-            </Text>
-          </View>
         ) : (
-          posts.map((post) => (
-            <PostSummaryCard
-              key={post.id}
-              post={post}
-              onPress={() => router.push(buildPostDetailRoute(post.id))}
-            />
-          ))
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{sectionTitle(feedMode, posts.length)}</Text>
+              {activeQuery.isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
+            </View>
+
+            {activeQuery.isLoading ? (
+              <View style={styles.centerState}>
+                <ActivityIndicator color={C.mist} />
+              </View>
+            ) : activeQuery.isError ? (
+              <View style={styles.errorCard}>
+                <Text style={styles.errorText}>
+                  {activeQuery.error instanceof Error
+                    ? activeQuery.error.message
+                    : 'Could not load community posts.'}
+                </Text>
+                <Pressable onPress={() => void activeQuery.refetch()}>
+                  <Text style={styles.errorAction}>Try again</Text>
+                </Pressable>
+              </View>
+            ) : posts.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Ionicons name="megaphone-outline" size={26} color={C.faint} />
+                <Text style={styles.emptyTitle}>No events yet</Text>
+                <Text style={styles.emptyText}>
+                  {feedMode === 'nearby'
+                    ? 'No approved posts nearby. Try All events or publish the first one.'
+                    : 'No approved posts yet. Be the first to publish a tournament or training session.'}
+                </Text>
+              </View>
+            ) : (
+              posts.map((post) => (
+                <PostSummaryCard
+                  key={post.id}
+                  post={post}
+                  onPress={() => router.push(buildPostDetailRoute(post.id))}
+                />
+              ))
+            )}
+          </>
         )}
       </ScrollView>
 
@@ -236,63 +313,216 @@ export default function CommunityScreen() {
 }
 
 const styles = StyleSheet.create({
-  centerState: {
+  content: {
+    backgroundColor: C.background,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 4,
+  },
+  locationText: {
+    fontFamily: 'Space Mono',
+    fontSize: 10.5,
+    letterSpacing: 1.5,
+    color: C.dim,
+    textTransform: 'uppercase',
+  },
+  title: {
+    fontFamily: 'HankenGrotesk-ExtraBold',
+    fontSize: 30,
+    color: C.mist,
+    letterSpacing: -0.8,
+    lineHeight: 36,
+  },
+  subtitle: {
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 14,
+    lineHeight: 20,
+    color: C.dim,
+    marginTop: 6,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  chipRow: {
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  filterIconChip: {
+    width: 43,
+    height: 39,
+    borderRadius: 11,
+    backgroundColor: C.surface1,
+    borderWidth: 1,
+    borderColor: C.hair,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 48,
+  },
+  chip: {
+    height: 39,
+    borderRadius: 11,
+    backgroundColor: C.surface1,
+    borderWidth: 1,
+    borderColor: C.hair,
+    paddingHorizontal: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipActive: {
+    backgroundColor: C.blue,
+    borderColor: C.blue,
+  },
+  chipText: {
+    fontFamily: 'HankenGrotesk-Bold',
+    fontSize: 14,
+    color: C.dim,
+  },
+  chipTextActive: {
+    color: C.mist,
+  },
+  moderationCard: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: C.surface1,
+    borderWidth: 1,
+    borderColor: C.hair,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  moderationLabel: {
+    fontFamily: 'HankenGrotesk-Bold',
+    fontSize: 14,
+    color: C.mist,
+  },
+  moderationRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  moderationBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: C.warning,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  moderationBadgeText: {
+    fontFamily: 'SpaceMono-Bold',
+    fontSize: 10,
+    color: C.background,
+  },
+  sectionHeader: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sectionTitle: {
+    fontFamily: 'SpaceMono-Bold',
+    fontSize: 11.5,
+    letterSpacing: 2,
+    color: C.label,
+    textTransform: 'uppercase',
+  },
+  centerState: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
     gap: 10,
   },
   gateTitle: {
-    color: C.mist,
-    fontFamily: 'Hanken Grotesk',
-    fontSize: 16,
-    fontWeight: '700',
+    fontFamily: 'HankenGrotesk-Bold',
+    fontSize: 15,
+    color: C.dim,
+    marginTop: 8,
   },
   gateText: {
-    color: C.dim,
     fontFamily: 'Hanken Grotesk',
-    fontSize: 14,
+    fontSize: 13,
+    lineHeight: 19,
+    color: C.faint,
     textAlign: 'center',
+  },
+  saveWarningCard: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    backgroundColor: 'rgba(224,177,91,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(224,177,91,0.22)',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  saveWarningText: {
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 13,
+    lineHeight: 18,
+    color: C.warning,
   },
   errorCard: {
     marginHorizontal: 20,
-    padding: 16,
-    borderRadius: 16,
+    backgroundColor: 'rgba(224,177,91,0.10)',
     borderWidth: 1,
-    borderColor: C.hair,
-    backgroundColor: '#141417',
-    gap: 10,
+    borderColor: 'rgba(224,177,91,0.30)',
+    borderRadius: 16,
+    padding: 16,
   },
   errorText: {
-    color: C.dim,
     fontFamily: 'Hanken Grotesk',
     fontSize: 14,
+    lineHeight: 20,
+    color: C.warning,
+    marginBottom: 12,
   },
   errorAction: {
-    color: C.mist,
-    fontFamily: 'Hanken Grotesk',
-    fontSize: 14,
-    fontWeight: '700',
+    fontFamily: 'SpaceMono-Bold',
+    fontSize: 11,
+    letterSpacing: 1.3,
+    textTransform: 'uppercase',
+    color: C.warning,
   },
-  emptyState: {
+  emptyCard: {
+    marginHorizontal: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 38,
     alignItems: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 40,
-    gap: 8,
+    backgroundColor: C.surface1,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: C.hair,
+    borderRadius: 20,
   },
   emptyTitle: {
-    color: C.mist,
-    fontFamily: 'Hanken Grotesk',
-    fontSize: 18,
-    fontWeight: '800',
+    fontFamily: 'HankenGrotesk-Bold',
+    fontSize: 14.5,
+    color: C.dim,
+    marginTop: 12,
+    marginBottom: 4,
   },
   emptyText: {
-    color: C.faint,
-    fontFamily: 'Hanken Grotesk',
-    fontSize: 14,
+    fontFamily: 'SpaceMono-Bold',
+    fontSize: 11,
+    letterSpacing: 0.5,
+    color: C.dim,
+    textTransform: 'uppercase',
     textAlign: 'center',
-    lineHeight: 20,
   },
   fab: {
     position: 'absolute',
