@@ -7,6 +7,11 @@ import { ScrollView, View, Text, Pressable } from '@/tw';
 import { NotificationBell } from '@/components/notification-bell';
 import { PostSummaryCard } from '@/features/community/components/post-summary-card';
 import {
+  CommunityFilterBar,
+  type CommunityFeedMode,
+  type CommunityTypeFilter,
+} from '@/features/community/components/community-filter-bar';
+import {
   buildCreatePostRoute,
   buildPostDetailRoute,
   buildModerationRoute,
@@ -22,11 +27,9 @@ import {
   useDiscoverLocation,
   type LocationAccessStatus,
 } from '@/features/discover/use-discover-location';
-import type { Database } from '@/types/database';
 
-type CommunityPostType = Database['public']['Enums']['community_post_type'];
-type FeedMode = 'nearby' | 'all';
-type TypeFilter = CommunityPostType | 'all';
+type FeedMode = CommunityFeedMode;
+type TypeFilter = CommunityTypeFilter;
 
 const C = {
   background: '#0B0B0B',
@@ -93,42 +96,6 @@ function LocationGate({
   );
 }
 
-function FilterChips<T extends string>({
-  options,
-  value,
-  onChange,
-  marginBottom = 7,
-}: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (value: T) => void;
-  marginBottom?: number;
-}) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={{ marginBottom }}
-      contentContainerStyle={styles.chipRow}
-    >
-      <View style={styles.filterIconChip}>
-        <Ionicons name="options-outline" size={17} color={C.dim} />
-      </View>
-      {options.map((option) => {
-        const active = value === option.value;
-        return (
-          <Pressable
-            key={option.value}
-            onPress={() => onChange(option.value)}
-            style={[styles.chip, active && styles.chipActive]}
-          >
-            <Text style={[styles.chipText, active && styles.chipTextActive]}>{option.label}</Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
-  );
-}
 
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
@@ -209,23 +176,11 @@ export default function CommunityScreen() {
           </View>
         ) : null}
 
-        <FilterChips
-          options={[
-            { value: 'nearby' as const, label: 'Nearby' },
-            { value: 'all' as const, label: 'All events' },
-          ]}
-          value={feedMode}
-          onChange={setFeedMode}
-          marginBottom={8}
-        />
-        <FilterChips
-          options={[
-            { value: 'all' as const, label: 'All types' },
-            { value: 'tournament' as const, label: 'Tournaments' },
-            { value: 'training' as const, label: 'Training' },
-          ]}
-          value={typeFilter}
-          onChange={setTypeFilter}
+        <CommunityFilterBar
+          feedMode={feedMode}
+          typeFilter={typeFilter}
+          onFeedModeChange={setFeedMode}
+          onTypeFilterChange={setTypeFilter}
         />
 
         {isModerator ? (
@@ -353,42 +308,6 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     gap: 10,
-  },
-  chipRow: {
-    paddingHorizontal: 20,
-    gap: 8,
-  },
-  filterIconChip: {
-    width: 43,
-    height: 39,
-    borderRadius: 11,
-    backgroundColor: C.surface1,
-    borderWidth: 1,
-    borderColor: C.hair,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chip: {
-    height: 39,
-    borderRadius: 11,
-    backgroundColor: C.surface1,
-    borderWidth: 1,
-    borderColor: C.hair,
-    paddingHorizontal: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipActive: {
-    backgroundColor: C.blue,
-    borderColor: C.blue,
-  },
-  chipText: {
-    fontFamily: 'HankenGrotesk-Bold',
-    fontSize: 14,
-    color: C.dim,
-  },
-  chipTextActive: {
-    color: C.mist,
   },
   moderationCard: {
     marginHorizontal: 20,
