@@ -25,6 +25,8 @@ function createInitialFormState(): CreatePostFormState {
     imageUri: null,
     imageBase64: null,
     imageMimeType: null,
+    imageWidth: null,
+    imageHeight: null,
     venueName: '',
     coords: null,
     formattedAddress: null,
@@ -51,6 +53,8 @@ export type CreatePostFormState = {
   imageUri: string | null;
   imageBase64: string | null;
   imageMimeType: string | null;
+  imageWidth: number | null;
+  imageHeight: number | null;
   venueName: string;
   coords: Coords | null;
   formattedAddress: string | null;
@@ -70,6 +74,8 @@ export type CreatePostFormActions = {
   setImageUri: (value: string | null) => void;
   setImageBase64: (value: string | null) => void;
   setImageMimeType: (value: string | null) => void;
+  setImageWidth: (value: number | null) => void;
+  setImageHeight: (value: number | null) => void;
   setVenueName: (value: string) => void;
   setCoords: (value: Coords | null) => void;
   setFormattedAddress: (value: string | null) => void;
@@ -93,6 +99,8 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageMimeType, setImageMimeType] = useState<string | null>(null);
+  const [imageWidth, setImageWidth] = useState<number | null>(null);
+  const [imageHeight, setImageHeight] = useState<number | null>(null);
   const [venueName, setVenueName] = useState('');
   const [coords, setCoords] = useState<Coords | null>(null);
   const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
@@ -112,6 +120,8 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
     setImageUri(initial.imageUri);
     setImageBase64(initial.imageBase64);
     setImageMimeType(initial.imageMimeType);
+    setImageWidth(initial.imageWidth);
+    setImageHeight(initial.imageHeight);
     setVenueName(initial.venueName);
     setCoords(initial.coords);
     setFormattedAddress(initial.formattedAddress);
@@ -202,6 +212,8 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
     imageUri,
     imageBase64,
     imageMimeType,
+    imageWidth,
+    imageHeight,
     venueName,
     coords,
     formattedAddress,
@@ -218,6 +230,8 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
     setImageUri,
     setImageBase64,
     setImageMimeType,
+    setImageWidth,
+    setImageHeight,
     setVenueName,
     setCoords,
     setFormattedAddress,

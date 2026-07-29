@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Platform, View as RNView, StyleSheet, Image } from 'react-native';
+import { Platform, View as RNView, StyleSheet } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +19,14 @@ import {
 } from '@/features/community/use-posts';
 import { uploadPostImage } from '@/lib/post-storage';
 import type { useCreatePostForm } from '@/features/community/create-post/use-create-post-form';
+import { PostFlyerImage } from '@/features/community/components/post-flyer-image';
+import { PostFlyerPickEditor } from '@/features/community/components/post-flyer-pick-editor';
+import { PostImageViewer } from '@/features/community/components/post-image-viewer';
+import {
+  createPendingFromPickerAsset,
+  type EncodedFlyerAsset,
+  type PendingFlyerAsset,
+} from '@/features/community/create-post/post-flyer-asset';
 
 const PLACEHOLDER_COLOR = 'rgba(228,228,228,0.20)';
 
@@ -49,6 +57,9 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [pendingAsset, setPendingAsset] = useState<PendingFlyerAsset | null>(null);
 
   async function handlePickImage(): Promise<void> {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -58,18 +69,34 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 5],
-      quality: 0.85,
-      base64: true,
+      allowsEditing: false,
+      quality: 1,
+      base64: false,
     });
 
     if (!result.canceled && result.assets[0] !== undefined) {
-      const asset = result.assets[0];
-      form.setImageUri(asset.uri);
-      form.setImageBase64(asset.base64 ?? null);
-      form.setImageMimeType(asset.mimeType ?? 'image/jpeg');
+      const pending = createPendingFromPickerAsset(result.assets[0]);
+      if (pending === null) {
+        return;
+      }
+      setPendingAsset(pending);
+      setEditorOpen(true);
     }
+  }
+
+  function handleConfirmFlyer(encoded: EncodedFlyerAsset): void {
+    form.setImageUri(encoded.uri);
+    form.setImageBase64(encoded.base64);
+    form.setImageMimeType(encoded.mimeType);
+    form.setImageWidth(encoded.width);
+    form.setImageHeight(encoded.height);
+    setPendingAsset(null);
+    setEditorOpen(false);
+  }
+
+  function handleDiscardFlyer(): void {
+    setPendingAsset(null);
+    setEditorOpen(false);
   }
 
   function handleDateChange(event: DateTimePickerEvent, date?: Date): void {
@@ -113,20 +140,49 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
 
         <View>
           <SectionLabel>Flyer image</SectionLabel>
-          <Pressable
-            onPress={() => void handlePickImage()}
-            className="rounded-2xl bg-surface-1 border border-neutral/10 overflow-hidden"
-          >
-            {form.imageUri !== null ? (
-              <Image source={{ uri: form.imageUri }} style={styles.previewImage} resizeMode="cover" />
-            ) : (
+          {form.imageUri !== null ? (
+            <View className="gap-3">
+              <PostFlyerImage
+                uri={form.imageUri}
+                width={form.imageWidth}
+                height={form.imageHeight}
+                variant="preview"
+                onPress={() => setViewerOpen(true)}
+              />
+              <Pressable
+                onPress={() => void handlePickImage()}
+                accessibilityRole="button"
+                accessibilityLabel="Change image"
+              >
+                <Text className="font-grotesk text-sm font-semibold text-neutral/55">
+                  Change image
+                </Text>
+              </Pressable>
+              <PostImageViewer
+                visible={viewerOpen}
+                uri={form.imageUri}
+                onClose={() => setViewerOpen(false)}
+              />
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => void handlePickImage()}
+              className="rounded-2xl bg-surface-1 border border-neutral/10 overflow-hidden"
+            >
               <View style={styles.imagePlaceholder}>
                 <Ionicons name="image-outline" size={28} color="rgba(228,228,228,0.38)" />
                 <Text className="font-grotesk text-sm text-neutral/55 mt-2">Upload post image</Text>
               </View>
-            )}
-          </Pressable>
+            </Pressable>
+          )}
         </View>
+
+        <PostFlyerPickEditor
+          visible={editorOpen}
+          asset={pendingAsset}
+          onConfirm={handleConfirmFlyer}
+          onDiscard={handleDiscardFlyer}
+        />
 
         <View>
           <SectionLabel>Title</SectionLabel>
@@ -447,10 +503,6 @@ export function CreatePostPublishFooter({ form }: CreatePostPublishFooterProps) 
 }
 
 const styles = StyleSheet.create({
-  previewImage: {
-    width: '100%',
-    height: 220,
-  },
   imagePlaceholder: {
     height: 180,
     alignItems: 'center',

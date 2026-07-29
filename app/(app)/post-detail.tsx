@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { ActivityIndicator, Image, Linking, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Linking, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +21,8 @@ import {
 } from '@/features/community/use-posts';
 import { usePostRealtime } from '@/features/community/use-post-realtime';
 import { buildPostImageUrl } from '@/lib/post-storage';
+import { PostFlyerImage } from '@/features/community/components/post-flyer-image';
+import { PostImageViewer } from '@/features/community/components/post-image-viewer';
 import type { Database } from '@/types/database';
 
 type CommunityPostReportReason = Database['public']['Enums']['community_post_report_reason'];
@@ -66,6 +68,7 @@ export default function PostDetailScreen() {
   const post = detailQuery.data;
   const isLoadingPost =
     detailQuery.isPending || (detailQuery.isFetching && post === undefined);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   const imageUrl = post !== undefined ? buildPostImageUrl(post.image_path) : null;
   const headerTop = insets.top + 16;
@@ -176,7 +179,13 @@ export default function PostDetailScreen() {
           ) : null}
 
           {imageUrl !== null ? (
-            <Image source={{ uri: imageUrl }} style={styles.heroImage} resizeMode="cover" />
+            <View style={styles.heroImageWrap}>
+              <PostFlyerImage
+                uri={imageUrl}
+                variant="hero"
+                onPress={() => setViewerOpen(true)}
+              />
+            </View>
           ) : null}
 
           <View style={styles.section}>
@@ -241,6 +250,14 @@ export default function PostDetailScreen() {
           ) : null}
         </View>
       ) : null}
+
+      {imageUrl !== null ? (
+        <PostImageViewer
+          visible={viewerOpen}
+          uri={imageUrl}
+          onClose={() => setViewerOpen(false)}
+        />
+      ) : null}
     </View>
   );
 }
@@ -298,11 +315,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  heroImage: {
-    width: '100%',
-    height: 280,
+  heroImageWrap: {
     marginTop: 16,
-    backgroundColor: C.surface1,
+    paddingHorizontal: 20,
   },
   section: {
     paddingHorizontal: 20,
