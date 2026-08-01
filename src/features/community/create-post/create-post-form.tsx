@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { AppBottomSheet } from '@/components/app-bottom-sheet';
 import { useAppAlert } from '@/components/app-alert-dialog';
 import { Pressable, View, Text, TextInput } from '@/tw';
-import { LocationField } from '@/features/matches/create-match/components/location-field';
+import { LocationField } from '@/features/location/location-field';
 import { SectionLabel } from '@/features/matches/create-match/components/section-label';
 import { SegmentedControl } from '@/features/matches/create-match/components/segmented-control';
 import { getErrorMessage } from '@/lib/error-message';
@@ -212,6 +212,8 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
           venueName={form.venueName}
           onVenueNameChange={form.setVenueName}
           coords={form.coords}
+          formattedAddress={form.formattedAddress}
+          placeId={form.placeId}
           onCoordsChange={form.setCoords}
           onFormattedAddressChange={form.setFormattedAddress}
           onPlaceIdChange={form.setPlaceId}

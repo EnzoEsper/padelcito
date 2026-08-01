@@ -17,7 +17,7 @@ import { SegmentedControl } from './components/segmented-control';
 import { StepperField } from './components/stepper-field';
 import { CategoryRangePicker } from './components/category-range-picker';
 import { PlayerRosterPreview } from './components/player-roster-preview';
-import { LocationField } from './components/location-field';
+import { LocationField } from '@/features/location/location-field';
 import { AdvancedSettingsPanel } from './components/advanced-settings-panel';
 import { DurationSelect } from './components/duration-select';
 
@@ -69,6 +69,8 @@ export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
           venueName={form.venueName}
           onVenueNameChange={form.setVenueName}
           coords={form.coords}
+          formattedAddress={form.formattedAddress}
+          placeId={form.placeId}
           onCoordsChange={form.setCoords}
           onFormattedAddressChange={form.setFormattedAddress}
           onPlaceIdChange={form.setPlaceId}

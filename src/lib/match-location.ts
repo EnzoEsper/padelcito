@@ -1,4 +1,3 @@
-import { findPresetLocationByCoords } from '@/features/matches/create-match/preset-locations';
 import { parseGeographyPoint } from '@/lib/location';
 
 type MatchLocationFields = {
@@ -10,10 +9,10 @@ type MatchLocationFields = {
 export function resolveMatchLocationSubtitle(match: MatchLocationFields): string | null {
   const stored = match.formatted_address?.trim();
   if (stored !== undefined && stored.length > 0) return stored;
+  return null;
+}
 
-  const coords = parseGeographyPoint(match.location);
-  if (coords === null) return null;
-
-  const preset = findPresetLocationByCoords(coords);
-  return preset?.formattedAddress ?? null;
+/** Parse match geography for map display (discover / detail). */
+export function resolveMatchCoords(match: MatchLocationFields) {
+  return parseGeographyPoint(match.location);
 }

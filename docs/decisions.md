@@ -45,3 +45,9 @@ The initial reliability model incremented `commitment_count` on every host cance
 ## Community posts rename + listings deferral (2026-07-11 — M5)
 
 The Community tab originally shipped as moderated **flyers** (`flyers` table). Product/architecture reconciliation renamed the entity to **`community_posts`** to distinguish it from dormant **`listings`** (future response-inbox classifieds) and from future **`tournaments`** graduation. Enums: `community_post_type`, `community_post_status`, `community_post_report_reason`; reports table `community_post_reports`; RPC `nearby_community_posts`; Storage bucket **`community-posts`**; notification types `community_post_*` with FK `notifications.community_post_id`. Client code uses ergonomic **post** naming inside `src/features/community/` while all DB calls hit `community_posts`. **`listings` / `listing_responses` stay in schema but have no client UI** — deferred to M5b+. Tournament-to-post linking (`linked_tournament_id`) is deferred to M6+. Migrations rewritten in place under `202607110*`. After applying locally: `npx supabase db reset` then `npx supabase gen types typescript --local > src/types/database.ts`.
+
+---
+
+## Google Places proxy + shared place picker (2026-07-30)
+
+Match and community create flows replaced hardcoded preset venues with a shared map picker (`src/features/location/`). Google **Places API (New)** runs only through Supabase Edge Function `places-search` so the REST key never ships in the app; Android map tiles use `react-native-maps` with a separate Maps SDK key. Session tokens (v4 UUID per picker session) are generated client-side and forwarded verbatim for correct session billing. Rate limiting via `consume_places_search_quota()` (migration `20260730120000_places_search_rate_limit`). Stored match/post coordinates are user-confirmed picker output; `place_id` is kept for future refresh. Full setup: `docs/places-setup.md`.

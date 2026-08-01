@@ -835,6 +835,24 @@ export type Database = {
           },
         ]
       }
+      places_search_rate_limits: {
+        Row: {
+          id: number
+          requested_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: never
+          requested_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: never
+          requested_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profile_sports: {
         Row: {
           created_at: string
@@ -1594,6 +1612,10 @@ export type Database = {
     Functions: {
       can_report_score: {
         Args: { p_tournament_match_id: string }
+        Returns: boolean
+      }
+      consume_places_search_quota: {
+        Args: { p_limit?: number; p_window_seconds?: number }
         Returns: boolean
       }
       emit_community_post_notification: {

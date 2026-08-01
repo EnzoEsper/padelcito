@@ -4,8 +4,10 @@
     "strict": true,
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
+    "resolveJsonModule": true,
     "paths": {
       "@/*": ["src/*"]
     }
-  }
+  },
+  "exclude": ["supabase/functions"]
 }
