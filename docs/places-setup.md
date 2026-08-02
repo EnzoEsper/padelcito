@@ -243,13 +243,19 @@ Hosts can always confirm a location as long as they can place the pin.
 API key not found. Check that <meta-data android:name="com.google.android.geo.API_KEY" .../>
 ```
 
-The EAS cloud build did not receive `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` at build time. The JS bundle from Metro may still have the key from `.env.local`, but the **native** Android manifest does not — maps crash immediately.
+The native Android manifest is missing `com.google.android.geo.API_KEY`. Metro may still load the key from `.env.local`, but **MapView reads the key from the manifest**, not from JS.
+
+Common causes:
+
+1. **Wrong config plugin prop (fixed in `app.config.ts`):** `react-native-maps` expects `androidGoogleMapsApiKey`, not `googleMapsApiKey`. Using the wrong name silently skips manifest injection.
+2. **EAS build without the env var:** the cloud build must see `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` when `app.config.ts` runs.
 
 Fix:
 
-1. Create the EAS environment variable (development) and verify with `eas env:list --environment development`.
-2. Run a **new** `eas-cli build --profile development --platform android` (old APKs cannot be patched).
-3. Or use `eas-cli build ... --local` so your local `.env.local` is used during the native build.
+1. Ensure `.env.local` has `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=...` and EAS has the same var: `eas env:list --environment development`.
+2. Run a **new** `pnpm dlx eas-cli build --profile development --platform android` (old APKs cannot be patched).
+3. Optional sanity check before building: `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your-key npx expo config --type public` and confirm `androidGoogleMapsApiKey` appears under the `react-native-maps` plugin.
+4. Or use `eas-cli build ... --local` so your local `.env.local` is used during the native build.
 
 ### `readRecentVenues failed` / Invalid SecureStore key
 

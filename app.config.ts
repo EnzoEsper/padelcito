@@ -20,7 +20,8 @@ const config: ExpoConfig = {
     [
       'react-native-maps',
       {
-        googleMapsApiKey,
+        // Plugin prop names from react-native-maps/app.plugin.js (not `googleMapsApiKey`).
+        androidGoogleMapsApiKey: googleMapsApiKey,
       },
     ],
   ],
