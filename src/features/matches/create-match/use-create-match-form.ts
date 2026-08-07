@@ -66,6 +66,36 @@ function combineDateAndTime(datePart: Date, timePart: Date): Date {
   return combined;
 }
 
+function createInitialCreateMatchFormState(): CreateMatchFormState {
+  return {
+    venueName: '',
+    coords: null,
+    formattedAddress: null,
+    placeId: null,
+    datePart: defaultDatePart(),
+    timePart: defaultTimePart(),
+    durationMinutes: 60,
+    courtCount: 1,
+    courtConfigs: [createDefaultCourtConfig()],
+    totalPlayers: 4,
+    openSpots: 1,
+    categoryMax: 5,
+    categoryMin: 6,
+    pricePerPlayer: '',
+    positionPreference: 'any',
+    genderPreference: 'male',
+    ageMin: '',
+    ageMax: '',
+    difficulty: 'friendly',
+    notes: '',
+    advancedExpanded: false,
+    minPlayers: minTotalPlayersFromConfigs([createDefaultCourtConfig()]),
+    maxPlayers: 60,
+    maxCourts: maxCourtCount(DEFAULT_COURT_FORMAT),
+    confirmedCount: derivedConfirmedCount(4, 1),
+  };
+}
+
 export type CreateMatchFormState = {
   venueName: string;
   coords: Coords | null;
@@ -115,6 +145,7 @@ export type CreateMatchFormActions = {
   setDifficulty: (value: MatchDifficulty) => void;
   setNotes: (value: string) => void;
   setAdvancedExpanded: (value: boolean) => void;
+  reset: () => void;
   buildSubmitInput: () => { ok: true; input: CreateMatchInput } | { ok: false; message: string };
 };
 
@@ -182,6 +213,31 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
   const setCategoryRange = useCallback((nextMax: number, nextMin: number) => {
     setCategoryMax(nextMax);
     setCategoryMin(nextMin);
+  }, []);
+
+  const reset = useCallback((): void => {
+    const initial = createInitialCreateMatchFormState();
+    setVenueName(initial.venueName);
+    setCoords(initial.coords);
+    setFormattedAddress(initial.formattedAddress);
+    setPlaceId(initial.placeId);
+    setDatePart(initial.datePart);
+    setTimePart(initial.timePart);
+    setDurationMinutes(initial.durationMinutes);
+    setCourtCountState(initial.courtCount);
+    setCourtConfigsState(initial.courtConfigs);
+    setTotalPlayersState(initial.totalPlayers);
+    setOpenSpotsState(initial.openSpots);
+    setCategoryMax(initial.categoryMax);
+    setCategoryMin(initial.categoryMin);
+    setPricePerPlayer(initial.pricePerPlayer);
+    setPositionPreference(initial.positionPreference);
+    setGenderPreference(initial.genderPreference);
+    setAgeMin(initial.ageMin);
+    setAgeMax(initial.ageMax);
+    setDifficulty(initial.difficulty);
+    setNotes(initial.notes);
+    setAdvancedExpanded(initial.advancedExpanded);
   }, []);
 
   const buildSubmitInput = useCallback((): { ok: true; input: CreateMatchInput } | { ok: false; message: string } => {
@@ -327,6 +383,7 @@ export function useCreateMatchForm(): CreateMatchFormState & CreateMatchFormActi
     setDifficulty,
     setNotes,
     setAdvancedExpanded,
+    reset,
     buildSubmitInput,
   };
 }

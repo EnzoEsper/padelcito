@@ -22,6 +22,7 @@ type AutocompleteBody = {
   sessionToken: string;
   lat?: number;
   lng?: number;
+  radiusMeters?: number;
   languageCode?: string;
   regionCodes?: string[];
 };
@@ -109,11 +110,16 @@ async function handleAutocomplete(body: AutocompleteBody): Promise<Response> {
     languageCode: body.languageCode ?? "es",
   };
 
+  // Soft proximity bias: predictions inside this circle rank first, but strong
+  // matches outside can still appear. A tighter radius keeps results near the
+  // user (e.g. a court in Resistencia won't be buried under Buenos Aires spots).
   if (typeof body.lat === "number" && typeof body.lng === "number") {
     payload.locationBias = {
       circle: {
         center: { latitude: body.lat, longitude: body.lng },
-        radius: 50_000,
+        radius: typeof body.radiusMeters === "number" && body.radiusMeters > 0
+          ? Math.min(body.radiusMeters, 50_000)
+          : 30_000,
       },
     };
   }

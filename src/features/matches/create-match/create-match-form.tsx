@@ -256,6 +256,7 @@ export function CreateMatchPublishFooter({ form }: CreateMatchPublishFooterProps
 
     try {
       const matchId = await createMatch.mutateAsync(result.input);
+      form.reset();
       router.replace(`/(app)/match-detail?id=${matchId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not create match.';

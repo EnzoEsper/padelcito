@@ -18,6 +18,7 @@ export type PlaceSearchState = {
   runSearch: () => Promise<void>;
   selectSuggestion: (suggestion: PlaceSuggestion) => Promise<SelectedPlace | null>;
   resolveRecentPlace: (placeId: string) => Promise<SelectedPlace | null>;
+  clearSuggestions: () => void;
   clearSearchError: () => void;
 };
 
@@ -58,6 +59,12 @@ export function usePlaceSearch(options: UsePlaceSearchOptions): PlaceSearchState
   const clearSearchError = useCallback((): void => {
     setSearchError(null);
   }, []);
+
+  const clearSuggestions = useCallback((): void => {
+    cancelInFlight();
+    setSuggestions([]);
+    setSearchError(null);
+  }, [cancelInFlight]);
 
   const runSearch = useCallback(async (): Promise<void> => {
     const trimmed = query.trim();
@@ -152,6 +159,7 @@ export function usePlaceSearch(options: UsePlaceSearchOptions): PlaceSearchState
     runSearch,
     selectSuggestion,
     resolveRecentPlace,
+    clearSuggestions,
     clearSearchError,
   };
 }
