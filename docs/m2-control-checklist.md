@@ -4,8 +4,8 @@ This document is the handoff point for M2 Core Matchmaking MVP sessions.
 
 ## Scope
 
-- Create public **padel** pickup matches (sport slug `padel`) with venue, map pin, datetime, capacity, duration, skill range, court setup (`court_count` + per-court `court_configs`), padel category band (`category_min` / `category_max`), required host preferences (`gender_preference`, `difficulty`, `position_preference`), and optional advanced fields (`price_per_player`, `age_min`, `age_max`).
-- Browse the padel match feed as a list, without map UI.
+- Create public **padel** pickup matches (sport slug `padel`) with venue, Google Places map picker pin, datetime, capacity, duration, skill range, court setup (`court_count` + per-court `court_configs`), padel category band (`category_min` / `category_max`), required host preferences (`gender_preference`, `difficulty`, `position_preference`), and optional advanced fields (`price_per_player`, `age_min`, `age_max`). Location uses shared `LocationField` from `src/features/location/` — not preset venue lists.
+- Browse the padel match feed on Discover as a **list** (map view is M4 — see [`docs/m4-control-checklist.md`](./m4-control-checklist.md)).
 - Open match details and request to join with a message.
 - Let hosts accept, reject, or remove participants.
 - Reveal WhatsApp contact links only through `match_contact_details()` after acceptance — **1:1 only** (no group button).
@@ -40,7 +40,7 @@ This document is the handoff point for M2 Core Matchmaking MVP sessions.
 - Confirm the host sees the pending request in Matches.
 - Accept the request and confirm the requester sees an accepted state with footer WhatsApp to **host only** (not "roster confirmed" for the host).
 - Open WhatsApp contacts after acceptance (player→host footer; host→player per roster row); message opens pre-filled with match venue and schedule.
-- Test pending cancellation, accepted withdrawal, and host removal — all **before** `starts_at` only; each action shows a confirmation dialog (withdraw/remove warn inside the late-withdrawal window).
+- Test pending cancellation, accepted withdrawal, and host removal — all **before** `starts_at` only; each action shows an `AppAlertDialog` confirmation (withdraw/remove warn inside the late-withdrawal window).
 - Player cancels pending request → host receives `join_request_cancelled` in-app notification.
 - Host cancels match pre-start → both devices show read-only footer; no roster remove; no WhatsApp; accepted player leaves Upcoming, appears in History (realtime).
 - After `starts_at`: Cancel / remove / withdraw hidden or blocked; status badge shows **Live**; `sync_match_lifecycle` sets `in_progress`.

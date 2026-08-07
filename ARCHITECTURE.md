@@ -11,6 +11,9 @@
 | [`schema.sql`](./schema.sql)                                 | Complete production DDL — apply as the initial Supabase migration            |
 | [`ARCHITECTURE.md`](./ARCHITECTURE.md)                       | This document: schema rationale, development plan, solo-dev workflow         |
 | [`ai-architecture-context.md`](./ai-architecture-context.md) | Drop into the future repo root — baseline context for all AI coding sessions |
+| [`docs/places-setup.md`](./docs/places-setup.md)             | Google Maps SDK + Places proxy setup, billing guardrails, EAS env            |
+| [`docs/m2-control-checklist.md`](./docs/m2-control-checklist.md) | M2 matchmaking handoff checklist                                          |
+| [`docs/m4-control-checklist.md`](./docs/m4-control-checklist.md) | M4 Discover map handoff checklist                                       |
 
 ---
 
@@ -125,7 +128,9 @@ A single `tournaments` table serves both worlds, switched by `is_local`:
 
 ### Geospatial discovery
 
-All location columns are `geography(Point, 4326)` with GIST indexes. Discovery RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`) take `(lat, lng, radius_m)` — the radius is **dynamically configurable per call** (and `profiles.search_radius_m` stores each user's preferred default). They are SECURITY INVOKER, so RLS still filters rows; `ST_DWithin` on geography uses the spatial index and returns meters. For the padel MVP, always pass `p_sport_id` from the padel sport lookup.
+All location columns are `geography(Point, 4326)` with GIST indexes. Discovery RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`, `nearby_community_posts`) take `(lat, lng, radius_m)` — the radius is **dynamically configurable per call** (and `profiles.search_radius_m` stores each user's preferred default). They are SECURITY INVOKER, so RLS still filters rows; `ST_DWithin` on geography uses the spatial index and returns meters. For the padel MVP, always pass `p_sport_id` from the padel sport lookup.
+
+`nearby_matches` also returns `lat`, `lng`, and `distance_m` per row. The Discover map reads those coordinates client-side; marker clustering (`supercluster`) is presentation-only — spatial filtering must stay in the RPC, never replaced by client-side distance filtering.
 
 ### Realtime replication — explicit table list
 
@@ -180,8 +185,8 @@ Ordered strictly by **data dependency** so nothing is ever built on sand. Each m
 
 ### M2 — Core Matchmaking MVP (≈ 2 weeks) ← first real release
 
-- Create match (sport, venue, map pin, datetime, capacity, duration, skill range, court count + per-court configs, category band, gender/difficulty/position preferences, optional price and age filters).
-- Match feed (list, no map yet) + detail screen; request to join with message.
+- Create match (sport, venue, Google Places map picker pin, datetime, capacity, duration, skill range, court count + per-court configs, category band, gender/difficulty/position preferences, optional price and age filters).
+- Match feed (list-first discover; map view in M4) + detail screen; request to join with message.
 - Host inbox: accept / reject (watch the capacity trigger flip `open → full`).
 - On acceptance: call `match_contact_details()` and render **1:1** `wa.me` deep links (`Linking.openURL`) — player→host in footer; host→each accepted player on roster rows.
 - Withdraw / remove flows (pre-start only); host cancel match (`status = 'cancelled'`) pre-start; schedule-driven `in_progress` / `finished` via `sync_match_lifecycle`.
@@ -195,11 +200,15 @@ Ordered strictly by **data dependency** so nothing is ever built on sand. Each m
 - Rating/reliability display on profile and match cards (`rating_avg`, `reliability_score`).
 - **Exit criteria met:** penalty reports optional and validated in DB; quality ratings double-blind; aggregates trigger-maintained.
 
-### M4 — Spatial Discovery & Realtime (≈ 1 week)
+### M4 — Spatial Discovery & Realtime (≈ 1 week) ✅ shipped
 
-- Map view + radius slider calling `nearby_matches` (persist preference to `search_radius_m`).
-- Realtime subscriptions for match lifecycle and notifications are **already wired** (`useMatchRealtime`, `useNotificationsRealtime`). Remaining M4 work: map UI and any polling cleanup outside those paths.
-- **Exit criteria:** acceptance appears on the requester's device within ~1s, app backgrounded-then-resumed included.
+- Discover list/map toggle with radius slider calling `nearby_matches` (`queryCenter` + search-this-area after pan).
+- Interactive map: contained card UI, `supercluster` marker clustering, category-colored pins, synced bottom carousel, recenter control.
+- Match coords from RPC `lat`/`lng` on `MatchSummary.coords` — no Places API on Discover map (Maps SDK tiles only).
+- Realtime subscriptions for match lifecycle and notifications (`useDiscoverMatchesRealtime`, `useNotificationsRealtime`).
+- **Exit criteria met:** map markers reflect nearby open matches; marker/carousel sync; search-this-area re-queries at new center; acceptance appears on requester's device within ~1s via Realtime.
+
+Handoff: `docs/m4-control-checklist.md`.
 
 ### M5 — Community Posts (≈ 1 week) ✅ shipped
 

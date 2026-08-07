@@ -35,7 +35,8 @@
 ## 4. Supabase Client Patterns
 
 - Single client instance in `src/lib/supabase.ts`, typed with `Database` from generated types; session storage via `expo-secure-store` adapter. Only the **anon key** in the app — `service_role` never ships to a client.
-- **Spatial queries:** always through RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`, `nearby_community_posts`). Never download rows and filter distance client-side. Pass `p_sport_id` from `fetchPadelSport()` for padel-scoped discovery.
+- **Spatial queries:** always through RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`, `nearby_community_posts`). Never download rows and filter distance client-side. Pass `p_sport_id` from `fetchPadelSport()` for padel-scoped discovery. Client-side marker clustering of RPC results (e.g. `supercluster` on Discover map) is presentation-only — spatial filtering stays in Postgres.
+- **Edge Function exception (Places only):** `supabase/functions/places-search` is the **only** allowed custom backend surface — it holds the Google Places REST key. Setup and billing rules: `docs/places-setup.md`. Do not add other Edge Functions for business logic.
 - **Bracket operations:** always through RPCs (`generate_single_elimination_bracket`, `generate_round_robin`). Never construct brackets client-side.
 - **Realtime:** subscribe only to the published tables (`matches`, `match_participants`, `notifications`, `community_posts`, `tournament_matches`, `tournament_standings`, `messages`). Channel naming: `match:{id}`, `notifications:{userId}`, `post:{id}`, `moderation:posts`, `community:posts`, `my-posts:{userId}`, `tournament:{id}`, `conversation:{id}`. Always `removeChannel` on unmount. Do not poll a table that has Realtime.
 - **Storage:** avatars → `avatars/{user_id}/...` (public); payment receipts → `receipts/{registration_id}/...` (private); community post covers → `community-posts/{author_id}/...` (public). Respect these path conventions — bucket policies depend on them.
@@ -46,7 +47,9 @@
 - **Managed workflow + expo-router** (file-based routing under `app/`). No ejecting; native needs go through config plugins + EAS Build.
 - **Native Compilation & Deployment:** We exclusively use Expo Application Services (EAS) for native builds (`eas build`). Do not instruct the developer to use local compilation commands like `npx expo run:android` or `npx expo run:ios`. All development clients and production binaries must be built via the cloud.
 - Prefer official Expo modules over community ones: `expo-location` (geo), `expo-secure-store` (tokens), `expo-image` (avatars), `expo-image-picker` (uploads), `expo-notifications` (push), `Linking.openURL` for `https://wa.me/<digits>` deep links.
-- State: TanStack Query for server state (query keys mirror table names: `['matches', id]`); avoid global stores for server data. Realtime events invalidate/patch the query cache.
+- **Maps:** `react-native-maps` for map tiles (Android: Google Maps SDK key in manifest via `app.config.ts`; iOS: Apple Maps). Requires an EAS dev client — not Expo Go. Style maps with inline `customMapStyle` JSON only; **never** load `MapView` with a cloud Map ID (billable Dynamic Maps SKU). Discover clustering uses `supercluster` (client-side only).
+- **Themed overlays:** prefer `AppAlertDialog` and `AppBottomSheet` (`src/components/`) over native `Alert.alert` for confirmations and pickers.
+- State: TanStack Query for server state (query keys mirror table names: `['matches', id]`); avoid global stores for server data. Realtime events invalidate/patch the query cache. Primary feeds (Discover, Matches, Profile) support pull-to-refresh via `RefreshControl`.
 - Components: function components + hooks only; co-locate screen-specific components; shared UI in `src/components/`.
 - Folder layout: `app/` (routes), `src/lib/` (supabase, utils), `src/features/<domain>/` (hooks + components per domain: matches, ratings, community, listings, tournaments), `src/types/` (generated DB types).
 
@@ -65,13 +68,15 @@
 3. Do NOT add columns to `public_profiles` without a security review of each column.
 4. Do NOT bypass triggers by writing status fields directly in ways that skip the state machine (e.g., setting `matches.status = 'full'` manually).
 5. Do NOT add tables to the Realtime publication casually — each one costs throughput; justify it in the migration comment.
-6. Do NOT introduce a custom backend/API layer; extend the database (RPCs, triggers) instead.
+6. Do NOT introduce custom backend/API layers beyond the existing `places-search` Edge Function (Google Places key proxy only); extend the database (RPCs, triggers) instead.
 7. Do NOT use `npm`/`yarn`, JavaScript files in `src/`, or Spanish identifiers.
 8. Do NOT store secrets in code, `app.json`, or AsyncStorage — env vars + `expo-secure-store` only.
 9. Do NOT poll endpoints that have Realtime subscriptions available.
 10. Do NOT write schema changes outside `supabase/migrations/`.
 11. Do NOT add group WhatsApp CTAs or expose `whatsapp_phone` outside `match_contact_details()` — contact is **1:1 only** (accepted player → host; host → each accepted player from roster rows).
 12. Do NOT allow roster edits, host cancel, player withdraw, or WhatsApp after `starts_at`, or any roster/contact action when `matches.status` is `cancelled` or `finished` — DB triggers/RLS enforce this; mirror with client helpers.
+13. Do NOT ship `GOOGLE_PLACES_API_KEY` in the app bundle or call Places API from the Discover map — coords come from `nearby_matches` RPC rows.
+14. Do NOT load `MapView` with a cloud Map ID — use inline `customMapStyle` to stay on the free Maps SDK SKU.
 
 ## 8. Match Lifecycle & Contact Rules (M2)
 
@@ -164,7 +169,7 @@ Empty host cancels, solo auto-`finished`, and early withdraw/remove do **not** i
 - `resolveMatchStatusBadge()` in `match-display.ts` — inline status badge on detail (Open / Full / Live / Finished / Cancelled).
 - `isWithinLateWithdrawalWindow()` in `match-display.ts` — client mirror of DB late-withdrawal penalty window for confirm-dialog copy.
 - WhatsApp: accepted players get footer CTA to message **host** only; hosts get per-row WhatsApp on **accepted** roster entries only — never a group button. Links open with pre-filled match-context text via `match-whatsapp.ts`.
-- Match detail destructive actions (remove player, withdraw, cancel pending request) require confirmation alerts before mutating roster state.
+- Match detail destructive actions (remove player, withdraw, cancel pending request) require confirmation via `AppAlertDialog` before mutating roster state.
 
 ## 10. Community Posts (M5 — shipped)
 
@@ -192,6 +197,9 @@ Types: `community_post_submitted` (moderators), `community_post_approved`, `comm
 - Routes: `app/(app)/community.tsx`, `create-post`, `post-detail`, `my-posts`, `moderation`.
 - Hooks: `use-posts.ts`, `use-post-realtime.ts`; mount `useModerationPostsRealtime` in `app/(app)/_layout.tsx` for moderator badge.
 - Storage: `src/lib/post-storage.ts` → bucket **`community-posts`** (hyphenated).
+- **Cover upload:** optional free-form crop via `post-flyer-crop-screen.tsx` / `post-flyer-pick-editor.tsx` (`post-flyer-crop-math.ts`).
+- **Filters:** unified chip row + bottom sheets in `community-filter-bar.tsx` (aligned with Discover layout).
+- **Location on create:** shared `LocationField` from `src/features/location/` (same Places picker as matches).
 
 ### M5 migrations
 
@@ -202,3 +210,67 @@ Types: `community_post_submitted` (moderators), `community_post_approved`, `comm
 - Schema source of truth: the full `supabase/migrations/` chain (starting with `20260608050054_0001_initial_schema.sql` and all subsequent migrations).
 - Architecture rationale & roadmap: `ARCHITECTURE.md` (repo root).
 - Generated DB types: `src/types/database.ts` (never hand-edit).
+- Google Maps / Places setup: `docs/places-setup.md`.
+- M2 / M4 handoff checklists: `docs/m2-control-checklist.md`, `docs/m4-control-checklist.md`.
+- Architecture decision log: `docs/decisions.md`.
+
+## 12. Location, Maps & Places (shipped)
+
+The database remains the source of truth for match/post coordinates. Google integration is split across two keys and one Edge Function:
+
+| Key / surface | Where it lives | Purpose |
+| --- | --- | --- |
+| **Maps SDK key** | `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (app env + EAS) | Android map tiles via `react-native-maps` (iOS uses Apple Maps — no Google key) |
+| **Places REST key** | Supabase secret `GOOGLE_PLACES_API_KEY` only | Autocomplete + Place Details via Edge Function — **never** in the app bundle |
+
+### Edge Function: `places-search`
+
+- Path: `supabase/functions/places-search/index.ts`.
+- Proxies Google **Places API (New)** only; requires authenticated JWT.
+- Session tokens: client generates a v4 UUID per picker session and forwards it verbatim (autocomplete + details = one billed session).
+- Rate limit: `consume_places_search_quota()` — migration `20260730120000_places_search_rate_limit` (default 20 req / 60 s / user).
+
+### Shared client module: `src/features/location/`
+
+- `LocationField`, `PlacePicker`, `PlaceMapView`, `places-client.ts`, `use-place-search.ts`.
+- Used by create-match and create-post flows.
+- Fallbacks: map pin + on-device reverse geocode when Places proxy is down; recent venues in SecureStore.
+
+### Stored location fields
+
+On `matches` and `community_posts`: `location` (geography), `venue_name`, `formatted_address`, `place_id` (migration `20260627210000_match_formatted_address` for matches). Coordinates written as WKT `POINT(lng lat)` via `coordsToWkt()`. User-confirmed picker output is authoritative; `place_id` is kept for future refresh.
+
+### Billing guardrails
+
+- Maps SDK SKU is unlimited/no-cost when **not** using a cloud Map ID.
+- Inline dark `customMapStyle` in `PlaceMapView` and Discover map — do not migrate to cloud-based map styling.
+- Full setup, troubleshooting, and EAS env: `docs/places-setup.md`.
+
+## 13. Discover Spatial UI (M4 — shipped)
+
+Interactive map on the Discover tab for nearby open matches. **No Places API calls** — reads coords already returned by `nearby_matches`.
+
+### Data flow
+
+1. `useDiscoverLocation()` → user coords + reverse-geocoded label (persisted to profile).
+2. `queryCenter` state in `app/(app)/discover.tsx` — defaults to user coords; updated by "Search this area" after panning.
+3. `useDiscoverMatches(queryCenter, radiusKm)` → RPC `nearby_matches` → hydrates `MatchSummary` with `distanceM` and `coords` (from RPC `lat`/`lng`, fallback `parseGeographyPoint(match.location)`).
+4. `useDiscoverMatchesRealtime()` invalidates discover queries on match/participant changes.
+
+### Map UI (`src/features/discover/`)
+
+- `discover-map.tsx` — contained rounded map card, `supercluster` clustering, recenter, search-this-area pill, synced bottom carousel.
+- `map-match-marker.tsx`, `map-cluster-marker.tsx`, `map-match-card.tsx`, `discover-map-utils.ts`.
+- List/map toggle; map body is **not** inside a vertical `ScrollView` (gesture conflict).
+- Category filter and radius slider apply to both list and map modes.
+
+### UX contracts
+
+- Tap marker → select match, center map, scroll carousel; swipe carousel → sync marker selection; tap card → `match-detail`.
+- Tap cluster → zoom to expansion level.
+- Recenter → reset `queryCenter` to user coords and animate map.
+- Matches without coords are omitted from the map (still visible in list if returned by RPC).
+
+### Verification handoff
+
+See `docs/m4-control-checklist.md`.

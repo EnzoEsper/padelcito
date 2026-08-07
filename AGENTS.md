@@ -20,3 +20,4 @@ The immutable baseline for this project is `ai-architecture-context.md`. **You m
 - **Padel-only MVP:** Client flows manage padel matches only — use `PADEL_SPORT_SLUG` / `fetchPadelSport()` from `src/lib/padel-sport.ts`.
 - **Security:** RLS is mandatory on every table. Cross-table checks go through `SECURITY DEFINER` helper functions.
 - **TypeScript:** Strict mode is on. No `any`. No non-null assertions (`!`).
+- **Maps & Places:** Read `docs/places-setup.md`. Edge Function `places-search` is the only allowed custom backend surface (Google Places key proxy). Discover map reads coords from `nearby_matches` — never call Places on Discover.

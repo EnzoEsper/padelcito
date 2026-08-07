@@ -51,3 +51,27 @@ The Community tab originally shipped as moderated **flyers** (`flyers` table). P
 ## Google Places proxy + shared place picker (2026-07-30)
 
 Match and community create flows replaced hardcoded preset venues with a shared map picker (`src/features/location/`). Google **Places API (New)** runs only through Supabase Edge Function `places-search` so the REST key never ships in the app; Android map tiles use `react-native-maps` with a separate Maps SDK key. Session tokens (v4 UUID per picker session) are generated client-side and forwarded verbatim for correct session billing. Rate limiting via `consume_places_search_quota()` (migration `20260730120000_places_search_rate_limit`). Stored match/post coordinates are user-confirmed picker output; `place_id` is kept for future refresh. Full setup: `docs/places-setup.md`.
+
+---
+
+## Themed dialogs and bottom sheets (2026-06-27)
+
+Destructive confirmations, inline pickers, and info sheets replaced native `Alert.alert` with themed `AppAlertDialog` and `AppBottomSheet` (`src/components/`). Used across match detail roster actions, create-match inline selects, community filters, and courts/roster info sheets. Keeps UX on-brand with the dark Void Eclipse palette.
+
+---
+
+## Community flyer crop editor (2026-08-07)
+
+Post cover upload supports optional free-form crop before publish (`post-flyer-crop-screen.tsx`, `post-flyer-pick-editor.tsx`, `post-flyer-crop-math.ts`). Authors can adjust framing on the full flyer image; cropped asset is what gets uploaded to the `community-posts` bucket.
+
+---
+
+## Place picker redesign (2026-08-07)
+
+Follow-up polish on the shared location picker: improved map pin UX in `place-map-view.tsx` / `place-picker.tsx`, tighter Places search error handling, and create-match form reset after successful publish (`use-create-match-form.ts`) so hosts can publish another match without stale field state.
+
+---
+
+## Discover map (2026-08-07 — M4)
+
+Discover tab map view replaces the M4 placeholder. Uses `nearby_matches` RPC coords (no Places calls on Discover — zero incremental Places cost). Client-side clustering via `supercluster` (not unmaintained RN map-clustering libs). Contained rounded map card, list/map toggle, search-this-area (`queryCenter`), recenter, and synced bottom carousel. Spatial filtering stays in Postgres; clustering is presentation-only. Handoff: `docs/m4-control-checklist.md`.

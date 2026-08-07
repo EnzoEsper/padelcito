@@ -232,6 +232,7 @@ Hosts can always confirm a location as long as they can place the pin.
 4. Publish match → open match detail → address subtitle shows `formatted_address`.
 5. Repeat on **Create post** (same `LocationField`).
 6. Toggle airplane mode → confirm you can still pick via map pin.
+7. **Discover map:** open Discover → switch to map view → confirm markers appear for nearby open matches; tap marker and swipe carousel stay in sync; pan map → "Search this area" → matches refresh at new center; recenter returns to user location. No Places API calls on this screen (coords from `nearby_matches` only).
 
 ---
 
@@ -272,3 +273,21 @@ When volume grows, add a `places` table keyed by `place_id` in front of the Edge
 ## 12. Architecture note
 
 `ai-architecture-context.md` states the database is the backend. We deliberately add a **Supabase Edge Function** only to hold the Google Places REST key securely — not as business logic. Match/post location rules remain in Postgres (`location`, `formatted_address`, `place_id` on `matches` / `community_posts`).
+
+---
+
+## 13. Discover map vs create-flow maps
+
+Two map surfaces share `react-native-maps` but differ in API usage and cost:
+
+| Surface | Maps SDK (tiles) | Places API | Data source |
+| --- | --- | --- | --- |
+| Create match / post picker | Yes (pin + tiles) | Yes (via `places-search` Edge Function) | Google Places + user-confirmed pin |
+| Discover map tab | Yes (tiles only) | **No** | `nearby_matches` RPC (`lat`, `lng` from Postgres) |
+
+**Billing notes:**
+
+- **Maps SDK SKU** (`6DE1-4D9C-5B67`) is unlimited/no-cost for native map loads when **not** using a cloud Map ID. Pan/zoom generates no extra billable events.
+- **Discover map adds $0** Places cost — it never calls the Edge Function or Places REST API.
+- Keep inline `customMapStyle` JSON (as in `PlaceMapView` and Discover map). Loading with a cloud Map ID moves billing to the **Dynamic Maps** SKU (~$7/1k loads after free tier).
+- Marker clustering on Discover uses `supercluster` client-side — no Google API involved.
