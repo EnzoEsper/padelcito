@@ -1,20 +1,22 @@
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, View, Text, Pressable } from '@/tw';
+import { ScrollView as TwScrollView, View, Text, Pressable } from '@/tw';
 import { useDiscoverMatches, type MatchSummary } from '@/features/matches/use-matches';
 import { MatchSummaryCard } from '@/features/matches/components/match-summary-card';
 import { useDiscoverMatchesRealtime } from '@/features/matches/use-match-realtime';
 import { NotificationBell } from '@/components/notification-bell';
 import { SearchRadiusSlider } from '@/features/discover/components/search-radius-slider';
+import { DiscoverMap } from '@/features/discover/components/discover-map';
 import { SEARCH_RADIUS_DEFAULT_KM } from '@/features/discover/search-radius';
 import {
   CATEGORY_TIER_LABEL,
   categoryToTier,
   type PadelCategoryTier,
 } from '@/lib/padel-category';
+import type { Coords } from '@/lib/location';
 import {
   useDiscoverLocation,
   type LocationAccessStatus,
@@ -40,7 +42,6 @@ const C = {
   hair2: 'rgba(228,228,228,0.055)',
   warning: '#E0B15B',
 } as const;
-
 
 function matchCategoryTier(match: MatchSummary): PadelCategoryTier {
   return categoryToTier(match.category_max);
@@ -108,7 +109,7 @@ function FilterChips({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      className="mb-7"
+      style={styles.chipScroll}
       contentContainerStyle={styles.chipRow}
     >
       <View style={styles.filterIconChip}>
@@ -175,14 +176,24 @@ export default function DiscoverScreen() {
   } = useDiscoverLocation();
   const locationReady = locationStatus === 'ready' && coords !== null;
   const [searchRadiusKm, setSearchRadiusKm] = useState(SEARCH_RADIUS_DEFAULT_KM);
+  const [queryCenter, setQueryCenter] = useState<Coords | null>(null);
+  const [mapCenterDraft, setMapCenterDraft] = useState<Coords | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('All');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+
+  useEffect(() => {
+    if (coords !== null) {
+      setQueryCenter(coords);
+      setMapCenterDraft(coords);
+    }
+  }, [coords?.lat, coords?.lng]);
 
   useDiscoverMatchesRealtime();
   const { data: matches, isPending, isRefetching, refetch, error } = useDiscoverMatches(
-    locationReady ? coords : null,
+    locationReady ? queryCenter : null,
     searchRadiusKm,
   );
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('All');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+
   const filteredMatches = useMemo(() => {
     const source = matches ?? [];
     return source.filter(
@@ -202,18 +213,48 @@ export default function DiscoverScreen() {
 
   const isRefreshing = locationReady ? isRefetching : locationStatus === 'locating';
 
-  return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefreshing}
-          onRefresh={handleRefresh}
-          tintColor={C.mist}
+  function renderListBody() {
+    if (isPending) {
+      return (
+        <View style={styles.centerState}>
+          <ActivityIndicator color={C.mist} />
+        </View>
+      );
+    }
+
+    if (error !== null) {
+      return (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>Could not load matches.</Text>
+          <Pressable onPress={() => void refetch()}>
+            <Text style={styles.errorAction}>Try again</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    if (filteredMatches.length > 0) {
+      return filteredMatches.map((match) => (
+        <MatchSummaryCard
+          key={match.id}
+          match={match}
+          distanceM={match.distanceM}
+          onPress={() => router.push(`/(app)/match-detail?id=${match.id}`)}
         />
-      }
-    >
+      ));
+    }
+
+    return (
+      <View style={styles.emptyCard}>
+        <Ionicons name="search-outline" size={26} color={C.faint} />
+        <Text style={styles.emptyTitle}>No matches in range</Text>
+        <Text style={styles.emptyText}>Widen your radius or switch category level.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View>
           <View style={styles.locationRow}>
@@ -228,91 +269,143 @@ export default function DiscoverScreen() {
       </View>
 
       {!locationReady ? (
-        <LocationGate
-          status={locationStatus}
-          message={errorMessage}
-          onRetry={() => void retryLocation()}
-          onOpenSettings={() => void openSettings()}
-        />
+        <TwScrollView
+          className="flex-1 bg-background"
+          contentContainerStyle={styles.gateContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={C.mist}
+            />
+          }
+        >
+          <LocationGate
+            status={locationStatus}
+            message={errorMessage}
+            onRetry={() => void retryLocation()}
+            onOpenSettings={() => void openSettings()}
+          />
+        </TwScrollView>
       ) : (
         <>
-          {saveWarning !== null ? (
-            <View style={styles.saveWarningCard}>
-              <Text style={styles.saveWarningText}>{saveWarning}</Text>
-            </View>
-          ) : null}
+          {viewMode === 'list' ? (
+            <TwScrollView
+              className="flex-1 bg-background"
+              contentContainerStyle={styles.listContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={C.mist}
+                />
+              }
+            >
+              {saveWarning !== null ? (
+                <View style={styles.saveWarningCard}>
+                  <Text style={styles.saveWarningText}>{saveWarning}</Text>
+                </View>
+              ) : null}
 
-          <SearchRadiusSlider radiusKm={searchRadiusKm} onRadiusCommit={setSearchRadiusKm} />
-          <FilterChips value={categoryFilter} onChange={setCategoryFilter} />
+              <SearchRadiusSlider radiusKm={searchRadiusKm} onRadiusCommit={setSearchRadiusKm} />
+              <FilterChips value={categoryFilter} onChange={setCategoryFilter} />
 
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {filteredMatches.length} Open Nearby
-            </Text>
-            <View style={styles.sectionRight}>
-              {isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
-              <ViewToggle value={viewMode} onChange={setViewMode} />
-            </View>
-          </View>
-
-          {isPending ? (
-            <View style={styles.centerState}>
-              <ActivityIndicator color={C.mist} />
-            </View>
-          ) : error !== null ? (
-            <View style={styles.errorCard}>
-              <Text style={styles.errorText}>
-                Could not load matches.
-              </Text>
-              <Pressable onPress={() => void refetch()}>
-                <Text style={styles.errorAction}>
-                  Try again
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  {filteredMatches.length} Open Nearby
                 </Text>
-              </Pressable>
-            </View>
-          ) : viewMode === 'map' ? (
-            <View style={styles.emptyCard}>
-              <Ionicons name="map-outline" size={26} color={C.faint} />
-              <Text style={styles.emptyTitle}>Map arrives in M4</Text>
-              <Text style={styles.emptyText}>Use list view for the M2 matchmaking flow.</Text>
-            </View>
-          ) : filteredMatches.length > 0 ? (
-            filteredMatches.map((match) => (
-              <MatchSummaryCard
-                key={match.id}
-                match={match}
-                distanceM={match.distanceM}
-                onPress={() => router.push(`/(app)/match-detail?id=${match.id}`)}
-              />
-            ))
+                <View style={styles.sectionRight}>
+                  {isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
+                  <ViewToggle value={viewMode} onChange={setViewMode} />
+                </View>
+              </View>
+
+              {renderListBody()}
+            </TwScrollView>
           ) : (
-            <View style={styles.emptyCard}>
-              <Ionicons name="search-outline" size={26} color={C.faint} />
-              <Text style={styles.emptyTitle}>
-                No matches in range
-              </Text>
-              <Text style={styles.emptyText}>
-                Widen your radius or switch category level.
-              </Text>
+            <View style={styles.mapLayout}>
+              <View style={styles.mapControls}>
+                {saveWarning !== null ? (
+                  <View style={styles.saveWarningCard}>
+                    <Text style={styles.saveWarningText}>{saveWarning}</Text>
+                  </View>
+                ) : null}
+
+                <SearchRadiusSlider radiusKm={searchRadiusKm} onRadiusCommit={setSearchRadiusKm} />
+                <FilterChips value={categoryFilter} onChange={setCategoryFilter} />
+
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>
+                    {filteredMatches.length} Open Nearby
+                  </Text>
+                  <View style={styles.sectionRight}>
+                    {isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
+                    <ViewToggle value={viewMode} onChange={setViewMode} />
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.mapBody}>
+                {isPending ? (
+                  <View style={styles.centerState}>
+                    <ActivityIndicator color={C.mist} />
+                  </View>
+                ) : error !== null ? (
+                  <View style={styles.errorCard}>
+                    <Text style={styles.errorText}>Could not load matches.</Text>
+                    <Pressable onPress={() => void refetch()}>
+                      <Text style={styles.errorAction}>Try again</Text>
+                    </Pressable>
+                  </View>
+                ) : coords !== null && queryCenter !== null ? (
+                  <DiscoverMap
+                    matches={filteredMatches}
+                    userCoords={coords}
+                    queryCenter={queryCenter}
+                    searchRadiusKm={searchRadiusKm}
+                    onMapCenterChange={setMapCenterDraft}
+                    onSearchThisArea={() => {
+                      if (mapCenterDraft !== null) {
+                        setQueryCenter(mapCenterDraft);
+                      }
+                    }}
+                    onRecenter={() => {
+                      if (coords !== null) {
+                        setQueryCenter(coords);
+                        setMapCenterDraft(coords);
+                      }
+                    }}
+                    onOpenMatch={(matchId) => router.push(`/(app)/match-detail?id=${matchId}`)}
+                  />
+                ) : null}
+              </View>
             </View>
           )}
         </>
       )}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingBottom: 24,
+  root: {
+    flex: 1,
     backgroundColor: C.background,
+  },
+  gateContent: {
+    flexGrow: 1,
+    paddingBottom: 24,
+  },
+  listContent: {
+    paddingBottom: 24,
   },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    backgroundColor: C.background,
   },
   locationRow: {
     flexDirection: 'row',
@@ -337,6 +430,18 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     gap: 10,
+  },
+  mapLayout: {
+    flex: 1,
+  },
+  mapControls: {
+    backgroundColor: C.background,
+  },
+  mapBody: {
+    flex: 1,
+  },
+  chipScroll: {
+    marginBottom: 22,
   },
   chipRow: {
     paddingHorizontal: 20,
@@ -376,7 +481,8 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingTop: 4,
+    paddingBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

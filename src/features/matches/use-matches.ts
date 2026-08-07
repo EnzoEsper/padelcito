@@ -4,7 +4,7 @@ import {
   PADEL_SPORT_SLUG,
   UnsupportedSportError,
 } from '@/lib/padel-sport';
-import { roundCoordsForKey, type Coords } from '@/lib/location';
+import { parseGeographyPoint, roundCoordsForKey, type Coords } from '@/lib/location';
 import type { CourtConfig } from '@/lib/padel-court';
 import { supabase } from '@/lib/supabase';
 import { computeMatchRosterStats } from '@/features/matches/match-roster';
@@ -58,6 +58,7 @@ export type MatchSummary = MatchRow & {
   isJoinFull: boolean;
   isHostedByCurrentUser: boolean;
   distanceM?: number;
+  coords?: Coords | null;
 };
 
 export type MatchDetail = MatchSummary & {
@@ -294,6 +295,12 @@ export function useDiscoverMatches(coords: Coords | null, radiusKm: number) {
       if (nearby === null || nearby.length === 0) return [];
 
       const distanceById = new Map(nearby.map((row) => [row.id, row.distance_m]));
+      const coordsById = new Map(
+        nearby.map((row) => [
+          row.id,
+          row.lat !== null && row.lng !== null ? { lat: row.lat, lng: row.lng } : null,
+        ]),
+      );
       const matchIds = nearby.map((row) => row.id);
       const orderIndex = new Map(matchIds.map((id, index) => [id, index]));
 
@@ -312,6 +319,9 @@ export function useDiscoverMatches(coords: Coords | null, radiusKm: number) {
       return summaries.map((summary) => ({
         ...summary,
         distanceM: distanceById.get(summary.id) ?? 0,
+        coords:
+          coordsById.get(summary.id) ??
+          parseGeographyPoint(summary.location),
       }));
     },
   });
