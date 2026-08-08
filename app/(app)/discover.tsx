@@ -1,28 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ScrollView as TwScrollView, View, Text, Pressable } from '@/tw';
-import { useDiscoverMatches, type MatchSummary } from '@/features/matches/use-matches';
+import { useDiscoverMatches } from '@/features/matches/use-matches';
 import { MatchSummaryCard } from '@/features/matches/components/match-summary-card';
 import { useDiscoverMatchesRealtime } from '@/features/matches/use-match-realtime';
 import { NotificationBell } from '@/components/notification-bell';
+import { DiscoverFilterBar } from '@/features/discover/components/discover-filter-bar';
 import { SearchRadiusSlider } from '@/features/discover/components/search-radius-slider';
 import { DiscoverMap } from '@/features/discover/components/discover-map';
-import { SEARCH_RADIUS_DEFAULT_KM } from '@/features/discover/search-radius';
 import {
-  CATEGORY_TIER_LABEL,
-  categoryToTier,
-  type PadelCategoryTier,
-} from '@/lib/padel-category';
+  applyDiscoverFilters,
+  DEFAULT_DISCOVER_FILTERS,
+  hasActiveDiscoverFilters,
+  sortDiscoverMatches,
+  type DiscoverFilters,
+} from '@/features/discover/discover-filters';
+import { SEARCH_RADIUS_DEFAULT_KM } from '@/features/discover/search-radius';
 import type { Coords } from '@/lib/location';
 import {
   useDiscoverLocation,
   type LocationAccessStatus,
 } from '@/features/discover/use-discover-location';
 
-type CategoryFilter = 'All' | PadelCategoryTier;
 type ViewMode = 'list' | 'map';
 
 const C = {
@@ -42,10 +44,6 @@ const C = {
   hair2: 'rgba(228,228,228,0.055)',
   warning: '#E0B15B',
 } as const;
-
-function matchCategoryTier(match: MatchSummary): PadelCategoryTier {
-  return categoryToTier(match.category_max);
-}
 
 function headerLocationLabel(
   status: LocationAccessStatus,
@@ -96,43 +94,6 @@ function LocationGate({
   );
 }
 
-function FilterChips({
-  value,
-  onChange,
-}: {
-  value: CategoryFilter;
-  onChange: (value: CategoryFilter) => void;
-}) {
-  const chips: CategoryFilter[] = ['All', 'advanced', 'intermediate', 'beginner'];
-
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.chipScroll}
-      contentContainerStyle={styles.chipRow}
-    >
-      <View style={styles.filterIconChip}>
-        <Ionicons name="options-outline" size={17} color={C.dim} />
-      </View>
-      {chips.map((chip) => {
-        const active = value === chip;
-        return (
-          <Pressable
-            key={chip}
-            onPress={() => onChange(chip)}
-            style={[styles.chip, active && styles.chipActive]}
-          >
-            <Text style={[styles.chipText, active && styles.chipTextActive]}>
-              {chip === 'All' ? 'All levels' : CATEGORY_TIER_LABEL[chip]}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
-  );
-}
-
 function ViewToggle({
   value,
   onChange,
@@ -178,7 +139,7 @@ export default function DiscoverScreen() {
   const [searchRadiusKm, setSearchRadiusKm] = useState(SEARCH_RADIUS_DEFAULT_KM);
   const [queryCenter, setQueryCenter] = useState<Coords | null>(null);
   const [mapCenterDraft, setMapCenterDraft] = useState<Coords | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('All');
+  const [filters, setFilters] = useState<DiscoverFilters>(DEFAULT_DISCOVER_FILTERS);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   useEffect(() => {
@@ -195,11 +156,9 @@ export default function DiscoverScreen() {
   );
 
   const filteredMatches = useMemo(() => {
-    const source = matches ?? [];
-    return source.filter(
-      (match) => categoryFilter === 'All' || matchCategoryTier(match) === categoryFilter,
-    );
-  }, [matches, categoryFilter]);
+    const filtered = applyDiscoverFilters(matches ?? [], filters);
+    return sortDiscoverMatches(filtered, filters.sort);
+  }, [matches, filters]);
 
   const locationLabel = headerLocationLabel(locationStatus, placeLabel);
 
@@ -244,11 +203,22 @@ export default function DiscoverScreen() {
       ));
     }
 
+    const filtersActive = hasActiveDiscoverFilters(filters);
+
     return (
       <View style={styles.emptyCard}>
         <Ionicons name="search-outline" size={26} color={C.faint} />
         <Text style={styles.emptyTitle}>No matches in range</Text>
-        <Text style={styles.emptyText}>Widen your radius or switch category level.</Text>
+        <Text style={styles.emptyText}>
+          {filtersActive
+            ? 'Try adjusting your filters or widening your search radius.'
+            : 'Widen your radius or check back later.'}
+        </Text>
+        {filtersActive ? (
+          <Pressable onPress={() => setFilters(DEFAULT_DISCOVER_FILTERS)} style={styles.emptyAction}>
+            <Text style={styles.emptyActionText}>Reset filters</Text>
+          </Pressable>
+        ) : null}
       </View>
     );
   }
@@ -308,7 +278,11 @@ export default function DiscoverScreen() {
               ) : null}
 
               <SearchRadiusSlider radiusKm={searchRadiusKm} onRadiusCommit={setSearchRadiusKm} />
-              <FilterChips value={categoryFilter} onChange={setCategoryFilter} />
+              <DiscoverFilterBar
+                filters={filters}
+                onChange={setFilters}
+                resultCount={filteredMatches.length}
+              />
 
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>
@@ -332,7 +306,11 @@ export default function DiscoverScreen() {
                 ) : null}
 
                 <SearchRadiusSlider radiusKm={searchRadiusKm} onRadiusCommit={setSearchRadiusKm} />
-                <FilterChips value={categoryFilter} onChange={setCategoryFilter} />
+                <DiscoverFilterBar
+                  filters={filters}
+                  onChange={setFilters}
+                  resultCount={filteredMatches.length}
+                />
 
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>
@@ -439,45 +417,6 @@ const styles = StyleSheet.create({
   },
   mapBody: {
     flex: 1,
-  },
-  chipScroll: {
-    marginBottom: 22,
-  },
-  chipRow: {
-    paddingHorizontal: 20,
-    gap: 8,
-  },
-  filterIconChip: {
-    width: 43,
-    height: 39,
-    borderRadius: 11,
-    backgroundColor: C.surface1,
-    borderWidth: 1,
-    borderColor: C.hair,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chip: {
-    height: 39,
-    borderRadius: 11,
-    backgroundColor: C.surface1,
-    borderWidth: 1,
-    borderColor: C.hair,
-    paddingHorizontal: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  chipActive: {
-    backgroundColor: C.blue,
-    borderColor: C.blue,
-  },
-  chipText: {
-    fontFamily: 'HankenGrotesk-Bold',
-    fontSize: 14,
-    color: C.dim,
-  },
-  chipTextActive: {
-    color: C.mist,
   },
   sectionHeader: {
     paddingHorizontal: 20,
@@ -600,5 +539,21 @@ const styles = StyleSheet.create({
     color: C.dim,
     textTransform: 'uppercase',
     textAlign: 'center',
+  },
+  emptyAction: {
+    marginTop: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(116,136,216,0.30)',
+    backgroundColor: 'rgba(43,57,109,0.20)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  emptyActionText: {
+    fontFamily: 'SpaceMono-Bold',
+    fontSize: 10.5,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    color: C.blueHi,
   },
 });
