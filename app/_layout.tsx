@@ -1,8 +1,13 @@
+/* eslint-disable import/no-duplicates -- RNGH side-effect import must stay first */
+import 'react-native-gesture-handler';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+/* eslint-enable import/no-duplicates */
 import '../src/global.css';
 
 import { useEffect, useState, useCallback } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 import {
   HankenGrotesk_400Regular,
@@ -14,24 +19,22 @@ import {
   SpaceMono_400Regular,
   SpaceMono_700Bold,
 } from '@expo-google-fonts/space-mono';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { applyRealtimeAuth, subscribeToAuthChanges } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { initSentry } from '@/lib/sentry';
+import { queryClient, persistOptions } from '@/lib/query-client';
+import { wireQueryPlatformManagers } from '@/lib/query-focus-manager';
 import { AppDialogProvider } from '@/components/app-alert-dialog';
 import { OnboardingContext } from '@/lib/onboarding-context';
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,
-      gcTime: 1000 * 60 * 10,
-      retry: 1,
-    },
-  },
-});
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
+initSentry();
+wireQueryPlatformManagers();
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -45,13 +48,10 @@ export default function RootLayout() {
 
   const [session, setSession] = useState<Session | null>(null);
   const [isReady, setIsReady] = useState(false);
-  // null = still checking; false = no username; true = profile complete
   const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
   const router = useRouter();
   const segments = useSegments();
 
-  // Queries the profiles table to determine whether the user has completed
-  // onboarding. "Complete" is defined as having a non-null username.
   const checkProfileComplete = useCallback(async (userId: string): Promise<void> => {
     try {
       const { data, error } = await supabase
@@ -61,9 +61,6 @@ export default function RootLayout() {
         .maybeSingle();
 
       if (error !== null) {
-        // PGRST303 means the stored JWT's iat is ahead of the server clock (clock
-        // skew — common in dev when Metro restarts). Refresh the session to get a
-        // new token, then retry once before giving up.
         if (error.code === 'PGRST303') {
           logger.warn('checkProfileComplete: JWT clock skew detected, refreshing session');
           const { error: refreshError } = await supabase.auth.refreshSession();
@@ -72,7 +69,6 @@ export default function RootLayout() {
             await supabase.auth.signOut();
             return;
           }
-          // Retry with the fresh token.
           const { data: retryData, error: retryError } = await supabase
             .from('profiles')
             .select('username')
@@ -88,7 +84,6 @@ export default function RootLayout() {
         }
 
         logger.error('checkProfileComplete: query failed', error);
-        // Safest fallback: treat as incomplete so the user can set up their profile.
         setProfileComplete(false);
         return;
       }
@@ -100,18 +95,16 @@ export default function RootLayout() {
     }
   }, []);
 
-  // Re-check profile completeness whenever the session identity changes.
+  const resolvedProfileComplete = session === null ? null : profileComplete;
+
   useEffect(() => {
     if (session === null) {
-      // Reset so the check runs fresh on the next sign-in.
-      setProfileComplete(null);
       return;
     }
     void checkProfileComplete(session.user.id);
   }, [session, checkProfileComplete]);
 
   useEffect(() => {
-    // Hydrate session from secure storage on first mount.
     void supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
       await applyRealtimeAuth(data.session?.access_token ?? null);
@@ -132,7 +125,6 @@ export default function RootLayout() {
     const inAuthGroup = segments[0] === '(auth)';
     const inOnboarding = segments[0] === '(onboarding)';
 
-    // No session → always send to login (no need to wait for profileComplete).
     if (session === null) {
       if (!inAuthGroup) {
         router.replace('/(auth)/login');
@@ -140,23 +132,23 @@ export default function RootLayout() {
       return;
     }
 
-    // Session exists — wait for profile check before redirecting.
-    if (profileComplete === null) return;
+    if (resolvedProfileComplete === null) return;
 
     const inAppGroup = segments[0] === '(app)';
 
-    if (profileComplete === false && !inOnboarding) {
+    if (resolvedProfileComplete === false && !inOnboarding) {
       router.replace('/(onboarding)/profile');
-    } else if (profileComplete === true && !inAppGroup) {
-      // Redirect from anywhere outside the app shell: (auth), (onboarding),
-      // or the root index (cold-start with a cached session).
+    } else if (resolvedProfileComplete === true && !inAppGroup) {
       router.replace('/(app)/profile');
     }
-  }, [session, isReady, profileComplete, segments, router]);
+  }, [session, isReady, resolvedProfileComplete, segments, router]);
 
-  // Synchronously marks the profile as complete. Called by the onboarding
-  // screen immediately after the DB writes succeed, before router.replace,
-  // so the redirect guard sees the correct state on the very next evaluation.
+  useEffect(() => {
+    if (fontsLoaded && isReady && (session === null || resolvedProfileComplete !== null)) {
+      void SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, isReady, resolvedProfileComplete, session]);
+
   const markProfileComplete = useCallback(() => {
     setProfileComplete(true);
   }, []);
@@ -164,15 +156,19 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <AppDialogProvider>
-          <OnboardingContext.Provider value={{ markProfileComplete }}>
-            <StatusBar style="light" />
-            <Stack screenOptions={{ headerShown: false }} />
-          </OnboardingContext.Provider>
-        </AppDialogProvider>
-      </QueryClientProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <PersistQueryClientProvider client={queryClient} persistOptions={persistOptions}>
+          <BottomSheetModalProvider>
+            <AppDialogProvider>
+              <OnboardingContext.Provider value={{ markProfileComplete }}>
+                <StatusBar style="light" />
+                <Stack screenOptions={{ headerShown: false }} />
+              </OnboardingContext.Provider>
+            </AppDialogProvider>
+          </BottomSheetModalProvider>
+        </PersistQueryClientProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

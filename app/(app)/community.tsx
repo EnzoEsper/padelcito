@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, View, Text, Pressable } from '@/tw';
+import { FlashList, View, Text, Pressable } from '@/tw';
 import { NotificationBell } from '@/components/notification-bell';
 import { PostSummaryCard } from '@/features/community/components/post-summary-card';
 import {
@@ -27,6 +27,7 @@ import {
   useDiscoverLocation,
   type LocationAccessStatus,
 } from '@/features/discover/use-discover-location';
+import type { PostSummary } from '@/features/community/use-posts';
 
 type FeedMode = CommunityFeedMode;
 type TypeFilter = CommunityTypeFilter;
@@ -96,7 +97,6 @@ function LocationGate({
   );
 }
 
-
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -135,6 +135,13 @@ export default function CommunityScreen() {
   const posts = activeQuery.data ?? [];
   const showLocationGate = feedMode === 'nearby' && !locationReady;
 
+  const openPost = useCallback(
+    (postId: string) => {
+      router.push(buildPostDetailRoute(postId));
+    },
+    [router],
+  );
+
   function handleRefresh() {
     if (feedMode === 'nearby' && !locationReady) {
       void retryLocation();
@@ -148,14 +155,18 @@ export default function CommunityScreen() {
       ? locationStatus === 'locating'
       : activeQuery.isRefetching;
 
-  return (
-    <View className="flex-1 bg-background">
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 96 }]}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={C.mist} />
-        }
-      >
+  const renderItem = useCallback(
+    ({ item }: { item: PostSummary }) => (
+      <PostSummaryCard post={item} onPress={() => openPost(item.id)} />
+    ),
+    [openPost],
+  );
+
+  const keyExtractor = useCallback((item: PostSummary) => item.id, []);
+
+  const listHeader = useMemo(
+    () => (
+      <>
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <View className="flex-1 pr-3">
             <View style={styles.locationRow}>
@@ -210,49 +221,85 @@ export default function CommunityScreen() {
             onOpenSettings={() => void openSettings()}
           />
         ) : (
-          <>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{sectionTitle(feedMode, posts.length)}</Text>
-              {activeQuery.isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
-            </View>
-
-            {activeQuery.isLoading ? (
-              <View style={styles.centerState}>
-                <ActivityIndicator color={C.mist} />
-              </View>
-            ) : activeQuery.isError ? (
-              <View style={styles.errorCard}>
-                <Text style={styles.errorText}>
-                  {activeQuery.error instanceof Error
-                    ? activeQuery.error.message
-                    : 'Could not load community posts.'}
-                </Text>
-                <Pressable onPress={() => void activeQuery.refetch()}>
-                  <Text style={styles.errorAction}>Try again</Text>
-                </Pressable>
-              </View>
-            ) : posts.length === 0 ? (
-              <View style={styles.emptyCard}>
-                <Ionicons name="megaphone-outline" size={26} color={C.faint} />
-                <Text style={styles.emptyTitle}>No events yet</Text>
-                <Text style={styles.emptyText}>
-                  {feedMode === 'nearby'
-                    ? 'No approved posts nearby. Try All events or publish the first one.'
-                    : 'No approved posts yet. Be the first to publish a tournament or training session.'}
-                </Text>
-              </View>
-            ) : (
-              posts.map((post) => (
-                <PostSummaryCard
-                  key={post.id}
-                  post={post}
-                  onPress={() => router.push(buildPostDetailRoute(post.id))}
-                />
-              ))
-            )}
-          </>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{sectionTitle(feedMode, posts.length)}</Text>
+            {activeQuery.isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
+          </View>
         )}
-      </ScrollView>
+      </>
+    ),
+    [
+      activeQuery.isRefetching,
+      errorMessage,
+      feedMode,
+      insets.top,
+      isModerator,
+      locationLabel,
+      locationStatus,
+      openSettings,
+      pendingReviewCount,
+      posts.length,
+      retryLocation,
+      router,
+      saveWarning,
+      showLocationGate,
+      typeFilter,
+    ],
+  );
+
+  const listEmpty = useMemo(() => {
+    if (showLocationGate) return null;
+    if (activeQuery.isLoading) {
+      return (
+        <View style={styles.centerState}>
+          <ActivityIndicator color={C.mist} />
+        </View>
+      );
+    }
+    if (activeQuery.isError) {
+      return (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>
+            {activeQuery.error instanceof Error
+              ? activeQuery.error.message
+              : 'Could not load community posts.'}
+          </Text>
+          <Pressable onPress={() => void activeQuery.refetch()}>
+            <Text style={styles.errorAction}>Try again</Text>
+          </Pressable>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.emptyCard}>
+        <Ionicons name="megaphone-outline" size={26} color={C.faint} />
+        <Text style={styles.emptyTitle}>No events yet</Text>
+        <Text style={styles.emptyText}>
+          {feedMode === 'nearby'
+            ? 'No approved posts nearby. Try All events or publish the first one.'
+            : 'No approved posts yet. Be the first to publish a tournament or training session.'}
+        </Text>
+      </View>
+    );
+  }, [
+    activeQuery,
+    feedMode,
+    showLocationGate,
+  ]);
+
+  return (
+    <View className="flex-1 bg-background">
+      <FlashList
+        data={showLocationGate ? [] : posts}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={listEmpty}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={C.mist} />
+        }
+      />
 
       <Pressable
         onPress={() => router.push(buildCreatePostRoute())}
@@ -268,9 +315,6 @@ export default function CommunityScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: {
-    backgroundColor: C.background,
-  },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 16,

@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView as TwScrollView, View, Text, Pressable } from '@/tw';
+import { FlashList, ScrollView as TwScrollView, View, Text, Pressable } from '@/tw';
 import { useDiscoverMatches } from '@/features/matches/use-matches';
 import { MatchSummaryCard } from '@/features/matches/components/match-summary-card';
 import { useDiscoverMatchesRealtime } from '@/features/matches/use-match-realtime';
@@ -20,6 +20,7 @@ import {
 } from '@/features/discover/discover-filters';
 import { SEARCH_RADIUS_DEFAULT_KM } from '@/features/discover/search-radius';
 import type { Coords } from '@/lib/location';
+import type { MatchSummary } from '@/features/matches/use-matches';
 import {
   useDiscoverLocation,
   type LocationAccessStatus,
@@ -147,7 +148,7 @@ export default function DiscoverScreen() {
       setQueryCenter(coords);
       setMapCenterDraft(coords);
     }
-  }, [coords?.lat, coords?.lng]);
+  }, [coords]);
 
   useDiscoverMatchesRealtime();
   const { data: matches, isPending, isRefetching, refetch, error } = useDiscoverMatches(
@@ -172,7 +173,55 @@ export default function DiscoverScreen() {
 
   const isRefreshing = locationReady ? isRefetching : locationStatus === 'locating';
 
-  function renderListBody() {
+  const openMatch = useCallback(
+    (matchId: string) => {
+      router.push(`/(app)/match-detail?id=${matchId}`);
+    },
+    [router],
+  );
+
+  const renderMatchItem = useCallback(
+    ({ item }: { item: MatchSummary }) => (
+      <MatchSummaryCard
+        match={item}
+        distanceM={item.distanceM}
+        onPress={() => openMatch(item.id)}
+      />
+    ),
+    [openMatch],
+  );
+
+  const matchKeyExtractor = useCallback((item: MatchSummary) => item.id, []);
+
+  const listHeader = useMemo(
+    () => (
+      <>
+        {saveWarning !== null ? (
+          <View style={styles.saveWarningCard}>
+            <Text style={styles.saveWarningText}>{saveWarning}</Text>
+          </View>
+        ) : null}
+
+        <SearchRadiusSlider radiusKm={searchRadiusKm} onRadiusCommit={setSearchRadiusKm} />
+        <DiscoverFilterBar
+          filters={filters}
+          onChange={setFilters}
+          resultCount={filteredMatches.length}
+        />
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>{filteredMatches.length} Open Nearby</Text>
+          <View style={styles.sectionRight}>
+            {isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
+            <ViewToggle value={viewMode} onChange={setViewMode} />
+          </View>
+        </View>
+      </>
+    ),
+    [filteredMatches.length, filters, isRefetching, saveWarning, searchRadiusKm, viewMode],
+  );
+
+  const listEmpty = useMemo(() => {
     if (isPending) {
       return (
         <View style={styles.centerState}>
@@ -180,7 +229,6 @@ export default function DiscoverScreen() {
         </View>
       );
     }
-
     if (error !== null) {
       return (
         <View style={styles.errorCard}>
@@ -191,20 +239,7 @@ export default function DiscoverScreen() {
         </View>
       );
     }
-
-    if (filteredMatches.length > 0) {
-      return filteredMatches.map((match) => (
-        <MatchSummaryCard
-          key={match.id}
-          match={match}
-          distanceM={match.distanceM}
-          onPress={() => router.push(`/(app)/match-detail?id=${match.id}`)}
-        />
-      ));
-    }
-
     const filtersActive = hasActiveDiscoverFilters(filters);
-
     return (
       <View style={styles.emptyCard}>
         <Ionicons name="search-outline" size={26} color={C.faint} />
@@ -221,7 +256,7 @@ export default function DiscoverScreen() {
         ) : null}
       </View>
     );
-  }
+  }, [error, filters, isPending, refetch]);
 
   return (
     <View style={styles.root}>
@@ -260,9 +295,14 @@ export default function DiscoverScreen() {
       ) : (
         <>
           {viewMode === 'list' ? (
-            <TwScrollView
+            <FlashList
               className="flex-1 bg-background"
               contentContainerStyle={styles.listContent}
+              data={filteredMatches}
+              keyExtractor={matchKeyExtractor}
+              renderItem={renderMatchItem}
+              ListHeaderComponent={listHeader}
+              ListEmptyComponent={listEmpty}
               refreshControl={
                 <RefreshControl
                   refreshing={isRefreshing}
@@ -270,32 +310,7 @@ export default function DiscoverScreen() {
                   tintColor={C.mist}
                 />
               }
-            >
-              {saveWarning !== null ? (
-                <View style={styles.saveWarningCard}>
-                  <Text style={styles.saveWarningText}>{saveWarning}</Text>
-                </View>
-              ) : null}
-
-              <SearchRadiusSlider radiusKm={searchRadiusKm} onRadiusCommit={setSearchRadiusKm} />
-              <DiscoverFilterBar
-                filters={filters}
-                onChange={setFilters}
-                resultCount={filteredMatches.length}
-              />
-
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>
-                  {filteredMatches.length} Open Nearby
-                </Text>
-                <View style={styles.sectionRight}>
-                  {isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
-                  <ViewToggle value={viewMode} onChange={setViewMode} />
-                </View>
-              </View>
-
-              {renderListBody()}
-            </TwScrollView>
+            />
           ) : (
             <View style={styles.mapLayout}>
               <View style={styles.mapControls}>

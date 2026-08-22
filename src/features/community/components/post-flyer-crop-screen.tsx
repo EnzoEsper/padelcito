@@ -117,27 +117,13 @@ export function PostFlyerCropScreen({
 
     viewportW.value = viewportSize.width;
     viewportH.value = viewportSize.height;
+  // Shared values from useSharedValue are stable; omitting them avoids false immutability lint noise.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional init when layout/asset changes
   }, [
     asset.uri,
-    centerX,
-    centerY,
-    frameH,
-    frameW,
-    frameX,
-    frameY,
     initialFrame,
     initialTransform,
-    savedCenterX,
-    savedCenterY,
-    savedFrameH,
-    savedFrameW,
-    savedFrameX,
-    savedFrameY,
-    savedScale,
-    scale,
-    viewportH,
     viewportSize,
-    viewportW,
   ]);
 
   function handleViewportLayout(event: LayoutChangeEvent): void {

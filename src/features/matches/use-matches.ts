@@ -11,6 +11,10 @@ import { computeMatchRosterStats } from '@/features/matches/match-roster';
 import type { Database } from '@/types/database';
 
 type MatchRow = Database['public']['Tables']['matches']['Row'];
+type MatchWithEmbeds = MatchRow & {
+  sport?: SportRow | null;
+  host?: PublicProfileRow | null;
+};
 type MatchInsert = Database['public']['Tables']['matches']['Insert'];
 type ParticipantRow = Database['public']['Tables']['match_participants']['Row'];
 type ParticipantStatus = Database['public']['Enums']['participant_status'];
@@ -106,53 +110,13 @@ function isHistoryListMatch(match: MatchSummary, now: number): boolean {
   return !isFutureMatch(match, now);
 }
 
-type MatchScheduleFields = Pick<MatchSummary, 'starts_at' | 'status'>;
-
-export function isMatchPreStart(
-  match: MatchScheduleFields,
-  nowMs: number = Date.now(),
-): boolean {
-  return (
-    (match.status === 'open' || match.status === 'full') &&
-    new Date(match.starts_at).getTime() > nowMs
-  );
-}
-
-export function canHostEditRoster(
-  match: MatchScheduleFields & { isHost: boolean },
-  nowMs: number = Date.now(),
-): boolean {
-  return match.isHost && isMatchPreStart(match, nowMs);
-}
-
-export function canHostManageRoster(
-  match: MatchScheduleFields & { isHost: boolean; appAcceptedCount: number },
-  nowMs: number = Date.now(),
-): boolean {
-  return canHostEditRoster(match, nowMs) && match.appAcceptedCount > 0;
-}
-
-export function canHostCancelMatch(
-  match: MatchScheduleFields,
-  nowMs: number = Date.now(),
-): boolean {
-  return isMatchPreStart(match, nowMs);
-}
-
-export function canPlayerWithdraw(
-  match: MatchScheduleFields & {
-    isHost: boolean;
-    currentUserParticipant: ParticipantRow | null;
-  },
-  nowMs: number = Date.now(),
-): boolean {
-  return (
-    !match.isHost &&
-    match.status !== 'cancelled' &&
-    match.currentUserParticipant?.status === 'accepted' &&
-    isMatchPreStart(match, nowMs)
-  );
-}
+export {
+  canHostCancelMatch,
+  canHostEditRoster,
+  canHostManageRoster,
+  canPlayerWithdraw,
+  isMatchPreStart,
+} from '@/features/matches/match-lifecycle';
 
 export const matchKeys = {
   all: ['matches'] as const,
@@ -255,12 +219,41 @@ function summarizeMatch(
   };
 }
 
-async function hydrateSummaries(matches: MatchRow[], userId: string): Promise<MatchSummary[]> {
-  const [sportsById, participants] = await Promise.all([
-    fetchSportsByIds(matches.map((match) => match.sport_id)),
+async function hydrateSummaries(
+  matches: MatchWithEmbeds[],
+  userId: string,
+): Promise<MatchSummary[]> {
+  if (matches.length === 0) return [];
+
+  const needsSports = matches.some((match) => match.sport === undefined);
+  const needsProfiles = matches.some((match) => match.host === undefined);
+
+  const [sportsById, participants, profilesById] = await Promise.all([
+    needsSports
+      ? fetchSportsByIds(matches.map((match) => match.sport_id))
+      : Promise.resolve(
+          new Map(
+            matches
+              .map((match) => match.sport)
+              .filter((sport): sport is SportRow => sport !== undefined && sport !== null)
+              .map((sport) => [sport.id, sport]),
+          ),
+        ),
     fetchVisibleParticipants(matches.map((match) => match.id)),
+    needsProfiles
+      ? fetchPublicProfilesByIds(matches.map((match) => match.host_id))
+      : Promise.resolve(
+          new Map(
+            matches
+              .map((match) => match.host)
+              .filter(
+                (profile): profile is PublicProfileRow & { id: string } =>
+                  profile !== undefined && profile !== null && profile.id !== null,
+              )
+              .map((profile) => [profile.id, profile]),
+          ),
+        ),
   ]);
-  const profilesById = await fetchPublicProfilesByIds(matches.map((match) => match.host_id));
 
   return matches.map((match) =>
     summarizeMatch(match, sportsById, profilesById, participants, userId),
@@ -306,7 +299,7 @@ export function useDiscoverMatches(coords: Coords | null, radiusKm: number) {
 
       const { data: matches, error: matchError } = await supabase
         .from('matches')
-        .select('*')
+        .select('*, sport:sports(*), host:public_profiles(*)')
         .in('id', matchIds);
 
       if (matchError !== null) throw matchError;
@@ -396,7 +389,7 @@ export function useMyMatches() {
       const [hostedResult, participantResult] = await Promise.all([
         supabase
           .from('matches')
-          .select('*')
+          .select('*, sport:sports(*), host:public_profiles(*)')
           .eq('host_id', userId)
           .eq('sport_id', padelSport.id)
           .order('starts_at', { ascending: true }),
@@ -418,7 +411,7 @@ export function useMyMatches() {
         participantMatchIds.length > 0
           ? await supabase
               .from('matches')
-              .select('*')
+              .select('*, sport:sports(*), host:public_profiles(*)')
               .in('id', unique(participantMatchIds))
               .eq('sport_id', padelSport.id)
           : { data: [] as MatchRow[], error: null };

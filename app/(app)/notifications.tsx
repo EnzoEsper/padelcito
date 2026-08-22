@@ -1,8 +1,9 @@
+import { useCallback, useMemo } from 'react';
 import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { ScrollView, View, Text, Pressable } from '@/tw';
+import { FlashList, View, Text, Pressable } from '@/tw';
 import {
   formatNotificationTime,
   groupNotificationsByDay,
@@ -25,7 +26,6 @@ const C = {
   faint: 'rgba(228,228,228,0.38)',
   hair: 'rgba(228,228,228,0.10)',
   hair2: 'rgba(228,228,228,0.055)',
-  primary: '#2B396D',
   primaryHi: '#5E70B8',
   success: '#5BE0A6',
   warning: '#E0B15B',
@@ -36,6 +36,8 @@ const ACCENT: Record<'primary' | 'success' | 'warning', string> = {
   success: C.success,
   warning: C.warning,
 };
+
+type NotificationSection = { label: string; items: NotificationRow[] };
 
 function NotificationRowItem({
   notification,
@@ -76,6 +78,31 @@ function NotificationRowItem({
   );
 }
 
+function NotificationSectionBlock({
+  section,
+  onPressNotification,
+}: {
+  section: NotificationSection;
+  onPressNotification: (notification: NotificationRow) => void;
+}) {
+  return (
+    <View style={styles.group}>
+      <Text style={styles.groupLabel}>{section.label}</Text>
+      <View style={styles.groupCard}>
+        {section.items.map((notification, index) => (
+          <View key={notification.id}>
+            <NotificationRowItem
+              notification={notification}
+              onPress={() => onPressNotification(notification)}
+            />
+            {index < section.items.length - 1 ? <View style={styles.rowDivider} /> : null}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -83,33 +110,35 @@ export default function NotificationsScreen() {
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
 
-  const notifications = data?.notifications ?? [];
-  const groups = groupNotificationsByDay(notifications);
+  const notifications = useMemo(() => data?.notifications ?? [], [data?.notifications]);
+  const sections = useMemo(() => groupNotificationsByDay(notifications), [notifications]);
   const hasUnread = notifications.some(isNotificationUnread);
 
-  function handleNotificationPress(notification: NotificationRow) {
-    if (isNotificationUnread(notification)) {
-      markRead.mutate(notification.id);
-    }
-
-    const route = resolveNotificationPresentation(notification).route;
-    if (route !== null) {
-      router.push(route);
-    }
-  }
-
-  return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={() => void refetch()}
-          tintColor={C.mist}
-        />
+  const handleNotificationPress = useCallback(
+    (notification: NotificationRow) => {
+      if (isNotificationUnread(notification)) {
+        markRead.mutate(notification.id);
       }
-    >
+
+      const route = resolveNotificationPresentation(notification).route;
+      if (route !== null) {
+        router.push(route);
+      }
+    },
+    [markRead, router],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: NotificationSection }) => (
+      <NotificationSectionBlock section={item} onPressNotification={handleNotificationPress} />
+    ),
+    [handleNotificationPress],
+  );
+
+  const keyExtractor = useCallback((item: NotificationSection) => item.label, []);
+
+  const listHeader = useMemo(
+    () => (
       <View style={styles.header}>
         <Pressable
           onPress={() => router.back()}
@@ -137,45 +166,56 @@ export default function NotificationsScreen() {
           <View style={styles.markAllPlaceholder} />
         )}
       </View>
+    ),
+    [hasUnread, markAllRead, router],
+  );
 
-      {isPending ? (
+  const listEmpty = useMemo(() => {
+    if (isPending) {
+      return (
         <View style={styles.centerState}>
           <ActivityIndicator color={C.mist} />
         </View>
-      ) : error !== null ? (
+      );
+    }
+    if (error !== null) {
+      return (
         <View style={styles.errorCard}>
           <Text style={styles.errorText}>Could not load notifications.</Text>
           <Pressable onPress={() => void refetch()}>
             <Text style={styles.errorAction}>Try again</Text>
           </Pressable>
         </View>
-      ) : notifications.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Ionicons name="notifications-off-outline" size={28} color={C.faint} />
-          <Text style={styles.emptyTitle}>No notifications yet</Text>
-          <Text style={styles.emptyText}>
-            Match updates like join requests and roster changes will appear here.
-          </Text>
-        </View>
-      ) : (
-        groups.map((group) => (
-          <View key={group.label} style={styles.group}>
-            <Text style={styles.groupLabel}>{group.label}</Text>
-            <View style={styles.groupCard}>
-              {group.items.map((notification, index) => (
-                <View key={notification.id}>
-                  <NotificationRowItem
-                    notification={notification}
-                    onPress={() => handleNotificationPress(notification)}
-                  />
-                  {index < group.items.length - 1 ? <View style={styles.rowDivider} /> : null}
-                </View>
-              ))}
-            </View>
-          </View>
-        ))
-      )}
-    </ScrollView>
+      );
+    }
+    return (
+      <View style={styles.emptyCard}>
+        <Ionicons name="notifications-off-outline" size={28} color={C.faint} />
+        <Text style={styles.emptyTitle}>No notifications yet</Text>
+        <Text style={styles.emptyText}>
+          Match updates like join requests and roster changes will appear here.
+        </Text>
+      </View>
+    );
+  }, [error, isPending, refetch]);
+
+  return (
+    <FlashList
+      className="flex-1 bg-background"
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
+      data={sections}
+      keyExtractor={keyExtractor}
+      renderItem={renderItem}
+      ListHeaderComponent={listHeader}
+      ListEmptyComponent={listEmpty}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefetching}
+          onRefresh={() => void refetch()}
+          tintColor={C.mist}
+        />
+      }
+    />
   );
 }
 

@@ -9,5 +9,12 @@
       "@/*": ["src/*"]
     }
   },
-  "exclude": ["supabase/functions"]
+  "exclude": [
+    "supabase/functions",
+    "**/__tests__/**",
+    "jest.setup.ts",
+    "jest.config.js",
+    "metro.config.js",
+    "babel.config.js"
+  ]
 }

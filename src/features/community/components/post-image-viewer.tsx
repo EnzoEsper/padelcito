@@ -1,6 +1,7 @@
-import { Image, Modal, Pressable as RNPressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable as RNPressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CachedRemoteImage } from '@/components/cached-remote-image';
 
 type PostImageViewerProps = {
   visible: boolean;
@@ -44,8 +45,8 @@ export function PostImageViewer({
             <Ionicons name="close" size={24} color="#E4E4E4" />
           </RNPressable>
 
-          <Image
-            source={{ uri }}
+          <CachedRemoteImage
+            uri={uri}
             style={[
               styles.image,
               {
@@ -53,7 +54,7 @@ export function PostImageViewer({
                 marginBottom: insets.bottom,
               },
             ]}
-            resizeMode="contain"
+            contentFit="contain"
             accessibilityLabel={accessibilityLabel}
           />
         </View>

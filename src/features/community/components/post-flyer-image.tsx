@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   type LayoutChangeEvent,
   StyleSheet,
   useWindowDimensions,
@@ -9,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable } from '@/tw';
+import { CachedRemoteImage } from '@/components/cached-remote-image';
 import {
   resolveFlyerDisplayHeight,
   type PostFlyerVariant,
@@ -79,10 +79,8 @@ export function PostFlyerImage({
     }
   }
 
-  function handleLoad(event: {
-    nativeEvent: { source: { width: number; height: number } };
-  }): void {
-    const { width: loadedWidth, height: loadedHeight } = event.nativeEvent.source;
+  function handleLoad(event: { source: { width: number; height: number } }): void {
+    const { width: loadedWidth, height: loadedHeight } = event.source;
     if (loadedWidth > 0 && loadedHeight > 0) {
       setResolvedWidth(loadedWidth);
       setResolvedHeight(loadedHeight);
@@ -105,10 +103,10 @@ export function PostFlyerImage({
         </View>
       ) : null}
 
-      <Image
-        source={{ uri }}
+      <CachedRemoteImage
+        uri={uri}
         style={styles.image}
-        resizeMode="contain"
+        contentFit="contain"
         onLoad={handleLoad}
         onLoadEnd={() => setIsLoading(false)}
       />

@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+import { captureException } from '@/lib/sentry';
 
 declare const __DEV__: boolean;
 
@@ -23,5 +23,9 @@ export const logger = {
   },
   error: (...args: LogArgs): void => {
     console.error(...prefixed('error', args));
+    const firstError = args.find((arg) => arg instanceof Error);
+    if (firstError instanceof Error) {
+      captureException(firstError);
+    }
   },
 };

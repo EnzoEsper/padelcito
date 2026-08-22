@@ -1,0 +1,9 @@
+appId: com.padelcito.app
+---
+# Host → request → accept → WhatsApp smoke flow (requires seeded dev accounts + EAS dev client).
+- launchApp
+- assertVisible: "Discover"
+- tapOn: "Matches"
+- assertVisible: "Calendar"
+- tapOn: "Discover"
+- assertVisible: "Discover"

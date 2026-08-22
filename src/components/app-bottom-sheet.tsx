@@ -1,5 +1,12 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable as RNPressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { StyleSheet, View } from 'react-native';
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetView,
+  type BottomSheetBackdropProps,
+} from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable, Text } from '@/tw';
@@ -13,6 +20,12 @@ type AppBottomSheetProps = {
   maxHeight?: `${number}%`;
 };
 
+function parseSnapPercent(maxHeight: `${number}%`): number {
+  const parsed = Number.parseInt(maxHeight.replace('%', ''), 10);
+  if (Number.isNaN(parsed)) return 52;
+  return Math.min(Math.max(parsed, 25), 95);
+}
+
 export function AppBottomSheet({
   visible,
   onClose,
@@ -22,59 +35,63 @@ export function AppBottomSheet({
   maxHeight = '52%',
 }: AppBottomSheetProps) {
   const insets = useSafeAreaInsets();
+  const sheetRef = useRef<BottomSheetModal>(null);
+  const snapPoints = useMemo(() => [`${parseSnapPercent(maxHeight)}%`], [maxHeight]);
+
+  useEffect(() => {
+    if (visible) {
+      sheetRef.current?.present();
+      return;
+    }
+    sheetRef.current?.dismiss();
+  }, [visible]);
+
+  const renderBackdrop = useCallback(
+    (props: BottomSheetBackdropProps) => (
+      <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.6} />
+    ),
+    [],
+  );
 
   return (
-    <Modal
-      transparent
-      animationType="slide"
-      visible={visible}
-      onRequestClose={onClose}
-      statusBarTranslucent
+    <BottomSheetModal
+      ref={sheetRef}
+      snapPoints={snapPoints}
+      enablePanDownToClose
+      onDismiss={onClose}
+      backdropComponent={renderBackdrop}
+      backgroundStyle={styles.sheet}
+      handleIndicatorStyle={styles.handle}
     >
-      <RNPressable style={styles.scrim} onPress={onClose}>
-        <RNPressable
-          style={[styles.sheet, { maxHeight, paddingBottom: Math.max(insets.bottom, 20) }]}
-          onPress={() => undefined}
-        >
-          <View style={styles.handleRow}>
-            <View style={styles.handle} />
+      <BottomSheetView style={{ paddingBottom: Math.max(insets.bottom, 20) }}>
+        {title !== undefined || showClose ? (
+          <View style={styles.headerRow}>
+            {title !== undefined ? (
+              <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38">
+                {title}
+              </Text>
+            ) : (
+              <View />
+            )}
+            {showClose ? (
+              <Pressable
+                onPress={onClose}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Ionicons name="close" size={20} color="rgba(228,228,228,0.45)" />
+              </Pressable>
+            ) : null}
           </View>
-
-          {title !== undefined || showClose ? (
-            <View style={styles.headerRow}>
-              {title !== undefined ? (
-                <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38">
-                  {title}
-                </Text>
-              ) : (
-                <View />
-              )}
-              {showClose ? (
-                <Pressable
-                  onPress={onClose}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Close"
-                >
-                  <Ionicons name="close" size={20} color="rgba(228,228,228,0.45)" />
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-
-          {children}
-        </RNPressable>
-      </RNPressable>
-    </Modal>
+        ) : null}
+        {children}
+      </BottomSheetView>
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
   sheet: {
     backgroundColor: '#1B1C21',
     borderTopLeftRadius: 30,
@@ -85,15 +102,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(228,228,228,0.1)',
     paddingHorizontal: 20,
   },
-  handleRow: {
-    alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
   handle: {
     width: 40,
-    height: 5,
-    borderRadius: 9999,
     backgroundColor: 'rgba(228,228,228,0.2)',
   },
   headerRow: {

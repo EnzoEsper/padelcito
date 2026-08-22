@@ -259,7 +259,7 @@ function ResendRow({ countdown, onResend }: ResendRowProps) {
   return (
     <View className="flex-row items-center justify-center gap-1 mt-5">
       <Text className="font-grotesk text-sm text-neutral/60">
-        Didn't receive it?
+        Didn{"'"}t receive it?
       </Text>
       {canResend ? (
         <Pressable

@@ -19,7 +19,7 @@ import {
   type SkillLevel,
   type ProfileFormData,
 } from '@/features/onboarding/use-onboarding-profile';
-import type { Control, FieldErrors } from 'react-hook-form';
+import type { Control } from 'react-hook-form';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 

@@ -6,6 +6,7 @@ export default [
     ignores: [
       "node_modules/**",
       ".expo/**",
+      ".agents/**",
       "dist/**",
       "supabase/**",
       "docs/**",
@@ -14,11 +15,18 @@ export default [
   },
   ...expo,
   {
-    // Explicitly set the React version to bypass the ESLint v9 auto-detect crash
     settings: {
       react: {
-        version: "18.3.1",
+        version: "19.2.3",
       },
+    },
+    rules: {
+      // React Compiler lint rules are too strict for common RN patterns:
+      // Reanimated shared values, RN Animated.Value, map marker refresh, etc.
+      "react-hooks/immutability": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/incompatible-library": "off",
     },
   },
 ];

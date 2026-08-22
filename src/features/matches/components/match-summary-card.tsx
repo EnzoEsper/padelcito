@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -123,7 +123,7 @@ export type MatchSummaryCardProps = {
   rateAction?: { onPress: () => void };
 };
 
-export function MatchSummaryCard({
+export const MatchSummaryCard = memo(function MatchSummaryCard({
   match,
   onPress,
   distanceM,
@@ -227,7 +227,7 @@ export function MatchSummaryCard({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

@@ -1,8 +1,9 @@
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { useCallback, useMemo } from 'react';
+import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, View, Text } from '@/tw';
+import { FlashList, Pressable, View, Text } from '@/tw';
 import { PostSummaryCard } from '@/features/community/components/post-summary-card';
 import {
   buildCreatePostRoute,
@@ -11,6 +12,7 @@ import {
 import { useMyPosts } from '@/features/community/use-posts';
 import { useMyPostsRealtime } from '@/features/community/use-post-realtime';
 import { useProfile } from '@/features/profile/use-profile';
+import type { PostSummary } from '@/features/community/use-posts';
 
 const C = {
   background: '#0B0B0B',
@@ -28,9 +30,94 @@ export default function MyPostsScreen() {
   useMyPostsRealtime(profile?.id ?? null);
   const posts = postsQuery.data ?? [];
 
+  const openPost = useCallback(
+    (postId: string) => {
+      router.push(buildPostDetailRoute(postId));
+    },
+    [router],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: PostSummary }) => (
+      <PostSummaryCard post={item} showStatus onPress={() => openPost(item.id)} />
+    ),
+    [openPost],
+  );
+
+  const keyExtractor = useCallback((item: PostSummary) => item.id, []);
+
+  const listHeader = useMemo(
+    () => (
+      <View style={{ paddingTop: insets.top + 12 }} className="px-5 pb-5">
+        <Pressable
+          onPress={() => router.back()}
+          className="mb-4 h-10 w-10 rounded-xl bg-surface-1 border border-neutral/10 items-center justify-center"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="chevron-back" size={20} color={C.mist} />
+        </Pressable>
+
+        <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-1">
+          COMMUNITY
+        </Text>
+        <Text
+          className="font-grotesk font-extrabold text-[30px] text-neutral"
+          style={{ letterSpacing: -0.8 }}
+        >
+          My publications
+        </Text>
+        <Text className="font-grotesk text-sm text-neutral/55 mt-2">
+          Track pending, published, and rejected posts you have submitted.
+        </Text>
+      </View>
+    ),
+    [insets.top, router],
+  );
+
+  const listEmpty = useMemo(() => {
+    if (postsQuery.isLoading) {
+      return (
+        <View style={styles.centerState}>
+          <ActivityIndicator color={C.mist} />
+        </View>
+      );
+    }
+    if (postsQuery.isError) {
+      return (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorText}>
+            {postsQuery.error instanceof Error
+              ? postsQuery.error.message
+              : 'Could not load your publications.'}
+          </Text>
+        </View>
+      );
+    }
+    return (
+      <View style={styles.emptyState}>
+        <Ionicons name="megaphone-outline" size={28} color={C.faint} />
+        <Text style={styles.emptyTitle}>No publications yet</Text>
+        <Text style={styles.emptyText}>
+          Publish a tournament or training post to reach players in your area.
+        </Text>
+        <Pressable
+          onPress={() => router.push(buildCreatePostRoute())}
+          style={styles.emptyAction}
+        >
+          <Text style={styles.emptyActionText}>Publish post</Text>
+        </Pressable>
+      </View>
+    );
+  }, [postsQuery.error, postsQuery.isError, postsQuery.isLoading, router]);
+
   return (
     <View className="flex-1 bg-background">
-      <ScrollView
+      <FlashList
+        data={posts}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={listEmpty}
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         refreshControl={
           <RefreshControl
@@ -39,67 +126,7 @@ export default function MyPostsScreen() {
             tintColor={C.mist}
           />
         }
-      >
-        <View style={{ paddingTop: insets.top + 12 }} className="px-5 pb-5">
-          <Pressable
-            onPress={() => router.back()}
-            className="mb-4 h-10 w-10 rounded-xl bg-surface-1 border border-neutral/10 items-center justify-center"
-            accessibilityLabel="Go back"
-          >
-            <Ionicons name="chevron-back" size={20} color={C.mist} />
-          </Pressable>
-
-          <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-1">
-            COMMUNITY
-          </Text>
-          <Text
-            className="font-grotesk font-extrabold text-[30px] text-neutral"
-            style={{ letterSpacing: -0.8 }}
-          >
-            My publications
-          </Text>
-          <Text className="font-grotesk text-sm text-neutral/55 mt-2">
-            Track pending, published, and rejected posts you have submitted.
-          </Text>
-        </View>
-
-        {postsQuery.isLoading ? (
-          <View style={styles.centerState}>
-            <ActivityIndicator color={C.mist} />
-          </View>
-        ) : postsQuery.isError ? (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>
-              {postsQuery.error instanceof Error
-                ? postsQuery.error.message
-                : 'Could not load your publications.'}
-            </Text>
-          </View>
-        ) : posts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="megaphone-outline" size={28} color={C.faint} />
-            <Text style={styles.emptyTitle}>No publications yet</Text>
-            <Text style={styles.emptyText}>
-              Publish a tournament or training post to reach players in your area.
-            </Text>
-            <Pressable
-              onPress={() => router.push(buildCreatePostRoute())}
-              style={styles.emptyAction}
-            >
-              <Text style={styles.emptyActionText}>Publish post</Text>
-            </Pressable>
-          </View>
-        ) : (
-          posts.map((post) => (
-            <PostSummaryCard
-              key={post.id}
-              post={post}
-              showStatus
-              onPress={() => router.push(buildPostDetailRoute(post.id))}
-            />
-          ))
-        )}
-      </ScrollView>
+      />
     </View>
   );
 }

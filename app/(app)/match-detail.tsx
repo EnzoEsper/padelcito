@@ -468,7 +468,7 @@ function FooterAction({
       <View style={styles.footerInner}>
         <View style={styles.confirmedRow}>
           <Ionicons name="checkmark" size={15} color={C.success} />
-          <Text style={styles.confirmedText}>You're hosting this match</Text>
+          <Text style={styles.confirmedText}>You{"'"}re hosting this match</Text>
         </View>
         {hostCanEditRoster && pendingRequestCount > 0 ? (
           <Text style={styles.hostPendingHint}>
@@ -489,7 +489,7 @@ function FooterAction({
       <View style={styles.footerInner}>
         <View style={styles.confirmedRow}>
           <Ionicons name="checkmark" size={15} color={C.success} />
-          <Text style={styles.confirmedText}>You're in — roster confirmed</Text>
+          <Text style={styles.confirmedText}>You{"'"}re in — roster confirmed</Text>
         </View>
         <Pressable onPress={onMessageHost} style={styles.whatsappButton}>
           <Ionicons name="chatbox-outline" size={19} color={C.background} />
@@ -604,7 +604,7 @@ export default function MatchDetailScreen() {
     match !== undefined && canHostEditRoster(match, scheduleNow);
 
   function handleRefresh() {
-    const refreshes: Array<Promise<unknown>> = [refetch()];
+    const refreshes: Promise<unknown>[] = [refetch()];
     if (canViewContacts) {
       refreshes.push(contactsQuery.refetch());
     }

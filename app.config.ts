@@ -17,11 +17,19 @@ const config: ExpoConfig = {
   ...base,
   plugins: [
     ...(base.plugins ?? []),
+    'expo-font',
     [
       'react-native-maps',
       {
         // Plugin prop names from react-native-maps/app.plugin.js (not `googleMapsApiKey`).
         androidGoogleMapsApiKey: googleMapsApiKey,
+      },
+    ],
+    [
+      '@sentry/react-native/expo',
+      {
+        organization: process.env.SENTRY_ORG,
+        project: process.env.SENTRY_PROJECT,
       },
     ],
   ],

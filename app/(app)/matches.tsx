@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, RefreshControl, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { ScrollView, View, Text, Pressable } from "@/tw";
+import { FlashList, View, Text, Pressable } from "@/tw";
 import { useAppAlert } from "@/components/app-alert-dialog";
 import { NotificationBell } from "@/components/notification-bell";
 import { ReliabilityBadge } from "@/components/reliability-badge";
@@ -26,6 +26,10 @@ import { SegmentedControl } from "@/features/matches/create-match/components/seg
 
 type MatchesTab = "upcoming" | "history" | "pending";
 type PendingView = "sent" | "inbox";
+
+type MatchesListItem =
+  | { kind: "match"; match: MatchSummary; tab: MatchesTab }
+  | { kind: "request"; request: HostRequest };
 
 const C = {
   surface1: "#141417",
@@ -172,6 +176,35 @@ function EmptyState({ title, message }: { title: string; message: string }) {
   );
 }
 
+function emptyStateForTab(tab: MatchesTab, pendingView: PendingView): {
+  title: string;
+  message: string;
+} {
+  if (tab === "upcoming") {
+    return {
+      title: "No upcoming matches",
+      message: "Accepted matches and hosted games show up here.",
+    };
+  }
+  if (tab === "history") {
+    return {
+      title: "No match history",
+      message: "Past hosted and accepted matches will appear here.",
+    };
+  }
+  if (pendingView === "sent") {
+    return {
+      title: "No pending requests",
+      message:
+        "Matches you request to join will appear here while awaiting host approval.",
+    };
+  }
+  return {
+    title: "No incoming requests",
+    message: "Join requests for your hosted matches will appear here.",
+  };
+}
+
 export default function MatchesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -183,169 +216,159 @@ export default function MatchesScreen() {
   const { pendingMatchIds } = usePendingRatingCount();
   const updateStatus = useUpdateParticipantStatus("");
 
-  async function handleStatus(
-    participantId: string,
-    status: "accepted" | "rejected",
-  ) {
-    try {
-      await updateStatus.mutateAsync({ participantId, status });
-    } catch (statusError) {
-      const message =
-        statusError instanceof Error
-          ? statusError.message
-          : "Could not update request.";
-      appAlert("Update failed", message);
-    }
-  }
+  const openMatch = useCallback(
+    (matchId: string) => {
+      router.push(`/(app)/match-detail?id=${matchId}`);
+    },
+    [router],
+  );
 
-  function openMatch(matchId: string) {
-    router.push(`/(app)/match-detail?id=${matchId}`);
-  }
+  const openRateMatch = useCallback(
+    (matchId: string) => {
+      router.push(buildRateMatchRoute(matchId));
+    },
+    [router],
+  );
 
-  function openRateMatch(matchId: string) {
-    router.push(buildRateMatchRoute(matchId));
-  }
+  const handleStatus = useCallback(
+    async (participantId: string, status: "accepted" | "rejected") => {
+      try {
+        await updateStatus.mutateAsync({ participantId, status });
+      } catch (statusError) {
+        const message =
+          statusError instanceof Error
+            ? statusError.message
+            : "Could not update request.";
+        appAlert("Update failed", message);
+      }
+    },
+    [appAlert, updateStatus],
+  );
 
-  function renderTabContent() {
-    if (data === undefined) return null;
+  const listData = useMemo((): MatchesListItem[] => {
+    if (data === undefined) return [];
 
     if (tab === "upcoming") {
-      if (data.upcoming.length === 0) {
-        return (
-          <EmptyState
-            title="No upcoming matches"
-            message="Accepted matches and hosted games show up here."
-          />
-        );
-      }
-      return data.upcoming.map((match) => (
-        <MyMatchCard
-          key={match.id}
-          match={match}
-          tab="upcoming"
-          onPress={() => openMatch(match.id)}
-        />
-      ));
+      return data.upcoming.map((match) => ({ kind: "match", match, tab: "upcoming" }));
     }
-
     if (tab === "history") {
-      if (data.history.length === 0) {
-        return (
-          <EmptyState
-            title="No match history"
-            message="Past hosted and accepted matches will appear here."
-          />
-        );
-      }
-      return data.history.map((match) => (
-        <MyMatchCard
-          key={match.id}
-          match={match}
-          tab="history"
-          onPress={() => openMatch(match.id)}
-          needsRating={
-            match.status === "finished" && pendingMatchIds.has(match.id)
-          }
-          onRate={() => openRateMatch(match.id)}
-        />
-      ));
+      return data.history.map((match) => ({ kind: "match", match, tab: "history" }));
     }
-
     if (pendingView === "sent") {
-      if (data.pendingOutgoing.length === 0) {
+      return data.pendingOutgoing.map((match) => ({
+        kind: "match",
+        match,
+        tab: "pending",
+      }));
+    }
+    return data.hostRequests.map((request) => ({ kind: "request", request }));
+  }, [data, tab, pendingView]);
+
+  const listKey = `${tab}-${pendingView}`;
+
+  const renderItem = useCallback(
+    ({ item }: { item: MatchesListItem }) => {
+      if (item.kind === "request") {
         return (
-          <EmptyState
-            title="No pending requests"
-            message="Matches you request to join will appear here while awaiting host approval."
+          <RequestCard
+            request={item.request}
+            isPending={updateStatus.isPending}
+            onAccept={() =>
+              void handleStatus(item.request.participant.id, "accepted")
+            }
+            onReject={() =>
+              void handleStatus(item.request.participant.id, "rejected")
+            }
           />
         );
       }
-      return data.pendingOutgoing.map((match) => (
-        <MyMatchCard
-          key={match.id}
-          match={match}
-          tab="pending"
-          onPress={() => openMatch(match.id)}
-        />
-      ));
-    }
 
-    if (data.hostRequests.length === 0) {
       return (
-        <EmptyState
-          title="No incoming requests"
-          message="Join requests for your hosted matches will appear here."
+        <MyMatchCard
+          match={item.match}
+          tab={item.tab}
+          onPress={() => openMatch(item.match.id)}
+          needsRating={
+            item.tab === "history" &&
+            item.match.status === "finished" &&
+            pendingMatchIds.has(item.match.id)
+          }
+          onRate={
+            item.tab === "history" ? () => openRateMatch(item.match.id) : undefined
+          }
         />
       );
-    }
+    },
+    [
+      handleStatus,
+      openMatch,
+      openRateMatch,
+      pendingMatchIds,
+      updateStatus.isPending,
+    ],
+  );
 
-    return data.hostRequests.map((request) => (
-      <RequestCard
-        key={request.participant.id}
-        request={request}
-        isPending={updateStatus.isPending}
-        onAccept={() => void handleStatus(request.participant.id, "accepted")}
-        onReject={() => void handleStatus(request.participant.id, "rejected")}
-      />
-    ));
-  }
+  const keyExtractor = useCallback((item: MatchesListItem) => {
+    if (item.kind === "request") return `request-${item.request.participant.id}`;
+    return item.match.id;
+  }, []);
 
-  return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerClassName="pb-6"
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={() => void refetch()}
-          tintColor={C.mist}
-        />
-      }
-    >
-      <View
-        style={{ paddingTop: insets.top + 16 }}
-        className="px-5 pb-5 flex-row justify-between items-start"
-      >
-        <View>
-          <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-1">
-            MATCHES
-          </Text>
-          <Text
-            className="font-grotesk font-extrabold text-[30px] text-neutral"
-            style={{ letterSpacing: -0.8 }}
-          >
-            Calendar
-          </Text>
+  const listHeader = useMemo(
+    () => (
+      <>
+        <View
+          style={{ paddingTop: insets.top + 16 }}
+          className="px-5 pb-5 flex-row justify-between items-start"
+        >
+          <View>
+            <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38 mb-1">
+              MATCHES
+            </Text>
+            <Text
+              className="font-grotesk font-extrabold text-[30px] text-neutral"
+              style={{ letterSpacing: -0.8 }}
+            >
+              Calendar
+            </Text>
+          </View>
+          <NotificationBell />
         </View>
-        <NotificationBell />
-      </View>
 
-      <View className="mx-5 mb-4">
-        <SegmentedControl
-          options={[
-            { value: "upcoming" as const, label: "Upcoming" },
-            { value: "history" as const, label: "History" },
-            { value: "pending" as const, label: "Pending" },
-          ]}
-          value={tab}
-          onChange={setTab}
-        />
-      </View>
-
-      {tab === "pending" ? (
-        <View className="mx-5 mb-4 flex-row items-center justify-between">
-          <Text className="font-mono text-[11px] tracking-[0.13em] uppercase text-neutral/60">
-            {pendingView === "sent" ? "Sent requests" : "Host inbox"}
-          </Text>
-          <PendingViewToggle value={pendingView} onChange={setPendingView} />
+        <View className="mx-5 mb-4">
+          <SegmentedControl
+            options={[
+              { value: "upcoming" as const, label: "Upcoming" },
+              { value: "history" as const, label: "History" },
+              { value: "pending" as const, label: "Pending" },
+            ]}
+            value={tab}
+            onChange={setTab}
+          />
         </View>
-      ) : null}
 
-      {isPending ? (
+        {tab === "pending" ? (
+          <View className="mx-5 mb-4 flex-row items-center justify-between">
+            <Text className="font-mono text-[11px] tracking-[0.13em] uppercase text-neutral/60">
+              {pendingView === "sent" ? "Sent requests" : "Host inbox"}
+            </Text>
+            <PendingViewToggle value={pendingView} onChange={setPendingView} />
+          </View>
+        ) : null}
+      </>
+    ),
+    [insets.top, pendingView, tab],
+  );
+
+  const listEmpty = useMemo(() => {
+    if (isPending) {
+      return (
         <View className="items-center py-10">
           <ActivityIndicator color="#E4E4E4" />
         </View>
-      ) : error !== null ? (
+      );
+    }
+    if (error !== null) {
+      return (
         <View className="mx-5 bg-warning/10 border border-warning/30 rounded-xl p-4">
           <Text className="font-grotesk text-sm text-warning leading-5 mb-3">
             Could not load your matches.
@@ -356,10 +379,30 @@ export default function MatchesScreen() {
             </Text>
           </Pressable>
         </View>
-      ) : (
-        renderTabContent()
-      )}
-    </ScrollView>
+      );
+    }
+    const empty = emptyStateForTab(tab, pendingView);
+    return <EmptyState title={empty.title} message={empty.message} />;
+  }, [error, isPending, pendingView, refetch, tab]);
+
+  return (
+    <FlashList
+      key={listKey}
+      className="flex-1 bg-background"
+      contentContainerStyle={{ paddingBottom: 24 }}
+      data={listData}
+      keyExtractor={keyExtractor}
+      renderItem={renderItem}
+      ListHeaderComponent={listHeader}
+      ListEmptyComponent={listEmpty}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefetching}
+          onRefresh={() => void refetch()}
+          tintColor={C.mist}
+        />
+      }
+    />
   );
 }
 

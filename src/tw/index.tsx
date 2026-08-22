@@ -44,7 +44,6 @@ export type ScrollViewProps = React.ComponentProps<typeof RNScrollView> & {
   contentContainerClassName?: string;
 };
 export const ScrollView = (props: ScrollViewProps) => {
-  // @ts-expect-error TS2590: ScrollView props create a union type too complex for StyledConfiguration inference
   return useCssElement(RNScrollView, props, {
     className: "style",
     contentContainerClassName: "contentContainerStyle",
@@ -92,3 +91,7 @@ export const TouchableHighlight = (props: TouchableHighlightProps) => {
   return useCssElement(RawTouchableHighlight, props, { className: "style" });
 };
 TouchableHighlight.displayName = "CSS(TouchableHighlight)";
+
+export { FlashList, type FlashListProps } from "./flash-list";
+export { Image, ExpoImage, type ImageProps } from "./image";
+export { Animated } from "./animated";

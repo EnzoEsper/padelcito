@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   StyleSheet,
   useWindowDimensions,
@@ -10,6 +9,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable, Text } from '@/tw';
+import { CachedRemoteImage } from '@/components/cached-remote-image';
 import { PostFlyerCropScreen } from '@/features/community/components/post-flyer-crop-screen';
 import {
   encodeFlyerForUpload,
@@ -118,10 +118,10 @@ export function PostFlyerPickEditor({
 
           <View style={styles.previewWrap}>
             <View style={[styles.previewFrame, { height: previewHeight }]}>
-              <Image
-                source={{ uri: currentAsset.uri }}
+              <CachedRemoteImage
+                uri={currentAsset.uri}
                 style={styles.previewImage}
-                resizeMode="contain"
+                contentFit="contain"
                 accessibilityLabel="Selected flyer preview"
               />
             </View>

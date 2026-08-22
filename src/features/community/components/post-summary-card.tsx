@@ -1,6 +1,8 @@
-import { Image, StyleSheet } from 'react-native';
+import { memo } from 'react';
+import { StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View, Text } from '@/tw';
+import { CachedRemoteImage } from '@/components/cached-remote-image';
 import {
   POST_STATUS_COLORS,
   POST_STATUS_LABELS,
@@ -30,7 +32,11 @@ type PostSummaryCardProps = {
   showStatus?: boolean;
 };
 
-export function PostSummaryCard({ post, onPress, showStatus = false }: PostSummaryCardProps) {
+export const PostSummaryCard = memo(function PostSummaryCard({
+  post,
+  onPress,
+  showStatus = false,
+}: PostSummaryCardProps) {
   const imageUrl = buildPostImageUrl(post.image_path);
   const distanceLabel = formatPostDistanceKm(post.distanceM);
   const scheduleLabel = formatPostEventSchedule(post.event_start, post.event_end);
@@ -40,7 +46,7 @@ export function PostSummaryCard({ post, onPress, showStatus = false }: PostSumma
   return (
     <Pressable onPress={onPress} style={styles.card}>
       {imageUrl !== null ? (
-        <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
+        <CachedRemoteImage uri={imageUrl} style={styles.image} contentFit="cover" />
       ) : (
         <View style={styles.imagePlaceholder}>
           <Ionicons name="image-outline" size={28} color={C.faint} />
@@ -92,7 +98,7 @@ export function PostSummaryCard({ post, onPress, showStatus = false }: PostSumma
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

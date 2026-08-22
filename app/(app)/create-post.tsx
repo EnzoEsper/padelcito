@@ -24,7 +24,7 @@ export default function CreatePostScreen() {
 
   useEffect(() => {
     form.reset();
-  }, [freshKey, form.reset]);
+  }, [freshKey, form]);
 
   const scrollBottomInset = 112 + insets.bottom;
   const headerTop = insets.top + 16;
