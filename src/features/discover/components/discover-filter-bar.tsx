@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AppBottomSheet } from '@/components/app-bottom-sheet';
+import { FilterSheetModal } from '@/components/filter-sheet-modal';
+import {
+  FilterSheetChipSection,
+  FilterSheetFooter,
+} from '@/components/filter-sheet-ui';
+import { OptionSelectSheet } from '@/components/option-select';
 import { Pressable, View, Text } from '@/tw';
 import {
   countActiveDiscoverFilters,
@@ -23,13 +28,10 @@ type FilterGroupId = 'when' | 'level' | 'gender' | 'sort';
 const C = {
   background: '#0B0B0B',
   surface1: '#141417',
-  surface3: '#232429',
   blue: '#2B396D',
   blueHi: '#7488D8',
   mist: '#E4E4E4',
-  label: 'rgba(228,228,228,0.72)',
   dim: 'rgba(228,228,228,0.60)',
-  faint: 'rgba(228,228,228,0.38)',
   hair: 'rgba(228,228,228,0.10)',
 } as const;
 
@@ -54,25 +56,14 @@ function FilterOptionSheet<T extends string>({
   }
 
   return (
-    <AppBottomSheet visible={visible} onClose={onClose} title={title} showClose>
-      <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
-        {options.map((option) => {
-          const selected = option.value === value;
-          return (
-            <Pressable
-              key={option.value}
-              onPress={() => handleSelect(option.value)}
-              style={[styles.sheetOption, selected && styles.sheetOptionSelected]}
-            >
-              <Text style={[styles.sheetOptionText, selected && styles.sheetOptionTextSelected]}>
-                {option.label}
-              </Text>
-              {selected ? <Ionicons name="checkmark" size={18} color={C.mist} /> : null}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </AppBottomSheet>
+    <OptionSelectSheet
+      visible={visible}
+      onClose={onClose}
+      title={title}
+      options={options}
+      value={value}
+      onSelect={handleSelect}
+    />
   );
 }
 
@@ -116,106 +107,56 @@ function AllFiltersSheet({
   onClose: () => void;
 }) {
   const hasActiveFilters = countActiveDiscoverFilters(filters) > 0;
+  const resultLabel = `${resultCount} ${resultCount === 1 ? 'match' : 'matches'} found`;
+  const primaryLabel = `Show ${resultCount} ${resultCount === 1 ? 'match' : 'matches'}`;
 
   return (
-    <AppBottomSheet visible={visible} onClose={onClose} title="Filters" showClose maxHeight="72%">
-      <View style={styles.allFiltersHeader}>
-        <Text style={styles.resultCountText}>
-          {resultCount} {resultCount === 1 ? 'match' : 'matches'}
-        </Text>
-        {hasActiveFilters ? (
-          <Pressable onPress={onReset} accessibilityRole="button" accessibilityLabel="Reset filters">
-            <Text style={styles.resetText}>Reset</Text>
-          </Pressable>
-        ) : null}
-      </View>
+    <FilterSheetModal
+      visible={visible}
+      onClose={onClose}
+      title="Filters"
+      footer={
+        <FilterSheetFooter
+          resultLabel={resultLabel}
+          primaryLabel={primaryLabel}
+          onPrimary={onClose}
+          clearLabel="Clear all"
+          onClear={onReset}
+          showClear={hasActiveFilters}
+        />
+      }
+    >
+      <FilterSheetChipSection
+        label="When"
+        options={WHEN_OPTIONS}
+        value={filters.when}
+        onChange={(when) => onChange({ ...filters, when })}
+      />
 
-      <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
-        <Text style={styles.sheetSectionLabel}>When</Text>
-        {WHEN_OPTIONS.map((option) => {
-          const selected = filters.when === option.value;
-          return (
-            <Pressable
-              key={`all-when-${option.value}`}
-              onPress={() => onChange({ ...filters, when: option.value })}
-              style={[styles.sheetOption, selected && styles.sheetOptionSelected]}
-            >
-              <Text style={[styles.sheetOptionText, selected && styles.sheetOptionTextSelected]}>
-                {option.label}
-              </Text>
-              {selected ? <Ionicons name="checkmark" size={18} color={C.mist} /> : null}
-            </Pressable>
-          );
-        })}
+      <FilterSheetChipSection
+        label="Level"
+        options={LEVEL_OPTIONS}
+        value={filters.level}
+        onChange={(level) => onChange({ ...filters, level })}
+        spaced
+      />
 
-        <Text style={[styles.sheetSectionLabel, styles.sheetSectionLabelSpaced]}>Level</Text>
-        {LEVEL_OPTIONS.map((option) => {
-          const selected = filters.level === option.value;
-          return (
-            <Pressable
-              key={`all-level-${option.value}`}
-              onPress={() => onChange({ ...filters, level: option.value })}
-              style={[styles.sheetOption, selected && styles.sheetOptionSelected]}
-            >
-              <Text style={[styles.sheetOptionText, selected && styles.sheetOptionTextSelected]}>
-                {option.label}
-              </Text>
-              {selected ? <Ionicons name="checkmark" size={18} color={C.mist} /> : null}
-            </Pressable>
-          );
-        })}
+      <FilterSheetChipSection
+        label="Gender"
+        options={GENDER_OPTIONS}
+        value={filters.gender}
+        onChange={(gender) => onChange({ ...filters, gender })}
+        spaced
+      />
 
-        <Text style={[styles.sheetSectionLabel, styles.sheetSectionLabelSpaced]}>Gender</Text>
-        {GENDER_OPTIONS.map((option) => {
-          const selected = filters.gender === option.value;
-          return (
-            <Pressable
-              key={`all-gender-${option.value}`}
-              onPress={() => onChange({ ...filters, gender: option.value })}
-              style={[styles.sheetOption, selected && styles.sheetOptionSelected]}
-            >
-              <Text style={[styles.sheetOptionText, selected && styles.sheetOptionTextSelected]}>
-                {option.label}
-              </Text>
-              {selected ? <Ionicons name="checkmark" size={18} color={C.mist} /> : null}
-            </Pressable>
-          );
-        })}
-
-        <Text style={[styles.sheetSectionLabel, styles.sheetSectionLabelSpaced]}>Availability</Text>
-        <Pressable
-          onPress={() => onChange({ ...filters, openSpotsOnly: !filters.openSpotsOnly })}
-          style={[styles.sheetOption, filters.openSpotsOnly && styles.sheetOptionSelected]}
-        >
-          <Text
-            style={[
-              styles.sheetOptionText,
-              filters.openSpotsOnly && styles.sheetOptionTextSelected,
-            ]}
-          >
-            Has open spots
-          </Text>
-          {filters.openSpotsOnly ? <Ionicons name="checkmark" size={18} color={C.mist} /> : null}
-        </Pressable>
-
-        <Text style={[styles.sheetSectionLabel, styles.sheetSectionLabelSpaced]}>Sort by</Text>
-        {SORT_OPTIONS.map((option) => {
-          const selected = filters.sort === option.value;
-          return (
-            <Pressable
-              key={`all-sort-${option.value}`}
-              onPress={() => onChange({ ...filters, sort: option.value })}
-              style={[styles.sheetOption, selected && styles.sheetOptionSelected]}
-            >
-              <Text style={[styles.sheetOptionText, selected && styles.sheetOptionTextSelected]}>
-                {option.label}
-              </Text>
-              {selected ? <Ionicons name="checkmark" size={18} color={C.mist} /> : null}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </AppBottomSheet>
+      <FilterSheetChipSection
+        label="Sort by"
+        options={SORT_OPTIONS}
+        value={filters.sort}
+        onChange={(sort) => onChange({ ...filters, sort })}
+        spaced
+      />
+    </FilterSheetModal>
   );
 }
 
@@ -250,6 +191,7 @@ export function DiscoverFilterBar({
     <>
       <ScrollView
         horizontal
+        nestedScrollEnabled
         showsHorizontalScrollIndicator={false}
         style={styles.filterBar}
         contentContainerStyle={styles.chipRow}
@@ -291,15 +233,6 @@ export function DiscoverFilterBar({
           onPress={() => openGroupSheet('gender')}
           accessibilityLabel={`Gender: ${genderFilterLabel(filters.gender)}`}
         />
-
-        {filters.openSpotsOnly ? (
-          <FilterChip
-            label="Open spots"
-            active
-            onPress={() => onChange({ ...filters, openSpotsOnly: false })}
-            accessibilityLabel="Open spots: active. Tap to remove."
-          />
-        ) : null}
 
         <View style={styles.filterDivider} accessibilityElementsHidden importantForAccessibility="no" />
 
@@ -361,6 +294,8 @@ export function DiscoverFilterBar({
 
 const styles = StyleSheet.create({
   filterBar: {
+    flexGrow: 0,
+    flexShrink: 0,
     marginBottom: 22,
   },
   chipRow: {
@@ -435,60 +370,6 @@ const styles = StyleSheet.create({
     color: C.dim,
   },
   chipTextActive: {
-    color: C.mist,
-  },
-  allFiltersHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  resultCountText: {
-    fontFamily: 'HankenGrotesk-Bold',
-    fontSize: 15,
-    color: C.mist,
-  },
-  resetText: {
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 11,
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    color: C.blueHi,
-  },
-  sheetList: {
-    flexGrow: 0,
-  },
-  sheetSectionLabel: {
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 10.5,
-    letterSpacing: 1.5,
-    color: C.label,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  sheetSectionLabelSpaced: {
-    marginTop: 16,
-  },
-  sheetOption: {
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: C.surface3,
-    paddingHorizontal: 16,
-    marginBottom: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sheetOptionSelected: {
-    backgroundColor: C.blue,
-  },
-  sheetOptionText: {
-    fontFamily: 'Hanken Grotesk',
-    fontSize: 15,
-    color: 'rgba(228,228,228,0.75)',
-  },
-  sheetOptionTextSelected: {
-    fontFamily: 'HankenGrotesk-Bold',
     color: C.mist,
   },
 });

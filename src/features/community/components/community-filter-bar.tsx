@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AppBottomSheet } from '@/components/app-bottom-sheet';
+import { FilterSheetModal } from '@/components/filter-sheet-modal';
+import { FilterSheetChipSection } from '@/components/filter-sheet-ui';
+import { OptionSelectSheet } from '@/components/option-select';
 import { Pressable, View, Text } from '@/tw';
 import type { Database } from '@/types/database';
 
@@ -20,7 +22,6 @@ const C = {
   surface1: '#141417',
   blue: '#2B396D',
   mist: '#E4E4E4',
-  label: 'rgba(228,228,228,0.72)',
   dim: 'rgba(228,228,228,0.60)',
   faint: 'rgba(228,228,228,0.38)',
   hair: 'rgba(228,228,228,0.10)',
@@ -37,7 +38,6 @@ const TYPE_FILTER_OPTIONS: FilterOption<CommunityTypeFilter>[] = [
   { value: 'training', label: 'Training' },
 ];
 
-/** Inline chips shown before opening a group sheet when options exceed this count. */
 const MAX_INLINE_OPTIONS = 4;
 
 function FilterOptionSheet<T extends string>({
@@ -61,25 +61,14 @@ function FilterOptionSheet<T extends string>({
   }
 
   return (
-    <AppBottomSheet visible={visible} onClose={onClose} title={title} showClose>
-      <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
-        {options.map((option) => {
-          const selected = option.value === value;
-          return (
-            <Pressable
-              key={option.value}
-              onPress={() => handleSelect(option.value)}
-              style={[styles.sheetOption, selected && styles.sheetOptionSelected]}
-            >
-              <Text style={[styles.sheetOptionText, selected && styles.sheetOptionTextSelected]}>
-                {option.label}
-              </Text>
-              {selected ? <Ionicons name="checkmark" size={18} color={C.mist} /> : null}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </AppBottomSheet>
+    <OptionSelectSheet
+      visible={visible}
+      onClose={onClose}
+      title={title}
+      options={options}
+      value={value}
+      onSelect={handleSelect}
+    />
   );
 }
 
@@ -176,43 +165,22 @@ function AllFiltersSheet({
   onClose: () => void;
 }) {
   return (
-    <AppBottomSheet visible={visible} onClose={onClose} title="Filters" showClose maxHeight="62%">
-      <ScrollView style={styles.sheetList} keyboardShouldPersistTaps="handled">
-        <Text style={styles.sheetSectionLabel}>Scope</Text>
-        {FEED_MODE_OPTIONS.map((option) => {
-          const selected = feedMode === option.value;
-          return (
-            <Pressable
-              key={`all-scope-${option.value}`}
-              onPress={() => onFeedModeChange(option.value)}
-              style={[styles.sheetOption, selected && styles.sheetOptionSelected]}
-            >
-              <Text style={[styles.sheetOptionText, selected && styles.sheetOptionTextSelected]}>
-                {option.label}
-              </Text>
-              {selected ? <Ionicons name="checkmark" size={18} color={C.mist} /> : null}
-            </Pressable>
-          );
-        })}
+    <FilterSheetModal visible={visible} onClose={onClose} title="Filters">
+      <FilterSheetChipSection
+        label="Scope"
+        options={FEED_MODE_OPTIONS}
+        value={feedMode}
+        onChange={onFeedModeChange}
+      />
 
-        <Text style={[styles.sheetSectionLabel, styles.sheetSectionLabelSpaced]}>Event type</Text>
-        {TYPE_FILTER_OPTIONS.map((option) => {
-          const selected = typeFilter === option.value;
-          return (
-            <Pressable
-              key={`all-type-${option.value}`}
-              onPress={() => onTypeFilterChange(option.value)}
-              style={[styles.sheetOption, selected && styles.sheetOptionSelected]}
-            >
-              <Text style={[styles.sheetOptionText, selected && styles.sheetOptionTextSelected]}>
-                {option.label}
-              </Text>
-              {selected ? <Ionicons name="checkmark" size={18} color={C.mist} /> : null}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </AppBottomSheet>
+      <FilterSheetChipSection
+        label="Event type"
+        options={TYPE_FILTER_OPTIONS}
+        value={typeFilter}
+        onChange={onTypeFilterChange}
+        spaced
+      />
+    </FilterSheetModal>
   );
 }
 
@@ -240,6 +208,7 @@ export function CommunityFilterBar({
     <>
       <ScrollView
         horizontal
+        nestedScrollEnabled
         showsHorizontalScrollIndicator={false}
         style={styles.filterBar}
         contentContainerStyle={styles.chipRow}
@@ -309,6 +278,8 @@ export function CommunityFilterBar({
 
 const styles = StyleSheet.create({
   filterBar: {
+    flexGrow: 0,
+    flexShrink: 0,
     marginBottom: 16,
   },
   chipRow: {
@@ -361,42 +332,6 @@ const styles = StyleSheet.create({
     color: C.dim,
   },
   chipTextActive: {
-    color: C.mist,
-  },
-  sheetList: {
-    flexGrow: 0,
-  },
-  sheetSectionLabel: {
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 10.5,
-    letterSpacing: 1.5,
-    color: C.label,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  sheetSectionLabelSpaced: {
-    marginTop: 16,
-  },
-  sheetOption: {
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#232429',
-    paddingHorizontal: 16,
-    marginBottom: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sheetOptionSelected: {
-    backgroundColor: C.blue,
-  },
-  sheetOptionText: {
-    fontFamily: 'Hanken Grotesk',
-    fontSize: 15,
-    color: 'rgba(228,228,228,0.75)',
-  },
-  sheetOptionTextSelected: {
-    fontFamily: 'HankenGrotesk-Bold',
     color: C.mist,
   },
 });

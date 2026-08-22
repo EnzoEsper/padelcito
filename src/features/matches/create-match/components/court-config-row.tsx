@@ -8,7 +8,7 @@ import {
   type CourtSurface,
   type CourtType,
 } from '@/lib/padel-court';
-import { InlineSelect } from './inline-select';
+import { OptionSelectField } from '@/components/option-select';
 
 type CourtConfigRowProps = {
   index: number;
@@ -23,7 +23,7 @@ export function CourtConfigRow({ index, config, onChange }: CourtConfigRowProps)
         Court {index + 1}
       </Text>
       <View className="rounded-xl bg-surface-1 border border-neutral/10 flex-row overflow-hidden">
-        <InlineSelect<CourtType>
+        <OptionSelectField<CourtType>
           embedded
           showDivider
           sheetTitle="Court type"
@@ -31,7 +31,7 @@ export function CourtConfigRow({ index, config, onChange }: CourtConfigRowProps)
           options={COURT_TYPE_OPTIONS}
           onChange={(type) => onChange(index, { type })}
         />
-        <InlineSelect<CourtStructure>
+        <OptionSelectField<CourtStructure>
           embedded
           showDivider
           sheetTitle="Court structure"
@@ -39,7 +39,7 @@ export function CourtConfigRow({ index, config, onChange }: CourtConfigRowProps)
           options={COURT_STRUCTURE_OPTIONS}
           onChange={(structure) => onChange(index, { structure })}
         />
-        <InlineSelect<CourtSurface>
+        <OptionSelectField<CourtSurface>
           embedded
           sheetTitle="Court surface"
           value={config.surface}

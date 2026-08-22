@@ -3,7 +3,7 @@ import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { FlashList, View, Text, Pressable } from '@/tw';
+import { FlashList, ScrollView, View, Text, Pressable } from '@/tw';
 import { NotificationBell } from '@/components/notification-bell';
 import { PostSummaryCard } from '@/features/community/components/post-summary-card';
 import {
@@ -164,91 +164,7 @@ export default function CommunityScreen() {
 
   const keyExtractor = useCallback((item: PostSummary) => item.id, []);
 
-  const listHeader = useMemo(
-    () => (
-      <>
-        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <View className="flex-1 pr-3">
-            <View style={styles.locationRow}>
-              <Ionicons name="location-outline" size={13} color={C.blueHi} />
-              <Text style={styles.locationText}>{locationLabel}</Text>
-            </View>
-            <Text style={styles.title}>Community</Text>
-            <Text style={styles.subtitle}>{feedSubtitle(feedMode)}</Text>
-          </View>
-          <View style={styles.headerActions}>
-            <NotificationBell />
-          </View>
-        </View>
-
-        {saveWarning !== null ? (
-          <View style={styles.saveWarningCard}>
-            <Text style={styles.saveWarningText}>{saveWarning}</Text>
-          </View>
-        ) : null}
-
-        <CommunityFilterBar
-          feedMode={feedMode}
-          typeFilter={typeFilter}
-          onFeedModeChange={setFeedMode}
-          onTypeFilterChange={setTypeFilter}
-        />
-
-        {isModerator ? (
-          <Pressable
-            onPress={() => router.push(buildModerationRoute())}
-            style={styles.moderationCard}
-          >
-            <Text style={styles.moderationLabel}>Moderation queue</Text>
-            <View style={styles.moderationRight}>
-              {pendingReviewCount > 0 ? (
-                <View style={styles.moderationBadge}>
-                  <Text style={styles.moderationBadgeText}>
-                    {pendingReviewCount > 99 ? '99+' : String(pendingReviewCount)}
-                  </Text>
-                </View>
-              ) : null}
-              <Ionicons name="shield-outline" size={18} color={C.dim} />
-            </View>
-          </Pressable>
-        ) : null}
-
-        {showLocationGate ? (
-          <LocationGate
-            status={locationStatus}
-            message={errorMessage}
-            onRetry={() => void retryLocation()}
-            onOpenSettings={() => void openSettings()}
-          />
-        ) : (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{sectionTitle(feedMode, posts.length)}</Text>
-            {activeQuery.isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
-          </View>
-        )}
-      </>
-    ),
-    [
-      activeQuery.isRefetching,
-      errorMessage,
-      feedMode,
-      insets.top,
-      isModerator,
-      locationLabel,
-      locationStatus,
-      openSettings,
-      pendingReviewCount,
-      posts.length,
-      retryLocation,
-      router,
-      saveWarning,
-      showLocationGate,
-      typeFilter,
-    ],
-  );
-
   const listEmpty = useMemo(() => {
-    if (showLocationGate) return null;
     if (activeQuery.isLoading) {
       return (
         <View style={styles.centerState}>
@@ -281,25 +197,108 @@ export default function CommunityScreen() {
         </Text>
       </View>
     );
-  }, [
-    activeQuery,
-    feedMode,
-    showLocationGate,
-  ]);
+  }, [activeQuery, feedMode]);
+
+  const refreshControl = (
+    <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={C.mist} />
+  );
+
+  const feedControls = (
+    <>
+      {isModerator ? (
+        <Pressable
+          onPress={() => router.push(buildModerationRoute())}
+          style={styles.moderationCard}
+        >
+          <Text style={styles.moderationLabel}>Moderation queue</Text>
+          <View style={styles.moderationRight}>
+            {pendingReviewCount > 0 ? (
+              <View style={styles.moderationBadge}>
+                <Text style={styles.moderationBadgeText}>
+                  {pendingReviewCount > 99 ? '99+' : String(pendingReviewCount)}
+                </Text>
+              </View>
+            ) : null}
+            <Ionicons name="shield-outline" size={18} color={C.dim} />
+          </View>
+        </Pressable>
+      ) : null}
+
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{sectionTitle(feedMode, posts.length)}</Text>
+        {activeQuery.isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
+      </View>
+    </>
+  );
+
+  const hasPosts = posts.length > 0;
 
   return (
-    <View className="flex-1 bg-background">
-      <FlashList
-        data={showLocationGate ? [] : posts}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={listEmpty}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={C.mist} />
-        }
+    <View style={styles.root}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View className="flex-1 pr-3">
+          <View style={styles.locationRow}>
+            <Ionicons name="location-outline" size={13} color={C.blueHi} />
+            <Text style={styles.locationText}>{locationLabel}</Text>
+          </View>
+          <Text style={styles.title}>Community</Text>
+          <Text style={styles.subtitle}>{feedSubtitle(feedMode)}</Text>
+        </View>
+        <View style={styles.headerActions}>
+          <NotificationBell />
+        </View>
+      </View>
+
+      {saveWarning !== null ? (
+        <View style={styles.saveWarningCard}>
+          <Text style={styles.saveWarningText}>{saveWarning}</Text>
+        </View>
+      ) : null}
+
+      <CommunityFilterBar
+        feedMode={feedMode}
+        typeFilter={typeFilter}
+        onFeedModeChange={setFeedMode}
+        onTypeFilterChange={setTypeFilter}
       />
+
+      {showLocationGate ? (
+        <ScrollView
+          className="flex-1 bg-background"
+          contentContainerStyle={styles.gateContent}
+          refreshControl={refreshControl}
+        >
+          <LocationGate
+            status={locationStatus}
+            message={errorMessage}
+            onRetry={() => void retryLocation()}
+            onOpenSettings={() => void openSettings()}
+          />
+        </ScrollView>
+      ) : (
+        <View style={styles.listLayout}>
+          <View style={styles.listControls}>{feedControls}</View>
+
+          {hasPosts ? (
+            <FlashList
+              style={styles.feedList}
+              data={posts}
+              keyExtractor={keyExtractor}
+              renderItem={renderItem}
+              contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 96 }]}
+              refreshControl={refreshControl}
+            />
+          ) : (
+            <ScrollView
+              style={styles.feedList}
+              contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 96 }]}
+              refreshControl={refreshControl}
+            >
+              {listEmpty}
+            </ScrollView>
+          )}
+        </View>
+      )}
 
       <Pressable
         onPress={() => router.push(buildCreatePostRoute())}
@@ -315,6 +314,27 @@ export default function CommunityScreen() {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: C.background,
+  },
+  listLayout: {
+    flex: 1,
+    backgroundColor: C.background,
+  },
+  listControls: {
+    backgroundColor: C.background,
+  },
+  gateContent: {
+    flexGrow: 1,
+    paddingBottom: 24,
+  },
+  listContent: {
+    flexGrow: 0,
+  },
+  feedList: {
+    flex: 1,
+  },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 16,

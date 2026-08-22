@@ -5,7 +5,6 @@ import {
 
 import React from "react";
 import {
-  View as RNView,
   Text as RNText,
   Pressable as RNPressable,
   ScrollView as RNScrollView,
@@ -13,21 +12,16 @@ import {
   TextInput as RNTextInput,
   StyleSheet,
 } from "react-native";
+import { View, type ViewProps } from "./view";
+
+export type { ViewProps };
+export { View };
 
 // CSS Variable hook — returns a live CSS variable value on native, var() string on web
 export const useCSSVariable =
   process.env.EXPO_OS !== "web"
     ? useFunctionalVariable
     : (variable: string) => `var(${variable})`;
-
-// View
-export type ViewProps = React.ComponentProps<typeof RNView> & {
-  className?: string;
-};
-export const View = (props: ViewProps) => {
-  return useCssElement(RNView, props, { className: "style" });
-};
-View.displayName = "CSS(View)";
 
 // Text
 export type TextProps = React.ComponentProps<typeof RNText> & {

@@ -1,4 +1,4 @@
-import { InlineSelect } from './inline-select';
+import { OptionSelectField } from '@/components/option-select';
 import { formatDurationLabel, type DurationOption } from '../use-create-match-form';
 
 type DurationSelectProps = {
@@ -10,7 +10,7 @@ type DurationSelectProps = {
 
 export function DurationSelect({ value, options, onChange, embedded = false }: DurationSelectProps) {
   return (
-    <InlineSelect
+    <OptionSelectField
       embedded={embedded}
       sheetTitle="Duration"
       value={String(value) as `${DurationOption}`}

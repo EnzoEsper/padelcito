@@ -21,10 +21,11 @@ export default function CreatePostScreen() {
   const { fresh } = useLocalSearchParams<{ fresh?: string | string[] }>();
   const freshKey = Array.isArray(fresh) ? fresh[0] : fresh;
   const form = useCreatePostForm();
+  const resetForm = form.reset;
 
   useEffect(() => {
-    form.reset();
-  }, [freshKey, form]);
+    resetForm();
+  }, [freshKey, resetForm]);
 
   const scrollBottomInset = 112 + insets.bottom;
   const headerTop = insets.top + 16;

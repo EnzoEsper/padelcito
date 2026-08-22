@@ -193,7 +193,7 @@ export default function DiscoverScreen() {
 
   const matchKeyExtractor = useCallback((item: MatchSummary) => item.id, []);
 
-  const listHeader = useMemo(
+  const discoverControls = useMemo(
     () => (
       <>
         {saveWarning !== null ? (
@@ -295,48 +295,27 @@ export default function DiscoverScreen() {
       ) : (
         <>
           {viewMode === 'list' ? (
-            <FlashList
-              className="flex-1 bg-background"
-              contentContainerStyle={styles.listContent}
-              data={filteredMatches}
-              keyExtractor={matchKeyExtractor}
-              renderItem={renderMatchItem}
-              ListHeaderComponent={listHeader}
-              ListEmptyComponent={listEmpty}
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefreshing}
-                  onRefresh={handleRefresh}
-                  tintColor={C.mist}
-                />
-              }
-            />
+            <View style={styles.listLayout}>
+              <View style={styles.listControls}>{discoverControls}</View>
+              <FlashList
+                style={styles.listFeed}
+                contentContainerStyle={styles.listContent}
+                data={filteredMatches}
+                keyExtractor={matchKeyExtractor}
+                renderItem={renderMatchItem}
+                ListEmptyComponent={listEmpty}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={isRefreshing}
+                    onRefresh={handleRefresh}
+                    tintColor={C.mist}
+                  />
+                }
+              />
+            </View>
           ) : (
             <View style={styles.mapLayout}>
-              <View style={styles.mapControls}>
-                {saveWarning !== null ? (
-                  <View style={styles.saveWarningCard}>
-                    <Text style={styles.saveWarningText}>{saveWarning}</Text>
-                  </View>
-                ) : null}
-
-                <SearchRadiusSlider radiusKm={searchRadiusKm} onRadiusCommit={setSearchRadiusKm} />
-                <DiscoverFilterBar
-                  filters={filters}
-                  onChange={setFilters}
-                  resultCount={filteredMatches.length}
-                />
-
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>
-                    {filteredMatches.length} Open Nearby
-                  </Text>
-                  <View style={styles.sectionRight}>
-                    {isRefetching ? <ActivityIndicator color={C.mist} size="small" /> : null}
-                    <ViewToggle value={viewMode} onChange={setViewMode} />
-                  </View>
-                </View>
-              </View>
+              <View style={styles.mapControls}>{discoverControls}</View>
 
               <View style={styles.mapBody}>
                 {isPending ? (
@@ -391,6 +370,17 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 24,
+  },
+  listLayout: {
+    flex: 1,
+    backgroundColor: C.background,
+  },
+  listControls: {
+    backgroundColor: C.background,
+  },
+  listFeed: {
+    flex: 1,
+    backgroundColor: C.background,
   },
   header: {
     paddingHorizontal: 20,

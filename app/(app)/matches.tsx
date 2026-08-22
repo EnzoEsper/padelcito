@@ -386,27 +386,32 @@ export default function MatchesScreen() {
   }, [error, isPending, pendingView, refetch, tab]);
 
   return (
-    <FlashList
-      key={listKey}
-      className="flex-1 bg-background"
-      contentContainerStyle={{ paddingBottom: 24 }}
-      data={listData}
-      keyExtractor={keyExtractor}
-      renderItem={renderItem}
-      ListHeaderComponent={listHeader}
-      ListEmptyComponent={listEmpty}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={() => void refetch()}
-          tintColor={C.mist}
-        />
-      }
-    />
+    <View className="flex-1 bg-background">
+      {listHeader}
+      <FlashList
+        key={listKey}
+        style={styles.feedList}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        data={listData}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        ListEmptyComponent={listEmpty}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => void refetch()}
+            tintColor={C.mist}
+          />
+        }
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  feedList: {
+    flex: 1,
+  },
   viewToggle: {
     flexDirection: "row",
     gap: 2,

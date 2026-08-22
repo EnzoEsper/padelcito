@@ -290,7 +290,12 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
 
       {showDatePicker ? (
         Platform.OS === 'ios' ? (
-          <AppBottomSheet visible={showDatePicker} onClose={() => setShowDatePicker(false)} title="Date">
+          <AppBottomSheet
+            visible={showDatePicker}
+            onClose={() => setShowDatePicker(false)}
+            title="Date"
+            scrollable={false}
+          >
             <RNView style={styles.pickerBody}>
               <DateTimePicker
                 value={form.datePart}
@@ -315,7 +320,12 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
 
       {showTimePicker ? (
         Platform.OS === 'ios' ? (
-          <AppBottomSheet visible={showTimePicker} onClose={() => setShowTimePicker(false)} title="Time">
+          <AppBottomSheet
+            visible={showTimePicker}
+            onClose={() => setShowTimePicker(false)}
+            title="Time"
+            scrollable={false}
+          >
             <RNView style={styles.pickerBody}>
               <DateTimePicker
                 value={form.timePart}
@@ -344,6 +354,7 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
             visible={showEndDatePicker}
             onClose={() => setShowEndDatePicker(false)}
             title="End date"
+            scrollable={false}
           >
             <RNView style={styles.pickerBody}>
               <DateTimePicker
@@ -373,6 +384,7 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
             visible={showEndTimePicker}
             onClose={() => setShowEndTimePicker(false)}
             title="End time"
+            scrollable={false}
           >
             <RNView style={styles.pickerBody}>
               <DateTimePicker

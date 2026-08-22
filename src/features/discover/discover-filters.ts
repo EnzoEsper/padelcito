@@ -14,7 +14,6 @@ export type DiscoverFilters = {
   when: WhenPreset;
   level: LevelFilter;
   gender: GenderFilter;
-  openSpotsOnly: boolean;
   sort: DiscoverSort;
 };
 
@@ -32,7 +31,6 @@ export const DEFAULT_DISCOVER_FILTERS: DiscoverFilters = {
   when: 'anytime',
   level: 'All',
   gender: 'all',
-  openSpotsOnly: false,
   sort: 'distance',
 };
 
@@ -129,10 +127,6 @@ function matchPassesGenderFilter(match: MatchSummary, gender: GenderFilter): boo
   return match.gender_preference === gender;
 }
 
-function matchHasOpenSpots(match: MatchSummary): boolean {
-  return !match.isJoinFull && match.joinSpotsRemaining > 0;
-}
-
 export function applyDiscoverFilters(
   matches: MatchSummary[],
   filters: DiscoverFilters,
@@ -144,8 +138,7 @@ export function applyDiscoverFilters(
     (match) =>
       matchPassesWhenFilter(match, range) &&
       matchPassesLevelFilter(match, filters.level) &&
-      matchPassesGenderFilter(match, filters.gender) &&
-      (!filters.openSpotsOnly || matchHasOpenSpots(match)),
+      matchPassesGenderFilter(match, filters.gender),
   );
 }
 
@@ -183,7 +176,6 @@ export function countActiveDiscoverFilters(filters: DiscoverFilters): number {
   if (filters.when !== DEFAULT_DISCOVER_FILTERS.when) count += 1;
   if (filters.level !== DEFAULT_DISCOVER_FILTERS.level) count += 1;
   if (filters.gender !== DEFAULT_DISCOVER_FILTERS.gender) count += 1;
-  if (filters.openSpotsOnly !== DEFAULT_DISCOVER_FILTERS.openSpotsOnly) count += 1;
   return count;
 }
 

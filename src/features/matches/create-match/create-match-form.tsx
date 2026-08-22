@@ -187,7 +187,12 @@ export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
 
       {showDatePicker ? (
         Platform.OS === 'ios' ? (
-          <AppBottomSheet visible={showDatePicker} onClose={() => setShowDatePicker(false)} title="Date">
+          <AppBottomSheet
+            visible={showDatePicker}
+            onClose={() => setShowDatePicker(false)}
+            title="Date"
+            scrollable={false}
+          >
             <RNView style={styles.pickerBody}>
               <DateTimePicker
                 value={form.datePart}
@@ -212,7 +217,12 @@ export function CreateMatchFormBody({ form }: CreateMatchFormBodyProps) {
 
       {showTimePicker ? (
         Platform.OS === 'ios' ? (
-          <AppBottomSheet visible={showTimePicker} onClose={() => setShowTimePicker(false)} title="Time">
+          <AppBottomSheet
+            visible={showTimePicker}
+            onClose={() => setShowTimePicker(false)}
+            title="Time"
+            scrollable={false}
+          >
             <RNView style={styles.pickerBody}>
               <DateTimePicker
                 value={form.timePart}

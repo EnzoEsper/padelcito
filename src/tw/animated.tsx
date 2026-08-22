@@ -1,7 +1,7 @@
-import * as TW from './index';
 import RNAnimated from 'react-native-reanimated';
+import { View } from './view';
 
 export const Animated = {
   ...RNAnimated,
-  View: RNAnimated.createAnimatedComponent(TW.View),
+  View: RNAnimated.createAnimatedComponent(View),
 };
