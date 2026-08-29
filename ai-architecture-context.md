@@ -36,7 +36,7 @@
 
 - Single client instance in `src/lib/supabase.ts`, typed with `Database` from generated types; session storage via `expo-secure-store` adapter. Only the **anon key** in the app — `service_role` never ships to a client.
 - **Spatial queries:** always through RPCs (`nearby_matches`, `nearby_listings`, `nearby_tournaments`, `nearby_community_posts`). Never download rows and filter distance client-side. Pass `p_sport_id` from `fetchPadelSport()` for padel-scoped discovery. Client-side marker clustering of RPC results (e.g. `supercluster` on Discover map) is presentation-only — spatial filtering stays in Postgres.
-- **Edge Function exception (Places only):** `supabase/functions/places-search` is the **only** allowed custom backend surface — it holds the Google Places REST key. Setup and billing rules: `docs/places-setup.md`. Do not add other Edge Functions for business logic.
+- **Edge Function exceptions (integration proxies only):** `supabase/functions/places-search` holds the Google Places REST key; `supabase/functions/push` holds the Expo push access token and delivers alerts when `notifications` rows are inserted. Setup: `docs/places-setup.md`, `docs/push-setup.md`. Do not add other Edge Functions for business logic.
 - **Bracket operations:** always through RPCs (`generate_single_elimination_bracket`, `generate_round_robin`). Never construct brackets client-side.
 - **Realtime:** subscribe only to the published tables (`matches`, `match_participants`, `notifications`, `community_posts`, `tournament_matches`, `tournament_standings`, `messages`). Channel naming: `match:{id}`, `notifications:{userId}`, `post:{id}`, `moderation:posts`, `community:posts`, `my-posts:{userId}`, `tournament:{id}`, `conversation:{id}`. Always `removeChannel` on unmount. Do not poll a table that has Realtime.
 - **Storage:** avatars → `avatars/{user_id}/...` (public); payment receipts → `receipts/{registration_id}/...` (private); community post covers → `community-posts/{author_id}/...` (public). Respect these path conventions — bucket policies depend on them.
@@ -68,7 +68,7 @@
 3. Do NOT add columns to `public_profiles` without a security review of each column.
 4. Do NOT bypass triggers by writing status fields directly in ways that skip the state machine (e.g., setting `matches.status = 'full'` manually).
 5. Do NOT add tables to the Realtime publication casually — each one costs throughput; justify it in the migration comment.
-6. Do NOT introduce custom backend/API layers beyond the existing `places-search` Edge Function (Google Places key proxy only); extend the database (RPCs, triggers) instead.
+6. Do NOT introduce custom backend/API layers beyond the existing integration-proxy Edge Functions (`places-search`, `push`); extend the database (RPCs, triggers) instead.
 7. Do NOT use `npm`/`yarn`, JavaScript files in `src/`, or Spanish identifiers.
 8. Do NOT store secrets in code, `app.json`, or AsyncStorage — env vars + `expo-secure-store` only.
 9. Do NOT poll endpoints that have Realtime subscriptions available.
@@ -144,6 +144,14 @@ Empty host cancels, solo auto-`finished`, and early withdraw/remove do **not** i
 - Client: `src/features/notifications/` (`use-notifications.ts`, `notification-display.ts`), `NotificationBell`, `app/(app)/notifications.tsx`. Mount `useNotificationsRealtime()` once in `app/(app)/_layout.tsx`.
 - Penalty-eligible notifications deep-link to `app/(app)/report-penalty.tsx`; `rating_request` deep-links to `app/(app)/rate-match.tsx`.
 
+### Push notifications (remote)
+
+- Table: `push_tokens` — clients upsert Expo push tokens after permission grant; Edge Function reads enabled rows via `service_role`.
+- Delivery: AFTER INSERT trigger on `notifications` → pg_net POST → Edge Function `push` → Expo Push Service (`exp.host`). Copy and deep-link routes mirror `notification-display.ts`.
+- Client: `use-push-registration.ts` — register token, handle tap/cold-start navigation, invalidate notification queries on foreground delivery. Mount in `app/(app)/_layout.tsx` alongside Realtime.
+- Requires EAS dev/production build (`expo-notifications` config plugin); not available in Expo Go on Android (SDK 56+). Setup: `docs/push-setup.md`.
+- Migrations: `20260823120000_create_push_tokens`, `20260823130000_push_on_notification_trigger`, `20260828210000_grant_push_tokens_service_role`.
+
 ### Post-match quality ratings
 
 - Eligibility: match `status = 'finished'`, caller is host or `accepted` participant, ≥2 members, within 14 days of `finished_at`.
@@ -211,6 +219,7 @@ Types: `community_post_submitted` (moderators), `community_post_approved`, `comm
 - Architecture rationale & roadmap: `ARCHITECTURE.md` (repo root).
 - Generated DB types: `src/types/database.ts` (never hand-edit).
 - Google Maps / Places setup: `docs/places-setup.md`.
+- Push notifications setup: `docs/push-setup.md`.
 - M2 / M4 handoff checklists: `docs/m2-control-checklist.md`, `docs/m4-control-checklist.md`.
 - Architecture decision log: `docs/decisions.md`.
 

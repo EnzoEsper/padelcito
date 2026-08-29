@@ -75,3 +75,9 @@ Follow-up polish on the shared location picker: improved map pin UX in `place-ma
 ## Discover map (2026-08-07 — M4)
 
 Discover tab map view replaces the M4 placeholder. Uses `nearby_matches` RPC coords (no Places calls on Discover — zero incremental Places cost). Client-side clustering via `supercluster` (not unmaintained RN map-clustering libs). Contained rounded map card, list/map toggle, search-this-area (`queryCenter`), recenter, and synced bottom carousel. Spatial filtering stays in Postgres; clustering is presentation-only. Handoff: `docs/m4-control-checklist.md`.
+
+---
+
+## Push notifications via Expo Push Service (2026-08-23)
+
+Remote push layers on the existing `notifications` fan-out — no duplicate trigger logic. Clients register Expo push tokens in `push_tokens` (`20260823120000_create_push_tokens`); AFTER INSERT on `notifications` dispatches via pg_net to Edge Function `push` (`20260823130000_push_on_notification_trigger`), which maps copy/routes and calls Expo Push Service. Scoped second Edge Function exception alongside `places-search` (integration proxy holding `EXPO_ACCESS_TOKEN`, not business logic). Client: `use-push-registration.ts` in `app/(app)/_layout.tsx`. Requires EAS dev build + Firebase `google-services.json` (Android) + Vault webhook secrets. Setup: `docs/push-setup.md`.

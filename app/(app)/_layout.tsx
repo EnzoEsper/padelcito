@@ -3,6 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Tabs } from 'expo-router';
 import { TabBar } from '@/components/tab-bar';
 import { useNotificationsRealtime } from '@/features/notifications/use-notifications';
+import {
+  usePushNotificationResponse,
+  usePushRegistration,
+} from '@/features/notifications/use-push-registration';
 import { useModerationPostsRealtime } from '@/features/community/use-post-realtime';
 import { useProfileContactGate } from '@/features/community/use-posts';
 import { ensurePadelSport } from '@/lib/padel-sport';
@@ -22,6 +26,12 @@ function NotificationsRealtime() {
   return null;
 }
 
+function PushNotifications() {
+  usePushRegistration();
+  usePushNotificationResponse();
+  return null;
+}
+
 function PostsModerationRealtime() {
   const { data: contactGate } = useProfileContactGate();
   useModerationPostsRealtime(contactGate?.isModerator === true);
@@ -33,6 +43,7 @@ export default function AppLayout() {
     <>
       <PadelSportPrefetch />
       <NotificationsRealtime />
+      <PushNotifications />
       <PostsModerationRealtime />
       <Tabs
         initialRouteName="profile"

@@ -7,6 +7,11 @@ Read `@AGENTS.md` and `ai-architecture-context.md` before proceeding.
 - Location/Places rules: `ai-architecture-context.md` §12; setup guide: `docs/places-setup.md`.
 - Discover map (M4 shipped): `ai-architecture-context.md` §13; handoff checklist: `docs/m4-control-checklist.md`.
 
+## Push notifications
+
+- Rules: `ai-architecture-context.md` §9 (Push notifications); setup guide: `docs/push-setup.md`.
+- Delivery is trigger-driven off `notifications` INSERT — do not send push from client code.
+
 ## Claude-Specific Database Workflow
 
 1. **Migrations First:** If asked to modify the database schema, ALWAYS write a new Supabase migration (`supabase migration new <name>`). Do not provide raw SQL to run in a UI.

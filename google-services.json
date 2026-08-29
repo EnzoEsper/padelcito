@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "220948981464",
+    "project_id": "padelcito-777",
+    "storage_bucket": "padelcito-777.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:220948981464:android:8f1c81161fc8957a2999ad",
+        "android_client_info": {
+          "package_name": "com.padelcito.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "220948981464-vcjkq2j55tg3o0sv7sneo5qd4c919jes.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.padelcito.app",
+            "certificate_hash": "4fa83587d03d97970d0876b9009e804796d2af1d"
+          }
+        },
+        {
+          "client_id": "220948981464-gjn1g6fc98ocgtt9t9voijk20r91bhto.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChOZfjTnHELvuGQ3OV5Cpvg-HUvuARwk4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "220948981464-gjn1g6fc98ocgtt9t9voijk20r91bhto.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

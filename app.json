@@ -18,6 +18,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
+      "googleServicesFile": "./google-services.json",
       "predictiveBackGestureEnabled": false,
       "package": "com.padelcito.app"
     },
@@ -39,6 +40,14 @@
         {
           "photosPermission": "Padelcito needs access to your photos so you can upload tournament and training posts.",
           "cameraPermission": "Padelcito needs camera access so you can photograph posts to publish."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#5BE0A6",
+          "defaultChannel": "default"
         }
       ]
     ],
