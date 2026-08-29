@@ -166,6 +166,8 @@ pnpm start
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=...apps.googleusercontent.com
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=...apps.googleusercontent.com   # iOS Sign-In + native URL scheme
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIza...   # Maps SDK for Android only
 ```
 

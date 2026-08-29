@@ -117,7 +117,9 @@ Already configured:
 
 ---
 
-## 6. iOS — APNs via EAS
+## 6. iOS — APNs, Google Sign-In, and EAS dev build
+
+### 6.1 APNs via EAS
 
 EAS provisions the APNs key when you build for iOS:
 
@@ -127,7 +129,44 @@ pnpm dlx eas-cli credentials -p ios
 
 Bundle identifier: `com.padelcito.app` (from `app.json`).
 
-No Google configuration is required on iOS — Apple Maps and APNs are separate from Firebase.
+No Firebase file is required on iOS for push — Apple Maps and APNs are separate from Firebase.
+
+### 6.2 Google Sign-In (iOS OAuth client)
+
+Android uses `google-services.json`. iOS needs a separate **OAuth client** in [Google Cloud Console](https://console.cloud.google.com/) (same project as Firebase):
+
+1. **APIs & Services → Credentials → Create credentials → OAuth client ID → iOS**
+2. Bundle ID: `com.padelcito.app`
+3. Copy the client ID (ends with `.apps.googleusercontent.com`)
+
+Add to `.env.local` (Metro) **and** EAS `development` environment (native build embeds the URL scheme):
+
+```bash
+pnpm dlx eas-cli env:create --name EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID \
+  --value "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com" \
+  --environment development --visibility plaintext
+```
+
+`app.config.ts` derives the reversed URL scheme for `@react-native-google-signin/google-signin` from this value.
+
+### 6.3 CocoaPods / AppCheckCore (Expo SDK 56)
+
+`@react-native-google-signin/google-signin` can pull `AppCheckCore` 11.3.0, which breaks `pod install` on Expo 56 static builds. The project pins `AppCheckCore` to `11.2.0` via `expo-build-properties` in `app.config.ts`. If iOS EAS build fails at `pod install`, ensure that plugin is present and rebuild with `--clear-cache`.
+
+### 6.4 Build and install dev client
+
+```bash
+pnpm dlx eas-cli device:create          # register iPhone UDID (once)
+pnpm dlx eas-cli build --profile development --platform ios --clear-cache
+```
+
+Install from the EAS build page on the physical device, then connect to Metro:
+
+```bash
+pnpm start -- --dev-client --host lan
+```
+
+Use your PC LAN IP in `EXPO_PUBLIC_SUPABASE_URL` (not `127.0.0.1`) so the phone reaches local Supabase.
 
 ---
 

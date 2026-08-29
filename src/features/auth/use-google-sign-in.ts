@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { Platform } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 
@@ -30,15 +31,23 @@ const googleSigninModule = loadGoogleSigninModule();
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 
 if (!webClientId) {
   throw new Error('Missing EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID env var');
 }
 
+if (Platform.OS === 'ios' && !iosClientId) {
+  throw new Error('Missing EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID env var');
+}
+
 // Configure once at module load — idempotent, safe to call outside a hook.
 // Skipped when the native module is unavailable (e.g. Expo Go).
 if (googleSigninModule) {
-  googleSigninModule.GoogleSignin.configure({ webClientId });
+  googleSigninModule.GoogleSignin.configure({
+    webClientId,
+    ...(iosClientId !== undefined ? { iosClientId } : {}),
+  });
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -78,7 +87,9 @@ export function useGoogleSignIn(): GoogleSignInReturn {
     setGoogleError(null);
 
     try {
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      if (Platform.OS === 'android') {
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      }
 
       const response = await GoogleSignin.signIn();
       const idToken = response.data?.idToken;
