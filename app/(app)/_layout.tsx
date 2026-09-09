@@ -48,7 +48,6 @@ export default function AppLayout() {
       <PushNotifications />
       <PostsModerationRealtime />
       <View style={styles.root}>
-        <BannedUserBanner />
         <View style={styles.tabs}>
           <Tabs
             initialRouteName="profile"
@@ -79,6 +78,7 @@ export default function AppLayout() {
         <Tabs.Screen name="blocked-users" options={{ href: null }} />
           </Tabs>
         </View>
+        <BannedUserBanner />
       </View>
     </>
   );

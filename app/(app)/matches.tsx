@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, RefreshControl, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppContentTopPadding } from "@/lib/app-layout-insets";
 import { Ionicons } from "@expo/vector-icons";
 import { FlashList, View, Text, Pressable } from "@/tw";
 import { useAppAlert } from "@/components/app-alert-dialog";
@@ -206,7 +206,7 @@ function emptyStateForTab(tab: MatchesTab, pendingView: PendingView): {
 }
 
 export default function MatchesScreen() {
-  const insets = useSafeAreaInsets();
+  const contentTopPadding = useAppContentTopPadding(16);
   const router = useRouter();
   const appAlert = useAppAlert();
   const [tab, setTab] = useState<MatchesTab>("upcoming");
@@ -317,7 +317,7 @@ export default function MatchesScreen() {
     () => (
       <>
         <View
-          style={{ paddingTop: insets.top + 16 }}
+          style={{ paddingTop: contentTopPadding }}
           className="px-5 pb-5 flex-row justify-between items-start"
         >
           <View>
@@ -356,7 +356,7 @@ export default function MatchesScreen() {
         ) : null}
       </>
     ),
-    [insets.top, pendingView, tab],
+    [contentTopPadding, pendingView, tab],
   );
 
   const listEmpty = useMemo(() => {

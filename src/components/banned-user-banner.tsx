@@ -2,7 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text } from '@/tw';
 import { LEGAL_URLS } from '@/lib/legal-urls';
-import { useProfile } from '@/features/profile/use-profile';
+import { useIsSuspended } from '@/lib/app-layout-insets';
 
 const C = {
   surface: '#141417',
@@ -13,25 +13,33 @@ const C = {
 
 export function BannedUserBanner() {
   const insets = useSafeAreaInsets();
-  const profileQuery = useProfile();
-  const bannedAt = profileQuery.data?.banned_at ?? null;
+  const isSuspended = useIsSuspended();
 
-  if (bannedAt === null) {
+  if (!isSuspended) {
     return null;
   }
 
   return (
-    <View style={[styles.banner, { paddingTop: insets.top + 10 }]}>
-      <Text style={styles.title}>Account suspended</Text>
-      <Text style={styles.body}>
-        You cannot create matches or community posts. Contact {LEGAL_URLS.supportEmail} if you
-        believe this is an error.
-      </Text>
+    <View pointerEvents="box-none" style={styles.overlay}>
+      <View style={[styles.banner, { paddingTop: insets.top + 10 }]}>
+        <Text style={styles.title}>Account suspended</Text>
+        <Text style={styles.body}>
+          You cannot create matches or community posts. Contact {LEGAL_URLS.supportEmail} if you
+          believe this is an error.
+        </Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
   banner: {
     backgroundColor: C.surface,
     borderBottomWidth: 1,

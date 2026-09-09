@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppContentTopPadding } from '@/lib/app-layout-insets';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList, ScrollView, View, Text, Pressable } from '@/tw';
 import { NotificationBell } from '@/components/notification-bell';
@@ -99,6 +100,7 @@ function LocationGate({
 
 export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
+  const contentTopPadding = useAppContentTopPadding(12);
   const router = useRouter();
   const [feedMode, setFeedMode] = useState<FeedMode>('nearby');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
@@ -235,7 +237,7 @@ export default function CommunityScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: contentTopPadding }]}>
         <View className="flex-1 pr-3">
           <View style={styles.locationRow}>
             <Ionicons name="location-outline" size={13} color={C.blueHi} />

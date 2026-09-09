@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppContentTopPadding } from '@/lib/app-layout-insets';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList, ScrollView as TwScrollView, View, Text, Pressable } from '@/tw';
 import { useDiscoverMatches } from '@/features/matches/use-matches';
@@ -125,7 +125,7 @@ function ViewToggle({
 }
 
 export default function DiscoverScreen() {
-  const insets = useSafeAreaInsets();
+  const contentTopPadding = useAppContentTopPadding(12);
   const router = useRouter();
   const {
     status: locationStatus,
@@ -260,7 +260,7 @@ export default function DiscoverScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: contentTopPadding }]}>
         <View>
           <View style={styles.locationRow}>
             <Ionicons name="location-outline" size={13} color={C.blueHi} />
