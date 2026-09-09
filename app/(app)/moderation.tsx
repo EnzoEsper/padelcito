@@ -186,7 +186,7 @@ export default function ModerationScreen() {
 
   const handleBan = useCallback(
     (authorId: string, authorName: string): void => {
-      appAlert('Ban author', `Ban ${authorName} from publishing posts?`, [
+      appAlert('Ban author', `Ban ${authorName} from the platform?`, [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Ban',
@@ -194,7 +194,12 @@ export default function ModerationScreen() {
           onPress: () => {
             void banAuthor
               .mutateAsync({ userId: authorId, banned: true })
-              .then(() => appAlert('Banned', 'The author can no longer publish posts.'))
+              .then(() =>
+                appAlert(
+                  'Banned',
+                  'The user has been banned. Their matches have been cancelled and open reports resolved.',
+                ),
+              )
               .catch((error: unknown) => {
                 const message = error instanceof Error ? error.message : 'Could not ban user.';
                 appAlert('Ban failed', message);

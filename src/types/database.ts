@@ -1800,6 +1800,13 @@ export type Database = {
         Args: { p_match_id: string }
         Returns: undefined
       }
+      fetch_ban_status_for_users: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          banned_at: string
+          user_id: string
+        }[]
+      }
       finalize_due_matches: { Args: never; Returns: number }
       generate_round_robin: {
         Args: { p_tournament_id: string }
@@ -1824,6 +1831,7 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       is_banned: { Args: never; Returns: boolean }
+      is_banned_user: { Args: { p_user_id: string }; Returns: boolean }
       is_circuit_organizer: { Args: { p_circuit_id: string }; Returns: boolean }
       is_community_post_author: {
         Args: { p_community_post_id: string }
@@ -2047,6 +2055,7 @@ export type Database = {
         | "community_post_rejected"
         | "community_post_submitted"
         | "user_reported"
+        | "user_banned"
       participant_status:
         | "pending"
         | "accepted"
@@ -2261,6 +2270,7 @@ export const Constants = {
         "community_post_rejected",
         "community_post_submitted",
         "user_reported",
+        "user_banned",
       ],
       participant_status: [
         "pending",

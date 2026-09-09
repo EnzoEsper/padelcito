@@ -11,6 +11,7 @@ type UserReportRow = Database['public']['Tables']['user_reports']['Row'];
 export type UserReportSummary = UserReportRow & {
   reporter: PublicProfileRow | null;
   reported: PublicProfileRow | null;
+  reportedBannedAt: string | null;
 };
 
 export type ReportUserInput = {
@@ -71,12 +72,30 @@ export function useOpenUserReports(options?: { enabled?: boolean }) {
       }
 
       const profileIds = rows.flatMap((row) => [row.reporter_id, row.reported_id]);
+      const reportedIds = Array.from(new Set(rows.map((row) => row.reported_id)));
       const profilesById = await fetchPublicProfilesByIds(profileIds);
+
+      const banStatusByUserId = new Map<string, string | null>();
+      if (reportedIds.length > 0) {
+        const { data: banRows, error: banError } = await supabase.rpc(
+          'fetch_ban_status_for_users',
+          { p_user_ids: reportedIds },
+        );
+
+        if (banError !== null) {
+          throw banError;
+        }
+
+        for (const row of banRows ?? []) {
+          banStatusByUserId.set(row.user_id, row.banned_at);
+        }
+      }
 
       return rows.map((row) => ({
         ...row,
         reporter: profilesById.get(row.reporter_id) ?? null,
         reported: profilesById.get(row.reported_id) ?? null,
+        reportedBannedAt: banStatusByUserId.get(row.reported_id) ?? null,
       }));
     },
   });
@@ -147,6 +166,7 @@ export function resolveUserReportErrorMessage(error: unknown): string {
 export type GroupedUserReports = {
   reportedId: string;
   reportedName: string;
+  reportedBannedAt: string | null;
   reports: UserReportSummary[];
 };
 
@@ -161,6 +181,7 @@ export function groupOpenUserReports(reports: UserReportSummary[]): GroupedUserR
       grouped.set(report.reported_id, {
         reportedId: report.reported_id,
         reportedName,
+        reportedBannedAt: report.reportedBannedAt,
         reports: [report],
       });
     } else {
@@ -171,4 +192,28 @@ export function groupOpenUserReports(reports: UserReportSummary[]): GroupedUserR
   return Array.from(grouped.values()).sort(
     (a, b) => b.reports.length - a.reports.length || a.reportedName.localeCompare(b.reportedName),
   );
+}
+
+export function useResolveAllUserReportsForUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (reportIds: string[]): Promise<void> => {
+      for (const reportId of reportIds) {
+        const { error } = await supabase.rpc('resolve_user_report', {
+          p_report_id: reportId,
+        });
+
+        if (error !== null) {
+          throw error;
+        }
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: userReportKeys.all });
+    },
+    onError: (error) => {
+      logger.error('resolve_user_report batch failed', error);
+    },
+  });
 }

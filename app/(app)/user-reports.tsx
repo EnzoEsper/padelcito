@@ -5,15 +5,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { FlashList, Pressable, View, Text } from '@/tw';
 import { useAppAlert } from '@/components/app-alert-dialog';
-import { useBanPostAuthor } from '@/features/community/use-posts';
-import { useProfileContactGate } from '@/features/community/use-posts';
+import { useBanPostAuthor, useProfileContactGate } from '@/features/community/use-posts';
 import {
   USER_REPORT_REASON_LABELS,
+  buildMatchContextRoute,
+  buildPostContextRoute,
+  formatReportRelativeTime,
 } from '@/features/safety/safety-display';
 import {
   groupOpenUserReports,
   resolveUserReportErrorMessage,
   useOpenUserReports,
+  useResolveAllUserReportsForUser,
   useResolveUserReport,
   type GroupedUserReports,
   type UserReportSummary,
@@ -31,30 +34,57 @@ const C = {
   danger: '#E07B7B',
 } as const;
 
+const BAN_SUCCESS_MESSAGE =
+  'The user has been banned. Their matches have been cancelled and open reports resolved.';
+
 function ReportCard({
   report,
   onResolve,
-  onBan,
+  isResolving,
 }: {
   report: UserReportSummary;
   onResolve: () => void;
-  onBan: () => void;
+  isResolving: boolean;
 }) {
+  const router = useRouter();
+
   return (
     <View style={styles.reportCard}>
       <Text style={styles.reportReason}>{USER_REPORT_REASON_LABELS[report.reason]}</Text>
       <Text style={styles.reportMeta}>
-        Reported by {report.reporter?.display_name ?? 'Player'}
+        Reported by {report.reporter?.display_name ?? 'Player'} ·{' '}
+        {formatReportRelativeTime(report.created_at)}
       </Text>
       {report.comment !== null && report.comment.length > 0 ? (
         <Text style={styles.reportComment}>{report.comment}</Text>
       ) : null}
+      <View style={styles.contextRow}>
+        {report.match_id !== null ? (
+          <Pressable
+            onPress={() => router.push(buildMatchContextRoute(report.match_id as string))}
+            style={styles.contextLink}
+          >
+            <Text style={styles.contextLinkText}>Match context</Text>
+          </Pressable>
+        ) : null}
+        {report.community_post_id !== null ? (
+          <Pressable
+            onPress={() =>
+              router.push(buildPostContextRoute(report.community_post_id as string))
+            }
+            style={styles.contextLink}
+          >
+            <Text style={styles.contextLinkText}>Post context</Text>
+          </Pressable>
+        ) : null}
+      </View>
       <View style={styles.actionRow}>
-        <Pressable onPress={onResolve} style={styles.resolveAction}>
-          <Text style={styles.resolveActionText}>Resolve</Text>
-        </Pressable>
-        <Pressable onPress={onBan} style={styles.banAction}>
-          <Text style={styles.banActionText}>Ban user</Text>
+        <Pressable
+          onPress={onResolve}
+          disabled={isResolving}
+          style={[styles.resolveAction, isResolving ? styles.actionDisabled : null]}
+        >
+          <Text style={styles.resolveActionText}>{isResolving ? 'Resolving…' : 'Resolve'}</Text>
         </Pressable>
       </View>
     </View>
@@ -64,26 +94,74 @@ function ReportCard({
 function GroupCard({
   group,
   onResolve,
+  onResolveAll,
   onBan,
+  onUnban,
+  isBanPending,
+  isResolveAllPending,
+  resolvingReportId,
 }: {
   group: GroupedUserReports;
   onResolve: (reportId: string) => void;
+  onResolveAll: (reportIds: string[]) => void;
   onBan: (userId: string, displayName: string) => void;
+  onUnban: (userId: string, displayName: string) => void;
+  isBanPending: boolean;
+  isResolveAllPending: boolean;
+  resolvingReportId: string | null;
 }) {
+  const isBanned = group.reportedBannedAt !== null;
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>{group.reportedName}</Text>
-        <Text style={styles.reportChip}>
-          {group.reports.length} open report{group.reports.length === 1 ? '' : 's'}
-        </Text>
+        <View style={styles.headerChips}>
+          {isBanned ? <Text style={styles.bannedChip}>Banned</Text> : null}
+          <Text style={styles.reportChip}>
+            {group.reports.length} open report{group.reports.length === 1 ? '' : 's'}
+          </Text>
+        </View>
       </View>
+
+      <View style={styles.groupActionRow}>
+        <Pressable
+          onPress={() => onResolveAll(group.reports.map((report) => report.id))}
+          disabled={isResolveAllPending || isBanPending}
+          style={[
+            styles.resolveAllAction,
+            isResolveAllPending || isBanPending ? styles.actionDisabled : null,
+          ]}
+        >
+          <Text style={styles.resolveAllActionText}>
+            {isResolveAllPending ? 'Resolving…' : 'Resolve all'}
+          </Text>
+        </Pressable>
+        {isBanned ? (
+          <Pressable
+            onPress={() => onUnban(group.reportedId, group.reportedName)}
+            disabled={isBanPending}
+            style={[styles.unbanAction, isBanPending ? styles.actionDisabled : null]}
+          >
+            <Text style={styles.unbanActionText}>{isBanPending ? 'Updating…' : 'Unban user'}</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => onBan(group.reportedId, group.reportedName)}
+            disabled={isBanPending}
+            style={[styles.banAction, isBanPending ? styles.actionDisabled : null]}
+          >
+            <Text style={styles.banActionText}>{isBanPending ? 'Banning…' : 'Ban user'}</Text>
+          </Pressable>
+        )}
+      </View>
+
       {group.reports.map((report) => (
         <ReportCard
           key={report.id}
           report={report}
           onResolve={() => onResolve(report.id)}
-          onBan={() => onBan(group.reportedId, group.reportedName)}
+          isResolving={resolvingReportId === report.id}
         />
       ))}
     </View>
@@ -99,6 +177,7 @@ export default function UserReportsScreen() {
     enabled: contactGate.data?.isModerator === true,
   });
   const resolveReport = useResolveUserReport();
+  const resolveAllReports = useResolveAllUserReportsForUser();
   const banAuthor = useBanPostAuthor();
 
   const isModerator = contactGate.data?.isModerator === true;
@@ -108,15 +187,49 @@ export default function UserReportsScreen() {
   );
 
   const handleResolve = useCallback(
-    async (reportId: string): Promise<void> => {
-      try {
-        await resolveReport.mutateAsync(reportId);
-        appAlert('Resolved', 'The report was marked as resolved.');
-      } catch (error) {
-        appAlert('Resolve failed', resolveUserReportErrorMessage(error));
-      }
+    (reportId: string): void => {
+      appAlert('Resolve report', 'Mark this report as resolved?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Resolve',
+          style: 'destructive',
+          onPress: () => {
+            void resolveReport
+              .mutateAsync(reportId)
+              .then(() => appAlert('Resolved', 'The report was marked as resolved.'))
+              .catch((error: unknown) => {
+                appAlert('Resolve failed', resolveUserReportErrorMessage(error));
+              });
+          },
+        },
+      ]);
     },
     [appAlert, resolveReport],
+  );
+
+  const handleResolveAll = useCallback(
+    (reportIds: string[]): void => {
+      appAlert(
+        'Resolve all reports',
+        `Mark all ${reportIds.length} open reports for this user as resolved?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Resolve all',
+            style: 'destructive',
+            onPress: () => {
+              void resolveAllReports
+                .mutateAsync(reportIds)
+                .then(() => appAlert('Resolved', 'All reports for this user were resolved.'))
+                .catch((error: unknown) => {
+                  appAlert('Resolve failed', resolveUserReportErrorMessage(error));
+                });
+            },
+          },
+        ],
+      );
+    },
+    [appAlert, resolveAllReports],
   );
 
   const handleBan = useCallback(
@@ -129,7 +242,7 @@ export default function UserReportsScreen() {
           onPress: () => {
             void banAuthor
               .mutateAsync({ userId, banned: true })
-              .then(() => appAlert('Banned', 'The user can no longer use the app.'))
+              .then(() => appAlert('Banned', BAN_SUCCESS_MESSAGE))
               .catch((error: unknown) => {
                 const message = error instanceof Error ? error.message : 'Could not ban user.';
                 appAlert('Ban failed', message);
@@ -141,15 +254,56 @@ export default function UserReportsScreen() {
     [appAlert, banAuthor],
   );
 
+  const handleUnban = useCallback(
+    (userId: string, displayName: string): void => {
+      appAlert(
+        'Unban user',
+        `Unban ${displayName}? They will be able to create matches and posts again.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Unban',
+            onPress: () => {
+              void banAuthor
+                .mutateAsync({ userId, banned: false })
+                .then(() =>
+                  appAlert('Unbanned', `${displayName} can use the platform again.`),
+                )
+                .catch((error: unknown) => {
+                  const message = error instanceof Error ? error.message : 'Could not unban user.';
+                  appAlert('Unban failed', message);
+                });
+            },
+          },
+        ],
+      );
+    },
+    [appAlert, banAuthor],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: GroupedUserReports }) => (
       <GroupCard
         group={item}
-        onResolve={(reportId) => void handleResolve(reportId)}
+        onResolve={handleResolve}
+        onResolveAll={handleResolveAll}
         onBan={handleBan}
+        onUnban={handleUnban}
+        isBanPending={banAuthor.isPending}
+        isResolveAllPending={resolveAllReports.isPending}
+        resolvingReportId={resolveReport.isPending ? (resolveReport.variables ?? null) : null}
       />
     ),
-    [handleBan, handleResolve],
+    [
+      banAuthor.isPending,
+      handleBan,
+      handleResolve,
+      handleResolveAll,
+      handleUnban,
+      resolveAllReports.isPending,
+      resolveReport.isPending,
+      resolveReport.variables,
+    ],
   );
 
   const keyExtractor = useCallback((item: GroupedUserReports) => item.reportedId, []);
@@ -282,6 +436,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
   },
+  headerChips: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   cardTitle: {
     flex: 1,
     color: C.mist,
@@ -295,6 +454,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 1,
     textTransform: 'uppercase',
+  },
+  bannedChip: {
+    color: C.danger,
+    fontFamily: 'Space Mono',
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  groupActionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   reportCard: {
     borderTopWidth: 1,
@@ -318,11 +489,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
   },
+  contextRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  contextLink: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(228,228,228,0.06)',
+  },
+  contextLinkText: {
+    color: C.mist,
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   actionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 4,
+  },
+  actionDisabled: {
+    opacity: 0.55,
   },
   resolveAction: {
     paddingHorizontal: 14,
@@ -338,6 +529,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  resolveAllAction: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(91,224,166,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(91,224,166,0.18)',
+  },
+  resolveAllActionText: {
+    color: C.success,
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   banAction: {
     paddingHorizontal: 14,
     paddingVertical: 10,
@@ -348,6 +553,20 @@ const styles = StyleSheet.create({
   },
   banActionText: {
     color: C.danger,
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  unbanAction: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(224,176,91,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(224,176,91,0.25)',
+  },
+  unbanActionText: {
+    color: C.warning,
     fontFamily: 'Hanken Grotesk',
     fontSize: 13,
     fontWeight: '700',

@@ -10,6 +10,7 @@ import {
 import { useModerationPostsRealtime } from '@/features/community/use-post-realtime';
 import { useProfileContactGate } from '@/features/community/use-posts';
 import { ensurePadelSport } from '@/lib/padel-sport';
+import { BannedUserBanner } from '@/components/banned-user-banner';
 
 function PadelSportPrefetch() {
   const queryClient = useQueryClient();
@@ -45,6 +46,7 @@ export default function AppLayout() {
       <NotificationsRealtime />
       <PushNotifications />
       <PostsModerationRealtime />
+      <BannedUserBanner />
       <Tabs
         initialRouteName="profile"
         screenOptions={{ headerShown: false }}

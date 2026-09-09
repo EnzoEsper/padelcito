@@ -7,6 +7,7 @@ import {
 } from '@/features/ratings/penalty-report';
 import { buildModerationRoute } from '@/features/community/post-display';
 import { buildUserReportsRoute } from '@/features/safety/safety-display';
+import { LEGAL_URLS } from '@/lib/legal-urls';
 import { buildRateMatchRoute } from '@/features/ratings/rating-display';
 
 export type NotificationRow = Database['public']['Tables']['notifications']['Row'];
@@ -271,6 +272,16 @@ export function resolveNotificationPresentation(
         actionLabel: 'Review',
       };
     }
+    case 'user_banned':
+      return {
+        ...base,
+        icon: 'ban-outline',
+        accent: 'warning',
+        title: 'Account suspended',
+        body: `Your account has been suspended by a moderator. Contact ${LEGAL_URLS.supportEmail} if you believe this is an error.`,
+        route: '/(app)/account-settings',
+        actionLabel: 'Account settings',
+      };
     default: {
       const _exhaustive: never = notification.type;
       return {
