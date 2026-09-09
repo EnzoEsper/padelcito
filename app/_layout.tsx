@@ -28,6 +28,7 @@ import { applyRealtimeAuth, subscribeToAuthChanges } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { initSentry } from '@/lib/sentry';
 import { queryClient, persistOptions } from '@/lib/query-client';
+import { invalidatePadelSportCache } from '@/lib/padel-sport';
 import { wireQueryPlatformManagers } from '@/lib/query-focus-manager';
 import { AppDialogProvider } from '@/components/app-alert-dialog';
 import { OnboardingContext } from '@/lib/onboarding-context';
@@ -108,12 +109,16 @@ export default function RootLayout() {
     void supabase.auth.getSession().then(async ({ data }) => {
       setSession(data.session);
       await applyRealtimeAuth(data.session?.access_token ?? null);
+      await invalidatePadelSportCache(queryClient);
       setIsReady(true);
     });
 
-    const subscription = subscribeToAuthChanges((_event, newSession) => {
+    const subscription = subscribeToAuthChanges((event, newSession) => {
       setSession(newSession);
       void applyRealtimeAuth(newSession?.access_token ?? null);
+      if (event === 'SIGNED_IN') {
+        void invalidatePadelSportCache(queryClient);
+      }
     });
 
     return () => subscription.unsubscribe();

@@ -6,6 +6,7 @@ import {
   type ReliabilityEventType,
 } from '@/features/ratings/penalty-report';
 import { buildModerationRoute } from '@/features/community/post-display';
+import { buildUserReportsRoute } from '@/features/safety/safety-display';
 import { buildRateMatchRoute } from '@/features/ratings/rating-display';
 
 export type NotificationRow = Database['public']['Tables']['notifications']['Row'];
@@ -20,6 +21,9 @@ export type NotificationData = {
   was_late_cancellation?: boolean;
   post_title?: string;
   rejection_reason?: string | null;
+  reported_user_name?: string;
+  reason?: string;
+  report_id?: string;
 };
 
 export type NotificationPresentation = {
@@ -254,6 +258,19 @@ export function resolveNotificationPresentation(
         route: buildModerationRoute(),
         actionLabel: 'Review',
       };
+    case 'user_reported': {
+      const reportedName = data.reported_user_name ?? 'a user';
+      const reasonLabel = data.reason ?? 'concern';
+      return {
+        ...base,
+        icon: 'flag-outline',
+        accent: 'warning',
+        title: 'User report',
+        body: `${actor} reported ${reportedName} for ${reasonLabel.replaceAll('_', ' ')}.`,
+        route: buildUserReportsRoute(),
+        actionLabel: 'Review',
+      };
+    }
     default: {
       const _exhaustive: never = notification.type;
       return {

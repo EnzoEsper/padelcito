@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
+import { toUserFacingError } from '@/lib/error-message';
 
 export type AuthStage = 'request' | 'verify';
 
@@ -62,7 +63,8 @@ export function useOtpForm(): OtpFormReturn {
           options: { shouldCreateUser: true },
         });
         if (error) {
-          setApiError(error.message);
+          logger.error('signInWithOtp failed', error);
+          setApiError(toUserFacingError(error, 'Unable to send code. Please try again.'));
           return false;
         }
         startCountdown();
@@ -100,7 +102,8 @@ export function useOtpForm(): OtpFormReturn {
           type: 'email',
         });
         if (error) {
-          setApiError(error.message);
+          logger.error('verifyOtp failed', error);
+          setApiError(toUserFacingError(error, 'Verification failed. Please try again.'));
           return;
         }
         // Session is now live — the root layout's onAuthStateChange listener

@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
-import { ensurePadelSport } from '@/lib/padel-sport';
+import { fetchPadelSportFresh } from '@/lib/padel-sport';
 import { useOnboardingContext } from '@/lib/onboarding-context';
 
 // ─── Skill level enum ────────────────────────────────────────────────────────
@@ -136,10 +136,10 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
           return;
         }
 
-        // 3. Resolve the Padel sport FK
+        // 3. Resolve the Padel sport FK (fresh fetch — persisted cache can hold stale ids after db reset)
         let padelSport;
         try {
-          padelSport = await ensurePadelSport(queryClient);
+          padelSport = await fetchPadelSportFresh(queryClient);
         } catch (sportError) {
           logger.error('padel sport lookup failed', sportError);
           setSubmitError('Padel sport not found in our system. Please contact support.');
@@ -147,16 +147,29 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
         }
 
         // 4. Upsert profile_sports (safe if the row already exists)
-        const { error: sportInsertError } = await supabase
-          .from('profile_sports')
-          .upsert(
+        const upsertProfileSport = async (sportId: string) =>
+          supabase.from('profile_sports').upsert(
             {
               profile_id: userId,
-              sport_id: padelSport.id,
+              sport_id: sportId,
               skill_level: data.skill_level,
             },
             { onConflict: 'profile_id,sport_id' },
           );
+
+        let sportInsertError = (await upsertProfileSport(padelSport.id)).error;
+
+        if (sportInsertError?.code === '23503') {
+          logger.warn('profile_sports.upsert stale sport id — refetching padel sport');
+          try {
+            padelSport = await fetchPadelSportFresh(queryClient);
+            sportInsertError = (await upsertProfileSport(padelSport.id)).error;
+          } catch (sportError) {
+            logger.error('padel sport refetch failed', sportError);
+            setSubmitError('Padel sport not found in our system. Please contact support.');
+            return;
+          }
+        }
 
         if (sportInsertError !== null) {
           logger.error('profile_sports.upsert failed', sportInsertError);

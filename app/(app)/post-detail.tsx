@@ -23,6 +23,12 @@ import { usePostRealtime } from '@/features/community/use-post-realtime';
 import { buildPostImageUrl } from '@/lib/post-storage';
 import { PostFlyerImage } from '@/features/community/components/post-flyer-image';
 import { PostImageViewer } from '@/features/community/components/post-image-viewer';
+import { blockGuardMessage, useBlockPairStatus } from '@/features/blocks/use-user-blocks';
+import {
+  UserActionsTrigger,
+  useUserActionsSheet,
+} from '@/features/safety/user-actions-sheet';
+import { toUserFacingError } from '@/lib/error-message';
 import type { Database } from '@/types/database';
 
 type CommunityPostReportReason = Database['public']['Enums']['community_post_report_reason'];
@@ -65,7 +71,9 @@ export default function PostDetailScreen() {
   usePostRealtime(postId);
   const reportPost = useReportPost();
   const archivePost = useArchivePost();
+  const { open: openUserActions, sheet: userActionsSheet } = useUserActionsSheet();
   const post = detailQuery.data;
+  const authorBlockStatus = useBlockPairStatus(post?.author_id ?? null);
   const isLoadingPost =
     detailQuery.isPending || (detailQuery.isFetching && post === undefined);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -92,8 +100,7 @@ export default function PostDetailScreen() {
               appAlert('Report submitted', 'Thanks — moderators will review this post.');
             })
             .catch((error: unknown) => {
-              const message = error instanceof Error ? error.message : 'Could not submit report.';
-              appAlert('Report failed', message);
+              appAlert('Report failed', toUserFacingError(error, 'Could not submit report.'));
             });
         },
       })),
@@ -144,6 +151,13 @@ export default function PostDetailScreen() {
               ? detailQuery.error.message
               : 'Could not load post.'}
           </Text>
+        </View>
+      ) : authorBlockStatus.data?.isBlocked === true && !post.isAuthor ? (
+        <View style={styles.centerState}>
+          <Text style={styles.errorText}>{blockGuardMessage(authorBlockStatus.data)}</Text>
+          <Pressable onPress={() => router.back()} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>Go back</Text>
+          </Pressable>
         </View>
       ) : (
         <ScrollView
@@ -217,13 +231,31 @@ export default function PostDetailScreen() {
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Organizer</Text>
-            <Text style={styles.sectionValue}>{post.author?.display_name ?? 'Player'}</Text>
-            {isPostContactVerified(post.contact_verified_at) ? (
-              <View style={styles.verifiedRow}>
-                <Ionicons name="shield-checkmark" size={14} color={C.success} />
-                <Text style={styles.verifiedText}>Verified contact</Text>
+            <View style={styles.organizerRow}>
+              <View style={styles.organizerMeta}>
+                <Text style={styles.sectionValue}>{post.author?.display_name ?? 'Player'}</Text>
+                {isPostContactVerified(post.contact_verified_at) ? (
+                  <View style={styles.verifiedRow}>
+                    <Ionicons name="shield-checkmark" size={14} color={C.success} />
+                    <Text style={styles.verifiedText}>Verified contact</Text>
+                  </View>
+                ) : null}
               </View>
-            ) : null}
+              {post.status === 'approved' && !post.isAuthor ? (
+                <UserActionsTrigger
+                  onPress={() =>
+                    openUserActions({
+                      userId: post.author_id,
+                      displayName: post.author?.display_name ?? 'Player',
+                      context: {
+                        postId: post.id,
+                        onBlocked: () => router.back(),
+                      },
+                    })
+                  }
+                />
+              ) : null}
+            </View>
           </View>
         </ScrollView>
       )}
@@ -258,6 +290,7 @@ export default function PostDetailScreen() {
           onClose={() => setViewerOpen(false)}
         />
       ) : null}
+      {userActionsSheet}
     </View>
   );
 }
@@ -336,6 +369,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Hanken Grotesk',
     fontSize: 16,
     fontWeight: '700',
+  },
+  organizerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  organizerMeta: {
+    flex: 1,
+    gap: 4,
   },
   sectionHint: {
     color: C.dim,

@@ -24,7 +24,9 @@ import {
   buildModerationRoute,
   buildMyPostsRoute,
 } from '@/features/community/post-display';
+import { buildUserReportsRoute } from '@/features/safety/safety-display';
 import { useModerationQueue } from '@/features/community/use-posts';
+import { useOpenUserReports } from '@/features/safety/use-user-reports';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -263,11 +265,13 @@ export default function ProfileScreen() {
 
   const isModerator = profile !== undefined && isModeratorRole(profile.role);
   const moderationQuery = useModerationQueue({ enabled: isModerator });
+  const userReportsQuery = useOpenUserReports({ enabled: isModerator });
   const pendingReviewCount = useMemo(
     () =>
       (moderationQuery.data ?? []).filter((post) => post.status === 'pending_review').length,
     [moderationQuery.data],
   );
+  const openUserReportCount = userReportsQuery.data?.length ?? 0;
 
   const skillLevel: SkillLevel = sport?.skill_level ?? 'intermediate';
   const rating = profile?.rating_avg ?? 0;
@@ -311,7 +315,8 @@ export default function ProfileScreen() {
           <Pressable
             className="active:opacity-70"
             style={styles.settingsBtn}
-            accessibilityLabel="Settings"
+            accessibilityLabel="Account settings"
+            onPress={() => router.push('/(app)/account-settings')}
           >
             <Ionicons name="settings-outline" size={19} color={C.neutral} />
           </Pressable>
@@ -374,6 +379,13 @@ export default function ProfileScreen() {
                 onPress={() => router.push(buildModerationRoute())}
               />
             ) : null}
+            {isModerator ? (
+              <PreferenceRow
+                label="User reports"
+                badgeCount={openUserReportCount}
+                onPress={() => router.push(buildUserReportsRoute())}
+              />
+            ) : null}
           </View>
 
           {/* Preferences */}
@@ -388,8 +400,12 @@ export default function ProfileScreen() {
           <SectionLabel>ACCOUNT</SectionLabel>
           <View style={[styles.prefCard, { marginHorizontal: 20 }]}>
             <PreferenceRow
-              label="Sign Out"
+              label="Account settings"
               isFirst
+              onPress={() => router.push('/(app)/account-settings')}
+            />
+            <PreferenceRow
+              label="Sign Out"
               onPress={signOut}
               labelColor={C.warning}
             />

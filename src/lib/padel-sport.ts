@@ -52,6 +52,20 @@ export function ensurePadelSport(queryClient: QueryClient): Promise<SportRow> {
   });
 }
 
+export function invalidatePadelSportCache(queryClient: QueryClient): Promise<void> {
+  return queryClient.invalidateQueries({ queryKey: padelSportKeys.all }).then(() => undefined);
+}
+
+/** Always hits the network — use before writes when a stale cached sport id would break FK inserts. */
+export async function fetchPadelSportFresh(queryClient: QueryClient): Promise<SportRow> {
+  await queryClient.invalidateQueries({ queryKey: padelSportKeys.all });
+  return queryClient.fetchQuery({
+    queryKey: padelSportKeys.all,
+    queryFn: fetchPadelSport,
+    staleTime: Infinity,
+  });
+}
+
 export function usePadelSport() {
   return useQuery({
     queryKey: padelSportKeys.all,

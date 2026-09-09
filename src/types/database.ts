@@ -1600,6 +1600,123 @@ export type Database = {
           },
         ]
       }
+      user_blocks: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      user_reports: {
+        Row: {
+          comment: string | null
+          community_post_id: string | null
+          created_at: string
+          id: string
+          match_id: string | null
+          reason: Database["public"]["Enums"]["user_report_reason"]
+          reported_id: string
+          reporter_id: string
+          resolved_at: string | null
+          reviewed_by: string | null
+        }
+        Insert: {
+          comment?: string | null
+          community_post_id?: string | null
+          created_at?: string
+          id?: string
+          match_id?: string | null
+          reason: Database["public"]["Enums"]["user_report_reason"]
+          reported_id: string
+          reporter_id: string
+          resolved_at?: string | null
+          reviewed_by?: string | null
+        }
+        Update: {
+          comment?: string | null
+          community_post_id?: string | null
+          created_at?: string
+          id?: string
+          match_id?: string | null
+          reason?: Database["public"]["Enums"]["user_report_reason"]
+          reported_id?: string
+          reporter_id?: string
+          resolved_at?: string | null
+          reviewed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_reports_community_post_id_fkey"
+            columns: ["community_post_id"]
+            isOneToOne: false
+            referencedRelation: "community_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reports_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reports_reported_id_fkey"
+            columns: ["reported_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reports_reported_id_fkey"
+            columns: ["reported_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reports_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_reports_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       public_profiles: {
@@ -1643,14 +1760,21 @@ export type Database = {
       }
     }
     Functions: {
+      block_user: { Args: { p_blocked_id: string }; Returns: undefined }
       can_report_score: {
         Args: { p_tournament_match_id: string }
         Returns: boolean
       }
-      consume_places_search_quota: {
-        Args: { p_limit?: number; p_window_seconds?: number }
+      can_update_tournament_match_score: {
+        Args: { p_tournament_match_id: string }
         Returns: boolean
       }
+      clear_severed_participation: {
+        Args: { p_a: string; p_b: string }
+        Returns: undefined
+      }
+      consume_places_search_quota: { Args: never; Returns: boolean }
+      delete_account: { Args: never; Returns: undefined }
       emit_community_post_notification: {
         Args: {
           p_actor_id: string
@@ -1857,13 +1981,33 @@ export type Database = {
         Args: { p_stage_id: string }
         Returns: undefined
       }
+      report_user: {
+        Args: {
+          p_comment?: string
+          p_community_post_id?: string
+          p_match_id?: string
+          p_reason: Database["public"]["Enums"]["user_report_reason"]
+          p_reported_id: string
+        }
+        Returns: string
+      }
+      resolve_user_report: { Args: { p_report_id: string }; Returns: undefined }
       set_user_banned: {
         Args: { p_banned: boolean; p_user_id: string }
+        Returns: undefined
+      }
+      sever_shared_upcoming_matches: {
+        Args: { p_a: string; p_b: string }
         Returns: undefined
       }
       sync_match_lifecycle: {
         Args: { p_match_id: string }
         Returns: Database["public"]["Enums"]["match_status"]
+      }
+      unblock_user: { Args: { p_blocked_id: string }; Returns: undefined }
+      users_are_blocked: {
+        Args: { p_user_a: string; p_user_b: string }
+        Returns: boolean
       }
     }
     Enums: {
@@ -1902,6 +2046,7 @@ export type Database = {
         | "community_post_approved"
         | "community_post_rejected"
         | "community_post_submitted"
+        | "user_reported"
       participant_status:
         | "pending"
         | "accepted"
@@ -1940,6 +2085,13 @@ export type Database = {
         | "in_progress"
         | "completed"
         | "cancelled"
+      user_report_reason:
+        | "harassment"
+        | "inappropriate"
+        | "spam"
+        | "scam"
+        | "safety"
+        | "other"
       user_role: "member" | "moderator" | "admin"
     }
     CompositeTypes: {
@@ -1956,12 +2108,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1985,11 +2137,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2010,11 +2162,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2035,11 +2187,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2052,11 +2204,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2108,6 +2260,7 @@ export const Constants = {
         "community_post_approved",
         "community_post_rejected",
         "community_post_submitted",
+        "user_reported",
       ],
       participant_status: [
         "pending",
@@ -2152,6 +2305,14 @@ export const Constants = {
         "in_progress",
         "completed",
         "cancelled",
+      ],
+      user_report_reason: [
+        "harassment",
+        "inappropriate",
+        "spam",
+        "scam",
+        "safety",
+        "other",
       ],
       user_role: ["member", "moderator", "admin"],
     },

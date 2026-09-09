@@ -53,6 +53,11 @@ import {
 import { formatMatchScheduleLabel } from '@/lib/match-time';
 import { resolveMatchLocationSubtitle } from '@/lib/match-location';
 import { UnsupportedSportError } from '@/lib/padel-sport';
+import { blockGuardMessage, useBlockPairStatus } from '@/features/blocks/use-user-blocks';
+import {
+  UserActionsTrigger,
+  useUserActionsSheet,
+} from '@/features/safety/user-actions-sheet';
 import type { Database } from '@/types/database';
 
 type PublicProfile = Database['public']['Views']['public_profiles']['Row'];
@@ -270,6 +275,7 @@ function PlayerRow({
   reliabilityLabel,
   onRemove,
   onWhatsApp,
+  onUserActions,
 }: {
   name: string;
   index: number;
@@ -279,6 +285,7 @@ function PlayerRow({
   reliabilityLabel?: string | null;
   onRemove?: () => void;
   onWhatsApp?: () => void;
+  onUserActions?: () => void;
 }) {
   return (
     <View style={styles.playerRow}>
@@ -303,7 +310,7 @@ function PlayerRow({
           </View>
         ) : null}
       </View>
-      {onWhatsApp !== undefined || onRemove !== undefined ? (
+      {onWhatsApp !== undefined || onRemove !== undefined || onUserActions !== undefined ? (
         <View style={styles.playerActions}>
           {onWhatsApp !== undefined ? (
             <Pressable
@@ -313,6 +320,9 @@ function PlayerRow({
             >
               <Ionicons name="chatbox-outline" size={16} color={C.mist} />
             </Pressable>
+          ) : null}
+          {onUserActions !== undefined ? (
+            <UserActionsTrigger onPress={onUserActions} />
           ) : null}
           {onRemove !== undefined ? (
             <Pressable onPress={onRemove} style={styles.removeButton}>
@@ -571,6 +581,10 @@ export default function MatchDetailScreen() {
   const updateStatus = useUpdateParticipantStatus(matchId ?? '');
   const cancelPending = useCancelPendingRequest(matchId ?? '');
   const cancelMatch = useCancelMatch(matchId ?? '');
+  const { open: openUserActions, sheet: userActionsSheet } = useUserActionsSheet();
+  const hostBlockTargetId =
+    match !== undefined && !match.isHost ? match.host_id : null;
+  const hostBlockStatus = useBlockPairStatus(hostBlockTargetId);
 
   const canLoadRatings =
     match !== undefined &&
@@ -833,6 +847,20 @@ export default function MatchDetailScreen() {
     );
   }
 
+  if (
+    hostBlockStatus.data?.isBlocked === true &&
+    !match.isHost
+  ) {
+    return (
+      <View style={[styles.errorRoot, { paddingTop: insets.top + 24 }]}>
+        <Text style={styles.errorTitle}>{blockGuardMessage(hostBlockStatus.data)}</Text>
+        <Pressable onPress={() => router.back()} style={styles.retryButton}>
+          <Text style={styles.retryText}>Go back</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   const courtConfigs = resolveMatchCourtConfigs(match.court_configs, match.court_count);
   const distanceM = resolveMatchDistanceM({
     matchId: match.id,
@@ -984,6 +1012,19 @@ export default function MatchDetailScreen() {
               host
               ratingLabel={hostRatingLabel}
               reliabilityLabel={hostReliabilityLabel}
+              onUserActions={
+                !match.isHost
+                  ? () =>
+                      openUserActions({
+                        userId: match.host_id,
+                        displayName: hostName,
+                        context: {
+                          matchId: match.id,
+                          onBlocked: () => router.back(),
+                        },
+                      })
+                  : undefined
+              }
             />
             {match.offlineConfirmedCount > 0 ? (
               <>
@@ -1024,6 +1065,16 @@ export default function MatchDetailScreen() {
                         ? () => void openPlayerContact(participant.profile_id)
                         : undefined
                     }
+                    onUserActions={
+                      participant.profile_id !== match.currentUserId
+                        ? () =>
+                            openUserActions({
+                              userId: participant.profile_id,
+                              displayName: name,
+                              context: { matchId: match.id },
+                            })
+                        : undefined
+                    }
                   />
                 </View>
               );
@@ -1056,6 +1107,15 @@ export default function MatchDetailScreen() {
                             ) : null}
                           </View>
                           <View style={styles.requestActions}>
+                            <UserActionsTrigger
+                              onPress={() =>
+                                openUserActions({
+                                  userId: participant.profile_id,
+                                  displayName: profile?.display_name ?? 'Player',
+                                  context: { matchId: match.id },
+                                })
+                              }
+                            />
                             <Pressable
                               onPress={() => void handleParticipantStatus(participant.id, 'accepted')}
                               style={styles.acceptSmall}
@@ -1125,6 +1185,7 @@ export default function MatchDetailScreen() {
           totalFilled: match.totalFilled,
         }}
       />
+      {userActionsSheet}
     </View>
   );
 }

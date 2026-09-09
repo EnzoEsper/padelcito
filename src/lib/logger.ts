@@ -10,6 +10,18 @@ function prefixed(level: string, args: LogArgs): LogArgs {
   return [`[padelcito:${level}]`, ...args];
 }
 
+function redactForProduction(args: LogArgs): LogArgs {
+  return args.map((arg) => {
+    if (arg instanceof Error) {
+      return arg.message;
+    }
+    if (typeof arg === 'string' && arg.length > 200) {
+      return `${arg.slice(0, 200)}…`;
+    }
+    return arg;
+  });
+}
+
 export const logger = {
   info: (...args: LogArgs): void => {
     if (isDev) {
@@ -22,7 +34,12 @@ export const logger = {
     }
   },
   error: (...args: LogArgs): void => {
-    console.error(...prefixed('error', args));
+    if (isDev) {
+      console.error(...prefixed('error', args));
+    } else {
+      console.error(...prefixed('error', redactForProduction(args)));
+    }
+
     const firstError = args.find((arg) => arg instanceof Error);
     if (firstError instanceof Error) {
       captureException(firstError);

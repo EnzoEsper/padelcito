@@ -144,6 +144,14 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
       if (trimmedTitle.length < 3) {
         return { ok: false, message: 'Add a title of at least 3 characters.' };
       }
+      if (trimmedTitle.length > 120) {
+        return { ok: false, message: 'Title cannot exceed 120 characters.' };
+      }
+
+      const trimmedDescription = description.trim();
+      if (trimmedDescription.length > 2000) {
+        return { ok: false, message: 'Description cannot exceed 2000 characters.' };
+      }
 
       if (coords === null) {
         return { ok: false, message: 'Pick a location so players can find this event.' };
@@ -177,7 +185,7 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
         input: {
           type,
           title: trimmedTitle,
-          description: description.trim() || null,
+          description: trimmedDescription.length > 0 ? trimmedDescription : null,
           imageUri,
           venueName: venueName.trim() || null,
           formattedAddress,

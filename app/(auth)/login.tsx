@@ -6,6 +6,7 @@ import {
   Platform,
   TextInput as RNTextInput,
   StyleSheet,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useForm, useController } from 'react-hook-form';
@@ -15,6 +16,8 @@ import { z } from 'zod';
 import { View, Text, Pressable, TextInput, ScrollView } from '@/tw';
 import { useOtpForm, type AuthStage } from '@/features/auth/use-otp-form';
 import { useGoogleSignIn } from '@/features/auth/use-google-sign-in';
+import { useAppleSignIn } from '@/features/auth/use-apple-sign-in';
+import { LEGAL_URLS } from '@/lib/legal-urls';
 
 // ─── Validation schemas ──────────────────────────────────────────────────────
 
@@ -158,6 +161,65 @@ function GoogleButton({
         {isLoading ? 'SIGNING IN...' : 'CONTINUE WITH GOOGLE'}
       </Text>
     </Pressable>
+  );
+}
+
+// ─── Apple sign-in button (iOS, App Store Guideline 4.8) ─────────────────────
+
+type AppleButtonProps = {
+  onPress: () => Promise<void>;
+  isLoading: boolean;
+  disabled?: boolean;
+};
+
+function AppleButton({ onPress, isLoading, disabled = false }: AppleButtonProps) {
+  const isDisabled = isLoading || disabled;
+
+  return (
+    <Pressable
+      onPress={() => void onPress()}
+      disabled={isDisabled}
+      android_ripple={{ color: 'rgba(228,228,228,0.06)' }}
+      className={[
+        'h-14 rounded-lg border border-neutral/10 bg-surface-2',
+        'flex-row items-center justify-center gap-3 mt-3',
+        isDisabled ? 'opacity-50' : '',
+      ].join(' ')}
+    >
+      {isLoading ? (
+        <ActivityIndicator color="#E4E4E4" size="small" />
+      ) : (
+        <View className="w-6 h-6 rounded-full bg-surface-3 items-center justify-center">
+          <Text className="font-mono text-xs text-neutral leading-none">A</Text>
+        </View>
+      )}
+      <Text
+        className={[
+          'font-mono text-[11px] tracking-[0.13em] uppercase',
+          isLoading ? 'text-neutral/38' : 'text-neutral',
+        ].join(' ')}
+      >
+        {isLoading ? 'SIGNING IN...' : 'CONTINUE WITH APPLE'}
+      </Text>
+    </Pressable>
+  );
+}
+
+function LegalFooter() {
+  return (
+    <View className="mt-8 gap-2">
+      <Text className="font-grotesk text-xs text-neutral/38 text-center leading-5">
+        By continuing, you agree to our Terms of Service and Privacy Policy.
+      </Text>
+      <View className="flex-row justify-center gap-4">
+        <Pressable onPress={() => void Linking.openURL(LEGAL_URLS.termsOfService)}>
+          <Text className="font-grotesk text-xs text-primary-hi">Terms</Text>
+        </Pressable>
+        <Pressable onPress={() => void Linking.openURL(LEGAL_URLS.privacyPolicy)}>
+          <Text className="font-grotesk text-xs text-primary-hi">Privacy</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -439,8 +501,16 @@ export default function LoginScreen() {
     isLoading: googleIsLoading,
     googleError,
     isNativeAvailable,
+    isConfigured: isGoogleConfigured,
     handleGoogleSignIn,
   } = useGoogleSignIn();
+
+  const {
+    isLoading: appleIsLoading,
+    appleError,
+    isAvailable: isAppleAvailable,
+    handleAppleSignIn,
+  } = useAppleSignIn();
 
   // Animation values are stored in a stable ref object so they never
   // appear as stale closures in the useEffect dependency array.
@@ -613,21 +683,36 @@ export default function LoginScreen() {
           {stage === 'request' && (
             <>
               <OrDivider />
-              <GoogleButton
-                onPress={handleGoogleSignIn}
-                isLoading={googleIsLoading}
-                disabled={isLoading || !isNativeAvailable}
-              />
-              {!isNativeAvailable && (
+              {Platform.OS === 'ios' && isAppleAvailable ? (
+                <AppleButton
+                  onPress={handleAppleSignIn}
+                  isLoading={appleIsLoading}
+                  disabled={isLoading || googleIsLoading}
+                />
+              ) : null}
+              {isGoogleConfigured ? (
+                <GoogleButton
+                  onPress={handleGoogleSignIn}
+                  isLoading={googleIsLoading}
+                  disabled={isLoading || appleIsLoading || !isNativeAvailable}
+                />
+              ) : null}
+              {isGoogleConfigured && !isNativeAvailable && (
                 <Text className="font-mono text-[10px] tracking-widest uppercase text-neutral/38 text-center mt-3">
-                  Requires an EAS development client
+                  Google Sign-In requires an EAS development client
                 </Text>
+              )}
+              {appleError !== null && (
+                <View className="mt-4">
+                  <ApiErrorBanner message={appleError} />
+                </View>
               )}
               {googleError !== null && (
                 <View className="mt-4">
                   <ApiErrorBanner message={googleError} />
                 </View>
               )}
+              <LegalFooter />
             </>
           )}
         </ScrollView>
