@@ -21,6 +21,7 @@ import {
   type GroupedUserReports,
   type UserReportSummary,
 } from '@/features/safety/use-user-reports';
+import { useAppContentTopPadding } from '@/lib/app-layout-insets';
 
 const C = {
   background: '#0B0B0B',
@@ -171,6 +172,7 @@ function GroupCard({
 export default function UserReportsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const contentTopPadding = useAppContentTopPadding(16);
   const appAlert = useAppAlert();
   const contactGate = useProfileContactGate();
   const reportsQuery = useOpenUserReports({
@@ -355,7 +357,7 @@ export default function UserReportsScreen() {
 
   if (!isModerator) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top + 16 }]}>
+      <View style={[styles.root, { paddingTop: contentTopPadding }]}>
         <Pressable onPress={() => router.back()} style={styles.backLink}>
           <Ionicons name="chevron-back" size={20} color={C.mist} />
           <Text style={styles.backText}>Back</Text>
@@ -370,7 +372,7 @@ export default function UserReportsScreen() {
   return (
     <View style={styles.root}>
       <FlashList
-        contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{ paddingTop: contentTopPadding, paddingBottom: insets.bottom + 24 }}
         data={groupedReports}
         keyExtractor={keyExtractor}
         renderItem={renderItem}

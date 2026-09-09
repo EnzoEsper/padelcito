@@ -1,17 +1,16 @@
-import { useMemo } from 'react';
-import { View, Text, ScrollView, Pressable } from '@/tw';
-import { StyleSheet, RefreshControl } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle } from 'react-native-svg';
-import { useAppAlert } from '@/components/app-alert-dialog';
-import { NotificationBell } from '@/components/notification-bell';
+import { useMemo } from "react";
+import { View, Text, ScrollView, Pressable } from "@/tw";
+import { StyleSheet, RefreshControl } from "react-native";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import Svg, { Circle } from "react-native-svg";
+import { useAppAlert } from "@/components/app-alert-dialog";
+import { NotificationBell } from "@/components/notification-bell";
 import {
   formatReliabilityScore,
   isLowReliability,
-} from '@/features/ratings/penalty-report';
-import { supabase } from '@/lib/supabase';
+} from "@/features/ratings/penalty-report";
+import { supabase } from "@/lib/supabase";
 import {
   useProfile,
   useProfileSport,
@@ -19,47 +18,48 @@ import {
   SKILL_LEVEL_COLORS,
   SKILL_LEVEL_LABEL,
   type SkillLevel,
-} from '@/features/profile/use-profile';
+} from "@/features/profile/use-profile";
 import {
   buildModerationRoute,
   buildMyPostsRoute,
-} from '@/features/community/post-display';
-import { buildUserReportsRoute } from '@/features/safety/safety-display';
-import { useModerationQueue } from '@/features/community/use-posts';
-import { useOpenUserReports } from '@/features/safety/use-user-reports';
+} from "@/features/community/post-display";
+import { buildUserReportsRoute } from "@/features/safety/safety-display";
+import { useModerationQueue } from "@/features/community/use-posts";
+import { useOpenUserReports } from "@/features/safety/use-user-reports";
+import { useAppContentTopPadding } from "@/lib/app-layout-insets";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const C = {
-  background: '#0B0B0B',
-  surface1: '#141417',
-  surface3: '#232429',
-  primaryHi: '#5E70B8',
-  neutral: '#E4E4E4',
-  dim: 'rgba(228,228,228,0.60)',
-  faint: 'rgba(228,228,228,0.38)',
-  ghost: 'rgba(228,228,228,0.20)',
-  hair: 'rgba(228,228,228,0.10)',
-  hair2: 'rgba(228,228,228,0.055)',
-  warning: '#E0B15B',
+  background: "#0B0B0B",
+  surface1: "#141417",
+  surface3: "#232429",
+  primaryHi: "#5E70B8",
+  neutral: "#E4E4E4",
+  dim: "rgba(228,228,228,0.60)",
+  faint: "rgba(228,228,228,0.38)",
+  ghost: "rgba(228,228,228,0.20)",
+  hair: "rgba(228,228,228,0.10)",
+  hair2: "rgba(228,228,228,0.055)",
+  warning: "#E0B15B",
 } as const;
 
 const AV_TONES: [string, string][] = [
-  ['#2B396D', '#E4E4E4'],
-  ['#3A4A86', '#E4E4E4'],
-  ['#202126', '#E4E4E4'],
-  ['#4458A6', '#0B0B0B'],
-  ['#2A2B30', '#E4E4E4'],
-  ['#1C2649', '#E4E4E4'],
+  ["#2B396D", "#E4E4E4"],
+  ["#3A4A86", "#E4E4E4"],
+  ["#202126", "#E4E4E4"],
+  ["#4458A6", "#0B0B0B"],
+  ["#2A2B30", "#E4E4E4"],
+  ["#1C2649", "#E4E4E4"],
 ];
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function Avatar({ name, size = 64 }: { name: string; size?: number }) {
   const initials = name
-    .split(' ')
+    .split(" ")
     .map((w) => w[0])
     .slice(0, 2)
-    .join('')
+    .join("")
     .toUpperCase();
   const toneIdx =
     ((name.charCodeAt(0) ?? 0) + (name.charCodeAt(1) ?? 0)) % AV_TONES.length;
@@ -69,7 +69,12 @@ function Avatar({ name, size = 64 }: { name: string; size?: number }) {
     <View
       style={[
         styles.avatar,
-        { width: size, height: size, borderRadius: size / 2, backgroundColor: bg },
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: bg,
+        },
       ]}
     >
       <Text style={[styles.avatarText, { color: fg, fontSize: size * 0.36 }]}>
@@ -90,7 +95,15 @@ function SkillBadge({ skillLevel }: { skillLevel: SkillLevel }) {
   );
 }
 
-function TrustRing({ value, max = 5, size = 92 }: { value: number; max?: number; size?: number }) {
+function TrustRing({
+  value,
+  max = 5,
+  size = 92,
+}: {
+  value: number;
+  max?: number;
+  size?: number;
+}) {
   const r = (size - 12) / 2;
   const circ = 2 * Math.PI * r;
   const pct = Math.min(value / max, 1);
@@ -99,21 +112,38 @@ function TrustRing({ value, max = 5, size = 92 }: { value: number; max?: number;
 
   return (
     <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+      <Svg
+        width={size}
+        height={size}
+        style={{ transform: [{ rotate: "-90deg" }] }}
+      >
         {/* Track */}
-        <Circle cx={cx} cy={cy} r={r} fill="none" stroke={C.surface3} strokeWidth={6} />
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke={C.surface3}
+          strokeWidth={6}
+        />
         {/* Progress arc */}
         <Circle
-          cx={cx} cy={cy} r={r}
-          fill="none" stroke={C.primaryHi} strokeWidth={6}
+          cx={cx}
+          cy={cy}
+          r={r}
+          fill="none"
+          stroke={C.primaryHi}
+          strokeWidth={6}
           strokeLinecap="round"
           strokeDasharray={circ}
           strokeDashoffset={circ * (1 - pct)}
         />
       </Svg>
-      <View style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
         <View style={styles.ringCenter}>
-          <Text style={styles.ringValue}>{value > 0 ? value.toFixed(1) : '—'}</Text>
+          <Text style={styles.ringValue}>
+            {value > 0 ? value.toFixed(1) : "—"}
+          </Text>
           <Text style={styles.ringLabel}>TRUST</Text>
         </View>
       </View>
@@ -152,7 +182,12 @@ function PreferenceRow({
       className="active:opacity-70"
       style={[styles.prefRow, !isFirst && styles.prefRowBorder]}
     >
-      <Text style={[styles.prefLabel, labelColor ? { color: labelColor } : undefined]}>
+      <Text
+        style={[
+          styles.prefLabel,
+          labelColor ? { color: labelColor } : undefined,
+        ]}
+      >
         {label}
       </Text>
       <View style={styles.prefRight}>
@@ -161,7 +196,9 @@ function PreferenceRow({
         )}
         {badgeCount !== undefined && badgeCount > 0 ? (
           <View style={styles.prefBadge}>
-            <Text style={styles.prefBadgeText}>{badgeCount > 99 ? '99+' : String(badgeCount)}</Text>
+            <Text style={styles.prefBadgeText}>
+              {badgeCount > 99 ? "99+" : String(badgeCount)}
+            </Text>
           </View>
         ) : null}
         <Ionicons name="chevron-forward" size={16} color={C.faint} />
@@ -195,7 +232,12 @@ function StatCard({
         <Text style={styles.statValue}>{value}</Text>
         {sub !== undefined && <Text style={styles.statSub}>{sub}</Text>}
         {showFlame && (
-          <Ionicons name="flame" size={17} color={C.primaryHi} style={{ marginLeft: 1 }} />
+          <Ionicons
+            name="flame"
+            size={17}
+            color={C.primaryHi}
+            style={{ marginLeft: 1 }}
+          />
         )}
       </View>
     </View>
@@ -208,18 +250,38 @@ function ProfileSkeleton() {
   return (
     <View className="gap-4 px-5 pt-4">
       <View style={styles.identityCard}>
-        <View style={[styles.skeletonPill, { width: 64, height: 64, borderRadius: 32 }]} />
+        <View
+          style={[
+            styles.skeletonPill,
+            { width: 64, height: 64, borderRadius: 32 },
+          ]}
+        />
         <View className="flex-1 gap-2">
           <View style={[styles.skeletonPill, { width: 140, height: 14 }]} />
           <View style={[styles.skeletonPill, { width: 100, height: 11 }]} />
-          <View style={[styles.skeletonPill, { width: 88, height: 16, alignSelf: 'flex-start' }]} />
+          <View
+            style={[
+              styles.skeletonPill,
+              { width: 88, height: 16, alignSelf: "flex-start" },
+            ]}
+          />
         </View>
-        <View style={[styles.skeletonPill, { width: 92, height: 92, borderRadius: 46 }]} />
+        <View
+          style={[
+            styles.skeletonPill,
+            { width: 92, height: 92, borderRadius: 46 },
+          ]}
+        />
       </View>
       <View className="flex-row gap-2.5">
         {[0, 1, 2].map((i) => (
           <View key={i} style={[styles.statCard, { flex: 1 }]}>
-            <View style={[styles.skeletonPill, { width: 40, height: 10, marginBottom: 8 }]} />
+            <View
+              style={[
+                styles.skeletonPill,
+                { width: 40, height: 10, marginBottom: 8 },
+              ]}
+            />
             <View style={[styles.skeletonPill, { width: 30, height: 20 }]} />
           </View>
         ))}
@@ -234,11 +296,11 @@ function useSignOut() {
   const appAlert = useAppAlert();
 
   return function confirmSignOut() {
-    appAlert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
+    appAlert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
       {
-        text: 'Sign Out',
-        style: 'destructive',
+        text: "Sign Out",
+        style: "destructive",
         onPress: async () => {
           await supabase.auth.signOut();
           // Root layout's onAuthStateChange fires → session = null → redirect to login.
@@ -251,7 +313,7 @@ function useSignOut() {
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function ProfileScreen() {
-  const insets = useSafeAreaInsets();
+  const contentTopPadding = useAppContentTopPadding(16);
   const router = useRouter();
   const {
     data: profile,
@@ -259,7 +321,11 @@ export default function ProfileScreen() {
     isRefetching: profileRefetching,
     refetch: refetchProfile,
   } = useProfile();
-  const { data: sport, isRefetching: sportRefetching, refetch: refetchSport } = useProfileSport();
+  const {
+    data: sport,
+    isRefetching: sportRefetching,
+    refetch: refetchSport,
+  } = useProfileSport();
   const isRefetching = profileRefetching || sportRefetching;
   const signOut = useSignOut();
 
@@ -268,25 +334,30 @@ export default function ProfileScreen() {
   const userReportsQuery = useOpenUserReports({ enabled: isModerator });
   const pendingReviewCount = useMemo(
     () =>
-      (moderationQuery.data ?? []).filter((post) => post.status === 'pending_review').length,
+      (moderationQuery.data ?? []).filter(
+        (post) => post.status === "pending_review",
+      ).length,
     [moderationQuery.data],
   );
   const openUserReportCount = userReportsQuery.data?.length ?? 0;
 
-  const skillLevel: SkillLevel = sport?.skill_level ?? 'intermediate';
+  const skillLevel: SkillLevel = sport?.skill_level ?? "intermediate";
   const rating = profile?.rating_avg ?? 0;
   const ratingCount = profile?.rating_count ?? 0;
   const reliabilityScore = profile?.reliability_score ?? null;
   const penaltyCount = profile?.penalty_count ?? 0;
   const commitmentCount = profile?.commitment_count ?? 0;
-  const reliabilityLabel = formatReliabilityScore(reliabilityScore, commitmentCount);
+  const reliabilityLabel = formatReliabilityScore(
+    reliabilityScore,
+    commitmentCount,
+  );
   const showReliabilityWarning = isLowReliability(
     reliabilityScore,
     penaltyCount,
     commitmentCount,
   );
-  const displayName = profile?.display_name ?? 'Player';
-  const username = profile?.username ?? '';
+  const displayName = profile?.display_name ?? "Player";
+  const username = profile?.username ?? "";
   const bio = profile?.bio;
 
   return (
@@ -303,7 +374,7 @@ export default function ProfileScreen() {
     >
       {/* Header */}
       <View
-        style={{ paddingTop: insets.top + 16 }}
+        style={{ paddingTop: contentTopPadding }}
         className="px-5 pb-4 flex-row justify-between items-start"
       >
         <View>
@@ -316,7 +387,7 @@ export default function ProfileScreen() {
             className="active:opacity-70"
             style={styles.settingsBtn}
             accessibilityLabel="Account settings"
-            onPress={() => router.push('/(app)/account-settings')}
+            onPress={() => router.push("/(app)/account-settings")}
           >
             <Ionicons name="settings-outline" size={19} color={C.neutral} />
           </Pressable>
@@ -328,7 +399,12 @@ export default function ProfileScreen() {
       ) : (
         <>
           {/* Identity card */}
-          <View style={[styles.identityCard, { marginHorizontal: 20, marginBottom: 16 }]}>
+          <View
+            style={[
+              styles.identityCard,
+              { marginHorizontal: 20, marginBottom: 16 },
+            ]}
+          >
             <Avatar name={displayName} size={64} />
             <View style={styles.identityMeta}>
               <Text style={styles.identityName} numberOfLines={1}>
@@ -351,8 +427,8 @@ export default function ProfileScreen() {
               <Ionicons name="warning-outline" size={16} color={C.warning} />
               <Text style={styles.penaltyNoticeText}>
                 {penaltyCount > 0
-                  ? `You have ${penaltyCount} reliability report${penaltyCount === 1 ? '' : 's'}. Play fair to rebuild trust.`
-                  : 'Your reliability score is below the community average. Keep showing up on time.'}
+                  ? `You have ${penaltyCount} reliability report${penaltyCount === 1 ? "" : "s"}. Play fair to rebuild trust.`
+                  : "Your reliability score is below the community average. Keep showing up on time."}
               </Text>
             </View>
           ) : null}
@@ -360,13 +436,21 @@ export default function ProfileScreen() {
           {/* Stats row */}
           <View style={styles.statsRow}>
             <StatCard label="PLAYED" value={String(ratingCount)} />
-            <StatCard label="RATING" value={rating > 0 ? rating.toFixed(1) : '—'} />
+            <StatCard
+              label="RATING"
+              value={rating > 0 ? rating.toFixed(1) : "—"}
+            />
             <StatCard label="RELIABILITY" value={reliabilityLabel} />
           </View>
 
           {/* Community */}
           <SectionLabel>COMMUNITY</SectionLabel>
-          <View style={[styles.prefCard, { marginHorizontal: 20, marginBottom: 16 }]}>
+          <View
+            style={[
+              styles.prefCard,
+              { marginHorizontal: 20, marginBottom: 16 },
+            ]}
+          >
             <PreferenceRow
               label="My publications"
               isFirst
@@ -390,9 +474,17 @@ export default function ProfileScreen() {
 
           {/* Preferences */}
           <SectionLabel>PREFERENCES</SectionLabel>
-          <View style={[styles.prefCard, { marginHorizontal: 20, marginBottom: 16 }]}>
+          <View
+            style={[
+              styles.prefCard,
+              { marginHorizontal: 20, marginBottom: 16 },
+            ]}
+          >
             <PreferenceRow label="Bio" value={bio ?? undefined} isFirst />
-            <PreferenceRow label="Skill Level" value={SKILL_LEVEL_LABEL[skillLevel]} />
+            <PreferenceRow
+              label="Skill Level"
+              value={SKILL_LEVEL_LABEL[skillLevel]}
+            />
             <PreferenceRow label="Location" value="Set location" />
           </View>
 
@@ -402,7 +494,7 @@ export default function ProfileScreen() {
             <PreferenceRow
               label="Account settings"
               isFirst
-              onPress={() => router.push('/(app)/account-settings')}
+              onPress={() => router.push("/(app)/account-settings")}
             />
             <PreferenceRow
               label="Sign Out"
@@ -420,22 +512,22 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   screenLabel: {
-    fontFamily: 'Space Mono',
+    fontFamily: "Space Mono",
     fontSize: 10.5,
     letterSpacing: 1.5,
     color: C.dim,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     marginBottom: 4,
   },
   screenTitle: {
-    fontFamily: 'HankenGrotesk-ExtraBold',
+    fontFamily: "HankenGrotesk-ExtraBold",
     fontSize: 30,
     color: C.neutral,
     letterSpacing: -0.8,
   },
   headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   settingsBtn: {
@@ -445,8 +537,8 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface1,
     borderWidth: 1,
     borderColor: C.hair,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   identityCard: {
     backgroundColor: C.surface1,
@@ -454,30 +546,30 @@ const styles = StyleSheet.create({
     borderColor: C.hair,
     borderRadius: 22,
     padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 18,
   },
   avatar: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
   avatarText: {
-    fontFamily: 'HankenGrotesk-Bold',
+    fontFamily: "HankenGrotesk-Bold",
     letterSpacing: 0.3,
   },
   skillBadge: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   skillBadgeText: {
-    fontFamily: 'SpaceMono-Bold',
+    fontFamily: "SpaceMono-Bold",
     fontSize: 9,
     letterSpacing: 0.6,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   identityMeta: {
     flex: 1,
@@ -486,12 +578,12 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   identityName: {
-    fontFamily: 'HankenGrotesk-Bold',
+    fontFamily: "HankenGrotesk-Bold",
     fontSize: 19,
     color: C.neutral,
   },
   username: {
-    fontFamily: 'Space Mono',
+    fontFamily: "Space Mono",
     fontSize: 11,
     color: C.dim,
     letterSpacing: 0.5,
@@ -501,45 +593,45 @@ const styles = StyleSheet.create({
   },
   ringCenter: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   ringValue: {
-    fontFamily: 'SpaceMono-Bold',
+    fontFamily: "SpaceMono-Bold",
     fontSize: 22,
     color: C.neutral,
     lineHeight: 26,
   },
   ringLabel: {
-    fontFamily: 'Space Mono',
+    fontFamily: "Space Mono",
     fontSize: 8.5,
     color: C.dim,
     letterSpacing: 1,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     marginTop: 3,
   },
   penaltyNotice: {
     marginHorizontal: 20,
     marginBottom: 16,
-    backgroundColor: 'rgba(224,177,91,0.08)',
+    backgroundColor: "rgba(224,177,91,0.08)",
     borderWidth: 1,
-    borderColor: 'rgba(224,177,91,0.30)',
+    borderColor: "rgba(224,177,91,0.30)",
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
   },
   penaltyNoticeText: {
     flex: 1,
-    fontFamily: 'Hanken Grotesk',
+    fontFamily: "Hanken Grotesk",
     fontSize: 13,
     lineHeight: 18,
     color: C.warning,
   },
   statsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
     paddingHorizontal: 20,
     marginBottom: 20,
@@ -554,35 +646,35 @@ const styles = StyleSheet.create({
     paddingTop: 15,
   },
   statLabel: {
-    fontFamily: 'Space Mono',
+    fontFamily: "Space Mono",
     fontSize: 9.5,
     color: C.dim,
     letterSpacing: 1,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     marginBottom: 8,
   },
   statValueRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+    flexDirection: "row",
+    alignItems: "baseline",
     gap: 3,
   },
   statValue: {
-    fontFamily: 'HankenGrotesk-ExtraBold',
+    fontFamily: "HankenGrotesk-ExtraBold",
     fontSize: 22,
     color: C.neutral,
     letterSpacing: -0.5,
   },
   statSub: {
-    fontFamily: 'Space Mono',
+    fontFamily: "Space Mono",
     fontSize: 12,
     color: C.dim,
   },
   sectionLabel: {
-    fontFamily: 'SpaceMono-Bold',
+    fontFamily: "SpaceMono-Bold",
     fontSize: 11.5,
     color: C.dim,
     letterSpacing: 2,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   prefCard: {
     backgroundColor: C.surface1,
@@ -593,9 +685,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   prefRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 14,
   },
   prefRowBorder: {
@@ -603,17 +695,17 @@ const styles = StyleSheet.create({
     borderTopColor: C.hair2,
   },
   prefLabel: {
-    fontFamily: 'HankenGrotesk-Medium',
+    fontFamily: "HankenGrotesk-Medium",
     fontSize: 15,
     color: C.neutral,
   },
   prefRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 7,
   },
   prefValue: {
-    fontFamily: 'HankenGrotesk-Medium',
+    fontFamily: "HankenGrotesk-Medium",
     fontSize: 14,
     color: C.dim,
   },
@@ -622,14 +714,14 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 11,
     backgroundColor: C.warning,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 6,
   },
   prefBadgeText: {
-    fontFamily: 'SpaceMono-Bold',
+    fontFamily: "SpaceMono-Bold",
     fontSize: 10,
-    color: '#0B0B0B',
+    color: "#0B0B0B",
   },
   skeletonPill: {
     backgroundColor: C.surface3,
