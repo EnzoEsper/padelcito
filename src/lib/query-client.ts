@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, type Query } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { shouldPersistQuery } from '@/lib/query-persist-policy';
 
@@ -22,7 +22,11 @@ export const persistOptions = {
   persister: asyncStoragePersister,
   maxAge: 1000 * 60 * 60 * 24,
   dehydrateOptions: {
-    shouldDehydrateQuery: (query: { queryKey: readonly unknown[] }) =>
-      shouldPersistQuery(query.queryKey),
+    shouldDehydrateQuery: (query: Query) => {
+      if (query.state.status === 'pending' || query.state.status === 'error') {
+        return false;
+      }
+      return shouldPersistQuery(query.queryKey);
+    },
   },
 };

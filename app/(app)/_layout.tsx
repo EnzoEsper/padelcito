@@ -70,6 +70,7 @@ export default function AppLayout() {
         <Tabs.Screen name="post-detail" options={{ href: null }} />
         <Tabs.Screen name="moderation" options={{ href: null }} />
         <Tabs.Screen name="user-reports" options={{ href: null }} />
+        <Tabs.Screen name="moderation-banned-users" options={{ href: null }} />
         <Tabs.Screen name="my-posts" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen name="report-penalty" options={{ href: null }} />

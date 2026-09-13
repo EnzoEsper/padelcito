@@ -25,6 +25,10 @@ export function buildUserReportsRoute(): string {
   return "/(app)/user-reports";
 }
 
+export function buildModerationBannedUsersRoute(): string {
+  return "/(app)/moderation-banned-users";
+}
+
 function formatPastRelativeTime(diffMs: number): string | null {
   const absSeconds = Math.max(1, Math.round(Math.abs(diffMs) / 1000));
 

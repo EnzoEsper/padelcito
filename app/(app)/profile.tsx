@@ -23,8 +23,12 @@ import {
   buildModerationRoute,
   buildMyPostsRoute,
 } from "@/features/community/post-display";
-import { buildUserReportsRoute } from "@/features/safety/safety-display";
+import {
+  buildModerationBannedUsersRoute,
+  buildUserReportsRoute,
+} from "@/features/safety/safety-display";
 import { useModerationQueue } from "@/features/community/use-posts";
+import { useBannedUsers } from "@/features/safety/use-banned-users";
 import { useOpenUserReports } from "@/features/safety/use-user-reports";
 import { useAppContentTopPadding } from "@/lib/app-layout-insets";
 
@@ -332,6 +336,7 @@ export default function ProfileScreen() {
   const isModerator = profile !== undefined && isModeratorRole(profile.role);
   const moderationQuery = useModerationQueue({ enabled: isModerator });
   const userReportsQuery = useOpenUserReports({ enabled: isModerator });
+  const bannedUsersQuery = useBannedUsers({ enabled: isModerator });
   const pendingReviewCount = useMemo(
     () =>
       (moderationQuery.data ?? []).filter(
@@ -340,6 +345,7 @@ export default function ProfileScreen() {
     [moderationQuery.data],
   );
   const openUserReportCount = userReportsQuery.data?.length ?? 0;
+  const bannedUserCount = bannedUsersQuery.data?.length ?? 0;
 
   const skillLevel: SkillLevel = sport?.skill_level ?? "intermediate";
   const rating = profile?.rating_avg ?? 0;
@@ -468,6 +474,13 @@ export default function ProfileScreen() {
                 label="User reports"
                 badgeCount={openUserReportCount}
                 onPress={() => router.push(buildUserReportsRoute())}
+              />
+            ) : null}
+            {isModerator ? (
+              <PreferenceRow
+                label="Banned users"
+                badgeCount={bannedUserCount}
+                onPress={() => router.push(buildModerationBannedUsersRoute())}
               />
             ) : null}
           </View>

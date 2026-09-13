@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { bannedUserKeys } from '@/features/safety/use-banned-users';
 import { userReportKeys } from '@/features/safety/use-user-reports';
 import {
   ensurePadelSport,
@@ -567,6 +568,7 @@ export function useBanPostAuthor() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: postKeys.moderation }),
         queryClient.invalidateQueries({ queryKey: userReportKeys.all }),
+        queryClient.invalidateQueries({ queryKey: bannedUserKeys.all }),
         queryClient.invalidateQueries({ queryKey: ['profile'] }),
       ]);
     },

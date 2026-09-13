@@ -9,6 +9,7 @@ import { useBanPostAuthor, useProfileContactGate } from '@/features/community/us
 import {
   USER_REPORT_REASON_LABELS,
   buildMatchContextRoute,
+  buildModerationBannedUsersRoute,
   buildPostContextRoute,
   formatReportRelativeTime,
 } from '@/features/safety/safety-display';
@@ -244,7 +245,15 @@ export default function UserReportsScreen() {
           onPress: () => {
             void banAuthor
               .mutateAsync({ userId, banned: true })
-              .then(() => appAlert('Banned', BAN_SUCCESS_MESSAGE))
+              .then(() =>
+                appAlert('Banned', BAN_SUCCESS_MESSAGE, [
+                  { text: 'OK', style: 'cancel' },
+                  {
+                    text: 'View banned users',
+                    onPress: () => router.push(buildModerationBannedUsersRoute()),
+                  },
+                ]),
+              )
               .catch((error: unknown) => {
                 const message = error instanceof Error ? error.message : 'Could not ban user.';
                 appAlert('Ban failed', message);
@@ -253,7 +262,7 @@ export default function UserReportsScreen() {
         },
       ]);
     },
-    [appAlert, banAuthor],
+    [appAlert, banAuthor, router],
   );
 
   const handleUnban = useCallback(
@@ -327,6 +336,12 @@ export default function UserReportsScreen() {
         <Text className="font-grotesk text-sm text-neutral/55 mt-2">
           Open abuse reports grouped by reported user, sorted by report count.
         </Text>
+        <Pressable
+          onPress={() => router.push(buildModerationBannedUsersRoute())}
+          style={styles.manageBansLink}
+        >
+          <Text style={styles.manageBansLinkText}>Manage banned users</Text>
+        </Pressable>
       </View>
     ),
     [router],
@@ -411,6 +426,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Hanken Grotesk',
     fontSize: 15,
     fontWeight: '600',
+  },
+  manageBansLink: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+  },
+  manageBansLinkText: {
+    color: '#5E70B8',
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 14,
+    fontWeight: '700',
   },
   errorText: {
     color: C.dim,

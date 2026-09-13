@@ -19,6 +19,8 @@ import {
 } from '@/features/community/use-posts';
 import { CachedRemoteImage } from '@/components/cached-remote-image';
 import { buildPostImageUrl } from '@/lib/post-storage';
+import { buildModerationBannedUsersRoute } from '@/features/safety/safety-display';
+import { useBannedUsers } from '@/features/safety/use-banned-users';
 import type { PostSummary } from '@/features/community/use-posts';
 
 const C = {
@@ -35,6 +37,7 @@ const C = {
 type ModerationCardProps = {
   post: PostSummary;
   isRejecting: boolean;
+  isAuthorBanned: boolean;
   rejectReason: string;
   onRejectReasonChange: (value: string) => void;
   onStartReject: () => void;
@@ -42,12 +45,14 @@ type ModerationCardProps = {
   onApprove: () => void;
   onReject: () => void;
   onBan: () => void;
+  onUnban: () => void;
   onPreview: () => void;
 };
 
 function ModerationCard({
   post,
   isRejecting,
+  isAuthorBanned,
   rejectReason,
   onRejectReasonChange,
   onStartReject,
@@ -55,6 +60,7 @@ function ModerationCard({
   onApprove,
   onReject,
   onBan,
+  onUnban,
   onPreview,
 }: ModerationCardProps) {
   const imageUrl = buildPostImageUrl(post.image_path);
@@ -72,6 +78,7 @@ function ModerationCard({
           {post.report_count > 0 ? (
             <Text style={styles.reportChip}>{post.report_count} reports</Text>
           ) : null}
+          {isAuthorBanned ? <Text style={styles.bannedChip}>Author banned</Text> : null}
         </View>
 
         <Text style={styles.cardTitle}>{post.title}</Text>
@@ -114,9 +121,15 @@ function ModerationCard({
             <Pressable onPress={onStartReject} style={styles.rejectAction}>
               <Text style={styles.rejectActionText}>Reject</Text>
             </Pressable>
-            <Pressable onPress={onBan} style={styles.secondaryAction}>
-              <Text style={styles.secondaryActionText}>Ban</Text>
-            </Pressable>
+            {isAuthorBanned ? (
+              <Pressable onPress={onUnban} style={styles.unbanAction}>
+                <Text style={styles.unbanActionText}>Unban author</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={onBan} style={styles.secondaryAction}>
+                <Text style={styles.secondaryActionText}>Ban author</Text>
+              </Pressable>
+            )}
           </View>
         )}
       </View>
@@ -132,11 +145,16 @@ export default function ModerationScreen() {
   const queueQuery = useModerationQueue();
   const moderatePost = useModeratePost();
   const banAuthor = useBanPostAuthor();
+  const bannedUsersQuery = useBannedUsers({ enabled: contactGate.data?.isModerator === true });
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
   const isModerator = contactGate.data?.isModerator === true;
   const posts = useMemo(() => queueQuery.data ?? [], [queueQuery.data]);
+  const bannedUserIds = useMemo(
+    () => new Set((bannedUsersQuery.data ?? []).map((user) => user.user_id)),
+    [bannedUsersQuery.data],
+  );
 
   const sortedPosts = useMemo(
     () =>
@@ -198,6 +216,13 @@ export default function ModerationScreen() {
                 appAlert(
                   'Banned',
                   'The user has been banned. Their matches have been cancelled and open reports resolved.',
+                  [
+                    { text: 'OK', style: 'cancel' },
+                    {
+                      text: 'View banned users',
+                      onPress: () => router.push(buildModerationBannedUsersRoute()),
+                    },
+                  ],
                 ),
               )
               .catch((error: unknown) => {
@@ -208,6 +233,31 @@ export default function ModerationScreen() {
         },
       ]);
     },
+    [appAlert, banAuthor, router],
+  );
+
+  const handleUnban = useCallback(
+    (authorId: string, authorName: string): void => {
+      appAlert(
+        'Unban author',
+        `Unban ${authorName}? They will be able to create matches and posts again.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Unban',
+            onPress: () => {
+              void banAuthor
+                .mutateAsync({ userId: authorId, banned: false })
+                .then(() => appAlert('Unbanned', `${authorName} can use the platform again.`))
+                .catch((error: unknown) => {
+                  const message = error instanceof Error ? error.message : 'Could not unban user.';
+                  appAlert('Unban failed', message);
+                });
+            },
+          },
+        ],
+      );
+    },
     [appAlert, banAuthor],
   );
 
@@ -216,6 +266,7 @@ export default function ModerationScreen() {
       <ModerationCard
         post={item}
         isRejecting={rejectingId === item.id}
+        isAuthorBanned={bannedUserIds.has(item.author_id)}
         rejectReason={rejectingId === item.id ? rejectReason : ''}
         onRejectReasonChange={setRejectReason}
         onStartReject={() => {
@@ -229,10 +280,20 @@ export default function ModerationScreen() {
         onApprove={() => void handleApprove(item.id)}
         onReject={() => void handleReject(item.id)}
         onBan={() => handleBan(item.author_id, item.author?.display_name ?? 'author')}
+        onUnban={() => handleUnban(item.author_id, item.author?.display_name ?? 'author')}
         onPreview={() => router.push(buildPostDetailRoute(item.id))}
       />
     ),
-    [handleApprove, handleBan, handleReject, rejectReason, rejectingId, router],
+    [
+      bannedUserIds,
+      handleApprove,
+      handleBan,
+      handleReject,
+      handleUnban,
+      rejectReason,
+      rejectingId,
+      router,
+    ],
   );
 
   const keyExtractor = useCallback((item: PostSummary) => item.id, []);
@@ -254,6 +315,12 @@ export default function ModerationScreen() {
         <Text className="font-grotesk text-sm text-neutral/55 mt-2">
           Sorted by reports, then oldest pending submissions.
         </Text>
+        <Pressable
+          onPress={() => router.push(buildModerationBannedUsersRoute())}
+          style={styles.manageBansLink}
+        >
+          <Text style={styles.manageBansLinkText}>Manage banned users</Text>
+        </Pressable>
       </View>
     ),
     [router],
@@ -393,6 +460,23 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
+  bannedChip: {
+    color: '#E07B7B',
+    fontFamily: 'Space Mono',
+    fontSize: 10,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  manageBansLink: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+  },
+  manageBansLinkText: {
+    color: '#5E70B8',
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 14,
+    fontWeight: '700',
+  },
   cardTitle: {
     color: C.mist,
     fontFamily: 'Hanken Grotesk',
@@ -456,6 +540,20 @@ const styles = StyleSheet.create({
     fontFamily: 'Hanken Grotesk',
     fontSize: 13,
     fontWeight: '600',
+  },
+  unbanAction: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(224,176,91,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(224,176,91,0.25)',
+  },
+  unbanActionText: {
+    color: C.warning,
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 13,
+    fontWeight: '700',
   },
   rejectBox: {
     gap: 8,

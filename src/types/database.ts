@@ -1879,6 +1879,15 @@ export type Database = {
         Args: { p_tournament_id: string }
         Returns: boolean
       }
+      list_banned_users: {
+        Args: never
+        Returns: {
+          banned_at: string
+          display_name: string
+          user_id: string
+          username: string
+        }[]
+      }
       match_accepted_count: { Args: { p_match_id: string }; Returns: number }
       match_contact_details: {
         Args: { p_match_id: string }
