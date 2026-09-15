@@ -82,3 +82,34 @@ export function buildMatchContextRoute(matchId: string): string {
 export function buildPostContextRoute(postId: string): string {
   return `/(app)/post-detail?id=${postId}`;
 }
+
+export type PlayerProfileRouteParams = {
+  userId: string;
+  matchId?: string;
+  postId?: string;
+};
+
+export function buildPlayerProfileRoute(params: PlayerProfileRouteParams): string {
+  const search = new URLSearchParams({ id: params.userId });
+  if (params.matchId !== undefined && params.matchId.length > 0) {
+    search.set('matchId', params.matchId);
+  }
+  if (params.postId !== undefined && params.postId.length > 0) {
+    search.set('postId', params.postId);
+  }
+  return `/(app)/player-profile?${search.toString()}`;
+}
+
+/** Where to land after leaving player-profile (tabs flatten history; do not rely on router.back()). */
+export function resolvePlayerProfileReturnRoute(context: {
+  matchId?: string | null;
+  postId?: string | null;
+}): string {
+  if (context.matchId !== null && context.matchId !== undefined && context.matchId.length > 0) {
+    return buildMatchContextRoute(context.matchId);
+  }
+  if (context.postId !== null && context.postId !== undefined && context.postId.length > 0) {
+    return buildPostContextRoute(context.postId);
+  }
+  return '/(app)/discover';
+}

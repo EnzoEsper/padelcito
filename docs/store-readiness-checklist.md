@@ -12,7 +12,8 @@ Use this checklist **before** your first App Store / Play Store submission. Publ
 - [x] Notification FK unlink guards (`20260830170000`, `20260830180000`) — allow `ON DELETE SET NULL` on optional notification refs during block/unblock/account deletion
 - [x] In-app account deletion UI (`Account settings → Delete Account`)
 - [x] Sign in with Apple (iOS) + Google Sign-In plugin registered
-- [x] User block list + overflow menus on match/post detail (Report user + Block user)
+- [x] User block list + public player profile (Report user + Block user via profile header menu)
+- [x] Public player profile screen (`player-profile`) with trust stats; match/post roster links preserve report context
 - [x] Moderator **User reports** screen + existing community **Moderation** queue
 - [x] Privacy / terms / deletion copy in `docs/legal/` + in-app links (`src/lib/legal-urls.ts`)
 - [x] Push notifications (prior plan) — `expo-notifications`, FCM, Edge Function `push`
@@ -25,8 +26,8 @@ Use a regular user account and a moderator/admin account where noted.
 
 ### Blocking & unblock
 
-- [ ] Block from match detail overflow (`...`) on host, accepted participant, and pending requester
-- [ ] Block from post detail overflow on organizer row
+- [ ] Block from player profile (opened via match roster tap) on host, accepted participant, and pending requester
+- [ ] Block from player profile (opened via post detail organizer tap)
 - [ ] Blocked users list loads; unblock succeeds; re-request to same match works after unblock
 - [ ] Pending join request cancelled on block; accepted roster severed on upcoming matches
 - [ ] Symmetric block: blocked user cannot join, cannot get WhatsApp via match contact RPC, neither user sees the other's matches/posts in Discover
@@ -34,7 +35,8 @@ Use a regular user account and a moderator/admin account where noted.
 
 ### User reports (not yet fully tested)
 
-- [ ] Report user from overflow menu (from match and post context)
+- [ ] Report user from player profile header menu (opened from match roster or post organizer; verify match/post context in moderator queue)
+- [ ] Match roster shows chevron profile links without per-row `...` menus
 - [ ] Duplicate open report updates reason instead of creating spam rows
 - [ ] Moderator receives `user_reported` notification; deep link opens User reports screen
 - [ ] Resolve and Ban actions work on User reports screen

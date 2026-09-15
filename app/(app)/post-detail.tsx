@@ -24,10 +24,7 @@ import { buildPostImageUrl } from '@/lib/post-storage';
 import { PostFlyerImage } from '@/features/community/components/post-flyer-image';
 import { PostImageViewer } from '@/features/community/components/post-image-viewer';
 import { blockGuardMessage, useBlockPairStatus } from '@/features/blocks/use-user-blocks';
-import {
-  UserActionsTrigger,
-  useUserActionsSheet,
-} from '@/features/safety/user-actions-sheet';
+import { buildPlayerProfileRoute } from '@/features/safety/safety-display';
 import { toUserFacingError } from '@/lib/error-message';
 import type { Database } from '@/types/database';
 
@@ -71,7 +68,6 @@ export default function PostDetailScreen() {
   usePostRealtime(postId);
   const reportPost = useReportPost();
   const archivePost = useArchivePost();
-  const { open: openUserActions, sheet: userActionsSheet } = useUserActionsSheet();
   const post = detailQuery.data;
   const authorBlockStatus = useBlockPairStatus(post?.author_id ?? null);
   const isLoadingPost =
@@ -231,31 +227,47 @@ export default function PostDetailScreen() {
 
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Organizer</Text>
-            <View style={styles.organizerRow}>
-              <View style={styles.organizerMeta}>
-                <Text style={styles.sectionValue}>{post.author?.display_name ?? 'Player'}</Text>
-                {isPostContactVerified(post.contact_verified_at) ? (
-                  <View style={styles.verifiedRow}>
-                    <Ionicons name="shield-checkmark" size={14} color={C.success} />
-                    <Text style={styles.verifiedText}>Verified contact</Text>
-                  </View>
-                ) : null}
-              </View>
-              {post.status === 'approved' && !post.isAuthor ? (
-                <UserActionsTrigger
-                  onPress={() =>
-                    openUserActions({
+            {post.status === 'approved' && !post.isAuthor ? (
+              <Pressable
+                onPress={() =>
+                  router.push(
+                    buildPlayerProfileRoute({
                       userId: post.author_id,
-                      displayName: post.author?.display_name ?? 'Player',
-                      context: {
-                        postId: post.id,
-                        onBlocked: () => router.back(),
-                      },
-                    })
-                  }
-                />
-              ) : null}
-            </View>
+                      postId: post.id,
+                    }),
+                  )
+                }
+                style={styles.organizerRow}
+                className="active:opacity-70"
+                accessibilityRole="button"
+                accessibilityLabel={`View ${post.author?.display_name ?? 'Player'}'s profile`}
+              >
+                <View style={styles.organizerMeta}>
+                  <View style={styles.organizerNameRow}>
+                    <Text style={styles.sectionValue}>{post.author?.display_name ?? 'Player'}</Text>
+                    <Ionicons name="chevron-forward" size={16} color={C.faint} />
+                  </View>
+                  {isPostContactVerified(post.contact_verified_at) ? (
+                    <View style={styles.verifiedRow}>
+                      <Ionicons name="shield-checkmark" size={14} color={C.success} />
+                      <Text style={styles.verifiedText}>Verified contact</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </Pressable>
+            ) : (
+              <View style={styles.organizerRow}>
+                <View style={styles.organizerMeta}>
+                  <Text style={styles.sectionValue}>{post.author?.display_name ?? 'Player'}</Text>
+                  {isPostContactVerified(post.contact_verified_at) ? (
+                    <View style={styles.verifiedRow}>
+                      <Ionicons name="shield-checkmark" size={14} color={C.success} />
+                      <Text style={styles.verifiedText}>Verified contact</Text>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            )}
           </View>
         </ScrollView>
       )}
@@ -290,7 +302,6 @@ export default function PostDetailScreen() {
           onClose={() => setViewerOpen(false)}
         />
       ) : null}
-      {userActionsSheet}
     </View>
   );
 }
@@ -379,6 +390,11 @@ const styles = StyleSheet.create({
   organizerMeta: {
     flex: 1,
     gap: 4,
+  },
+  organizerNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   sectionHint: {
     color: C.dim,

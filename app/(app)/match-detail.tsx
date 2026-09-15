@@ -32,7 +32,6 @@ import {
   formatDifficultyLabel,
   formatDistanceKm,
   formatMatchPriceArs,
-  formatProfileRating,
   formatWithdrawalThreshold,
   hasHostNote,
   isWithinLateWithdrawalWindow,
@@ -42,8 +41,8 @@ import {
   type MatchMetaChipEmphasis,
   type MatchStatusBadgeTone,
 } from '@/features/matches/match-display';
-import { formatPublicReliabilityScore } from '@/features/ratings/penalty-report';
 import { RosterInfoButton, RosterInfoSheet } from '@/features/matches/roster-info-sheet';
+import { buildPlayerProfileRoute } from '@/features/safety/safety-display';
 import type { CourtConfig } from '@/lib/padel-court';
 import {
   buildHostToPlayerWhatsAppMessage,
@@ -54,10 +53,6 @@ import { formatMatchScheduleLabel } from '@/lib/match-time';
 import { resolveMatchLocationSubtitle } from '@/lib/match-location';
 import { UnsupportedSportError } from '@/lib/padel-sport';
 import { blockGuardMessage, useBlockPairStatus } from '@/features/blocks/use-user-blocks';
-import {
-  UserActionsTrigger,
-  useUserActionsSheet,
-} from '@/features/safety/user-actions-sheet';
 import type { Database } from '@/types/database';
 
 type PublicProfile = Database['public']['Views']['public_profiles']['Row'];
@@ -266,29 +261,86 @@ function Avatar({ name, index }: { name: string; index: number }) {
   );
 }
 
+function PendingRequestRow({
+  name,
+  index,
+  message,
+  onPressProfile,
+  onAccept,
+  onReject,
+}: {
+  name: string;
+  index: number;
+  message: string | null;
+  onPressProfile: () => void;
+  onAccept: () => void;
+  onReject: () => void;
+}) {
+  return (
+    <View style={styles.requestRow}>
+      <Pressable
+        onPress={onPressProfile}
+        style={styles.requestIdentityRow}
+        className="active:opacity-70"
+        accessibilityRole="button"
+        accessibilityLabel={`View ${name}'s profile`}
+      >
+        <Avatar name={name} index={index} />
+        <View style={styles.requestCopy}>
+          <View style={styles.requestNameRow}>
+            <Text style={styles.requestName} numberOfLines={1}>
+              {name}
+            </Text>
+            <Ionicons name="chevron-forward" size={14} color={C.faint} />
+          </View>
+          {message !== null && message.length > 0 ? (
+            <Text style={styles.requestMessage} numberOfLines={2}>
+              {message}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+      <View style={styles.requestActions}>
+        <Pressable
+          onPress={onReject}
+          style={styles.rejectSmall}
+          accessibilityRole="button"
+          accessibilityLabel={`Reject ${name}`}
+        >
+          <Text style={styles.rejectSmallText}>Decline</Text>
+        </Pressable>
+        <Pressable
+          onPress={onAccept}
+          style={styles.acceptSmall}
+          accessibilityRole="button"
+          accessibilityLabel={`Accept ${name}`}
+        >
+          <Text style={styles.acceptSmallText}>Accept</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function PlayerRow({
   name,
   index,
   host = false,
   you = false,
-  ratingLabel,
-  reliabilityLabel,
+  onPressProfile,
   onRemove,
   onWhatsApp,
-  onUserActions,
 }: {
   name: string;
   index: number;
   host?: boolean;
   you?: boolean;
-  ratingLabel: string | null;
-  reliabilityLabel?: string | null;
+  onPressProfile?: () => void;
   onRemove?: () => void;
   onWhatsApp?: () => void;
-  onUserActions?: () => void;
 }) {
-  return (
-    <View style={styles.playerRow}>
+  const identity = (
+    <>
       <Avatar name={name} index={index} />
       <View style={styles.playerInfo}>
         <View style={styles.playerNameRow}>
@@ -301,16 +353,27 @@ function PlayerRow({
             </View>
           ) : null}
         </View>
-        {ratingLabel !== null || reliabilityLabel !== null ? (
-          <View style={styles.trustRow}>
-            <Ionicons name="shield-checkmark-outline" size={13} color={C.blueHi} />
-            <Text style={styles.trustText}>
-              {[ratingLabel, reliabilityLabel].filter((value) => value !== null).join(' · ')}
-            </Text>
-          </View>
-        ) : null}
       </View>
-      {onWhatsApp !== undefined || onRemove !== undefined || onUserActions !== undefined ? (
+    </>
+  );
+
+  return (
+    <View style={styles.playerRow}>
+      {onPressProfile !== undefined ? (
+        <Pressable
+          onPress={onPressProfile}
+          style={styles.playerIdentityPressable}
+          className="active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel={`View ${name}'s profile`}
+        >
+          {identity}
+          <Ionicons name="chevron-forward" size={16} color={C.faint} />
+        </Pressable>
+      ) : (
+        <View style={styles.playerIdentityPressable}>{identity}</View>
+      )}
+      {onWhatsApp !== undefined || onRemove !== undefined ? (
         <View style={styles.playerActions}>
           {onWhatsApp !== undefined ? (
             <Pressable
@@ -320,9 +383,6 @@ function PlayerRow({
             >
               <Ionicons name="chatbox-outline" size={16} color={C.mist} />
             </Pressable>
-          ) : null}
-          {onUserActions !== undefined ? (
-            <UserActionsTrigger onPress={onUserActions} />
           ) : null}
           {onRemove !== undefined ? (
             <Pressable onPress={onRemove} style={styles.removeButton}>
@@ -581,7 +641,6 @@ export default function MatchDetailScreen() {
   const updateStatus = useUpdateParticipantStatus(matchId ?? '');
   const cancelPending = useCancelPendingRequest(matchId ?? '');
   const cancelMatch = useCancelMatch(matchId ?? '');
-  const { open: openUserActions, sheet: userActionsSheet } = useUserActionsSheet();
   const hostBlockTargetId =
     match !== undefined && !match.isHost ? match.host_id : null;
   const hostBlockStatus = useBlockPairStatus(hostBlockTargetId);
@@ -889,14 +948,6 @@ export default function MatchDetailScreen() {
           ? 130
           : 110
         : 100;
-  const hostRatingLabel = formatProfileRating(
-    match.host?.rating_avg ?? null,
-    match.host?.rating_count ?? null,
-  );
-  const hostReliabilityLabel = formatPublicReliabilityScore(
-    match.host?.reliability_score ?? null,
-    match.host?.penalty_count ?? 0,
-  );
   const withdrawalThreshold = formatWithdrawalThreshold(match.late_withdrawal_threshold);
   const headerTop = insets.top + 16;
 
@@ -1010,19 +1061,16 @@ export default function MatchDetailScreen() {
               name={hostName}
               index={0}
               host
-              ratingLabel={hostRatingLabel}
-              reliabilityLabel={hostReliabilityLabel}
-              onUserActions={
+              you={match.isHost}
+              onPressProfile={
                 !match.isHost
                   ? () =>
-                      openUserActions({
-                        userId: match.host_id,
-                        displayName: hostName,
-                        context: {
+                      router.push(
+                        buildPlayerProfileRoute({
+                          userId: match.host_id,
                           matchId: match.id,
-                          onBlocked: () => router.back(),
-                        },
-                      })
+                        }),
+                      )
                   : undefined
               }
             />
@@ -1038,23 +1086,25 @@ export default function MatchDetailScreen() {
             {acceptedParticipants.map((participant, index) => {
               const profile = participantProfilesById.get(participant.profile_id);
               const name = profile?.display_name ?? 'Player';
-              const ratingLabel = formatProfileRating(
-                profile?.rating_avg ?? null,
-                profile?.rating_count ?? null,
-              );
-              const reliabilityLabel = formatPublicReliabilityScore(
-                profile?.reliability_score ?? null,
-                profile?.penalty_count ?? 0,
-              );
+              const isSelf = participant.profile_id === match.currentUserId;
               return (
                 <View key={participant.id}>
                   <View style={styles.rosterDivider} />
                   <PlayerRow
                     name={name}
                     index={match.offlineConfirmedCount + index + 1}
-                    you={participant.profile_id === match.currentUserId}
-                    ratingLabel={ratingLabel}
-                    reliabilityLabel={reliabilityLabel}
+                    you={isSelf}
+                    onPressProfile={
+                      !isSelf
+                        ? () =>
+                            router.push(
+                              buildPlayerProfileRoute({
+                                userId: participant.profile_id,
+                                matchId: match.id,
+                              }),
+                            )
+                        : undefined
+                    }
                     onRemove={
                       hostManagesRoster
                         ? () => confirmRemovePlayer(participant.id, name)
@@ -1063,16 +1113,6 @@ export default function MatchDetailScreen() {
                     onWhatsApp={
                       match.isHost && canViewContacts
                         ? () => void openPlayerContact(participant.profile_id)
-                        : undefined
-                    }
-                    onUserActions={
-                      participant.profile_id !== match.currentUserId
-                        ? () =>
-                            openUserActions({
-                              userId: participant.profile_id,
-                              displayName: name,
-                              context: { matchId: match.id },
-                            })
                         : undefined
                     }
                   />
@@ -1096,40 +1136,26 @@ export default function MatchDetailScreen() {
                 <View style={styles.requestList}>
                   {match.visibleParticipants
                     .filter((participant) => participant.status === 'pending')
-                    .map((participant) => {
+                    .map((participant, pendingIndex) => {
                       const profile = participantProfilesById.get(participant.profile_id);
+                      const name = profile?.display_name ?? 'Player';
                       return (
-                        <View key={participant.id} style={styles.requestRow}>
-                          <View style={styles.requestCopy}>
-                            <Text style={styles.requestName}>{profile?.display_name ?? 'Player'}</Text>
-                            {participant.message !== null ? (
-                              <Text style={styles.requestMessage}>{participant.message}</Text>
-                            ) : null}
-                          </View>
-                          <View style={styles.requestActions}>
-                            <UserActionsTrigger
-                              onPress={() =>
-                                openUserActions({
-                                  userId: participant.profile_id,
-                                  displayName: profile?.display_name ?? 'Player',
-                                  context: { matchId: match.id },
-                                })
-                              }
-                            />
-                            <Pressable
-                              onPress={() => void handleParticipantStatus(participant.id, 'accepted')}
-                              style={styles.acceptSmall}
-                            >
-                              <Text style={styles.acceptSmallText}>Accept</Text>
-                            </Pressable>
-                            <Pressable
-                              onPress={() => void handleParticipantStatus(participant.id, 'rejected')}
-                              style={styles.rejectSmall}
-                            >
-                              <Text style={styles.rejectSmallText}>Reject</Text>
-                            </Pressable>
-                          </View>
-                        </View>
+                        <PendingRequestRow
+                          key={participant.id}
+                          name={name}
+                          index={pendingIndex + 1}
+                          message={participant.message}
+                          onPressProfile={() =>
+                            router.push(
+                              buildPlayerProfileRoute({
+                                userId: participant.profile_id,
+                                matchId: match.id,
+                              }),
+                            )
+                          }
+                          onAccept={() => void handleParticipantStatus(participant.id, 'accepted')}
+                          onReject={() => void handleParticipantStatus(participant.id, 'rejected')}
+                        />
                       );
                     })}
                 </View>
@@ -1185,7 +1211,6 @@ export default function MatchDetailScreen() {
           totalFilled: match.totalFilled,
         }}
       />
-      {userActionsSheet}
     </View>
   );
 }
@@ -1453,7 +1478,14 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   playerRow: {
-    minHeight: 72,
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  playerIdentityPressable: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 13,
@@ -1478,7 +1510,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 3,
   },
   playerName: {
     fontFamily: 'HankenGrotesk-Bold',
@@ -1627,28 +1658,42 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   requestList: {
-    gap: 14,
+    gap: 16,
   },
   requestRow: {
     gap: 12,
   },
+  requestIdentityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   requestCopy: {
+    flex: 1,
+    minWidth: 0,
     gap: 4,
   },
+  requestNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   requestName: {
+    flex: 1,
     fontFamily: 'HankenGrotesk-Bold',
     fontSize: 15,
     color: C.mist,
   },
   requestMessage: {
     fontFamily: 'Hanken Grotesk',
-    fontSize: 14,
+    fontSize: 13,
     color: C.dim,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   requestActions: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'stretch',
+    gap: 10,
   },
   acceptSmall: {
     flex: 1,
