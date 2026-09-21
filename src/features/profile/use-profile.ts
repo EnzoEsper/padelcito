@@ -5,12 +5,16 @@ import type { Database } from '@/types/database';
 export type SkillLevel = Database['public']['Enums']['skill_level'];
 export type UserRole = Database['public']['Enums']['user_role'];
 
+export type ProfileGender = Database['public']['Enums']['profile_gender'];
+
 export type ProfileRow = {
   id: string;
   username: string | null;
   display_name: string;
   avatar_url: string | null;
   bio: string | null;
+  gender: ProfileGender;
+  birth_date: string | null;
   rating_avg: number | null;
   rating_count: number;
   reliability_score: number | null;
@@ -42,7 +46,7 @@ async function fetchProfile(userId: string): Promise<ProfileRow> {
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, username, display_name, avatar_url, bio, rating_avg, rating_count, reliability_score, penalty_count, commitment_count, role, banned_at, whatsapp_phone, whatsapp_verified_at',
+      'id, username, display_name, avatar_url, bio, gender, birth_date, rating_avg, rating_count, reliability_score, penalty_count, commitment_count, role, banned_at, whatsapp_phone, whatsapp_verified_at',
     )
     .eq('id', userId)
     .single();

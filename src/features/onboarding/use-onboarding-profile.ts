@@ -8,6 +8,12 @@ import { supabase } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { fetchPadelSportFresh } from '@/lib/padel-sport';
 import { useOnboardingContext } from '@/lib/onboarding-context';
+import type { Database } from '@/types/database';
+import { isBirthDateEligible, MIN_PROFILE_AGE_YEARS } from '@/lib/profile-demographics';
+
+type DominantHand = Database['public']['Enums']['dominant_hand'];
+type CourtSidePreference = Database['public']['Enums']['match_position_preference'];
+type ProfileGender = Database['public']['Enums']['profile_gender'];
 
 // ─── Skill level enum ────────────────────────────────────────────────────────
 
@@ -40,6 +46,27 @@ export const profileSchema = z.object({
       ),
     ),
   skill_level: z.enum(SKILL_LEVELS),
+  dominant_hand: z.enum(['unspecified', 'right', 'left', 'ambidextrous']),
+  court_side_preference: z.enum(['any', 'drive', 'backhand']),
+  years_playing: z
+    .string()
+    .transform((val) => val.trim())
+    .pipe(
+      z.string().refine(
+        (val) => val === '' || (/^\d+$/.test(val) && Number(val) <= 80),
+        { message: 'Enter a number up to 80' },
+      ),
+    ),
+  gender: z.enum(['unspecified', 'male', 'female', 'hidden']),
+  birth_date: z
+    .string()
+    .transform((val) => val.trim())
+    .pipe(
+      z.string().refine(
+        (val) => val === '' || isBirthDateEligible(val),
+        { message: `You must be at least ${MIN_PROFILE_AGE_YEARS} years old` },
+      ),
+    ),
 });
 
 export type ProfileFormData = z.infer<typeof profileSchema>;
@@ -100,6 +127,11 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
       username: '',
       bio: '',
       whatsapp_phone: composeArgentinaWhatsAppPhone(TEMP_DEFAULT_WHATSAPP_LOCAL),
+      dominant_hand: 'unspecified' satisfies DominantHand,
+      court_side_preference: 'any' satisfies CourtSidePreference,
+      years_playing: '',
+      gender: 'unspecified' satisfies ProfileGender,
+      birth_date: '',
     },
   });
 
@@ -124,6 +156,8 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
           username: data.username.trim(),
           bio: data.bio.trim() || null,
           whatsapp_phone: data.whatsapp_phone.trim() || null,
+          gender: data.gender,
+          birth_date: data.birth_date.length > 0 ? data.birth_date : null,
         });
 
         if (profileError !== null) {
@@ -147,12 +181,20 @@ export function useOnboardingProfile(): UseOnboardingProfileReturn {
         }
 
         // 4. Upsert profile_sports (safe if the row already exists)
+        const parsedYears =
+          data.years_playing.length > 0 ? Number.parseInt(data.years_playing, 10) : null;
+        const yearsPlaying =
+          parsedYears !== null && !Number.isNaN(parsedYears) ? parsedYears : null;
+
         const upsertProfileSport = async (sportId: string) =>
           supabase.from('profile_sports').upsert(
             {
               profile_id: userId,
               sport_id: sportId,
               skill_level: data.skill_level,
+              dominant_hand: data.dominant_hand,
+              court_side_preference: data.court_side_preference,
+              years_playing: yearsPlaying,
             },
             { onConflict: 'profile_id,sport_id' },
           );

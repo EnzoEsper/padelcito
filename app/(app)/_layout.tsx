@@ -77,6 +77,8 @@ export default function AppLayout() {
         <Tabs.Screen name="report-penalty" options={{ href: null }} />
         <Tabs.Screen name="rate-match" options={{ href: null }} />
         <Tabs.Screen name="account-settings" options={{ href: null }} />
+        <Tabs.Screen name="edit-playing-profile" options={{ href: null }} />
+        <Tabs.Screen name="edit-personal-info" options={{ href: null }} />
         <Tabs.Screen name="blocked-users" options={{ href: null }} />
           </Tabs>
         </View>

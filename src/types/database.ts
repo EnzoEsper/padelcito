@@ -855,7 +855,9 @@ export type Database = {
       }
       profile_sports: {
         Row: {
+          court_side_preference: Database["public"]["Enums"]["match_position_preference"]
           created_at: string
+          dominant_hand: Database["public"]["Enums"]["dominant_hand"]
           id: string
           notes: string | null
           profile_id: string
@@ -864,7 +866,9 @@ export type Database = {
           years_playing: number | null
         }
         Insert: {
+          court_side_preference?: Database["public"]["Enums"]["match_position_preference"]
           created_at?: string
+          dominant_hand?: Database["public"]["Enums"]["dominant_hand"]
           id?: string
           notes?: string | null
           profile_id: string
@@ -873,7 +877,9 @@ export type Database = {
           years_playing?: number | null
         }
         Update: {
+          court_side_preference?: Database["public"]["Enums"]["match_position_preference"]
           created_at?: string
+          dominant_hand?: Database["public"]["Enums"]["dominant_hand"]
           id?: string
           notes?: string | null
           profile_id?: string
@@ -910,9 +916,11 @@ export type Database = {
           avatar_url: string | null
           banned_at: string | null
           bio: string | null
+          birth_date: string | null
           commitment_count: number
           created_at: string
           display_name: string
+          gender: Database["public"]["Enums"]["profile_gender"]
           home_location: unknown
           id: string
           penalty_count: number
@@ -930,9 +938,11 @@ export type Database = {
           avatar_url?: string | null
           banned_at?: string | null
           bio?: string | null
+          birth_date?: string | null
           commitment_count?: number
           created_at?: string
           display_name?: string
+          gender?: Database["public"]["Enums"]["profile_gender"]
           home_location?: unknown
           id: string
           penalty_count?: number
@@ -950,9 +960,11 @@ export type Database = {
           avatar_url?: string | null
           banned_at?: string | null
           bio?: string | null
+          birth_date?: string | null
           commitment_count?: number
           created_at?: string
           display_name?: string
+          gender?: Database["public"]["Enums"]["profile_gender"]
           home_location?: unknown
           id?: string
           penalty_count?: number
@@ -1721,10 +1733,13 @@ export type Database = {
     Views: {
       public_profiles: {
         Row: {
+          age_years: number | null
           avatar_url: string | null
           bio: string | null
+          commitment_count: number | null
           created_at: string | null
           display_name: string | null
+          gender: Database["public"]["Enums"]["profile_gender"] | null
           id: string | null
           penalty_count: number | null
           rating_avg: number | null
@@ -1733,10 +1748,13 @@ export type Database = {
           username: string | null
         }
         Insert: {
+          age_years?: never
           avatar_url?: string | null
           bio?: string | null
+          commitment_count?: number | null
           created_at?: string | null
           display_name?: string | null
+          gender?: never
           id?: string | null
           penalty_count?: number | null
           rating_avg?: number | null
@@ -1745,10 +1763,13 @@ export type Database = {
           username?: string | null
         }
         Update: {
+          age_years?: never
           avatar_url?: string | null
           bio?: string | null
+          commitment_count?: number | null
           created_at?: string | null
           display_name?: string | null
+          gender?: never
           id?: string | null
           penalty_count?: number | null
           rating_avg?: number | null
@@ -1985,6 +2006,18 @@ export type Database = {
           status: Database["public"]["Enums"]["tournament_status"]
         }[]
       }
+      profile_finished_match: {
+        Args: { p_match_id: string; p_profile_id: string }
+        Returns: boolean
+      }
+      public_player_profile_stats: {
+        Args: { p_profile_id: string }
+        Returns: {
+          matches_finished_count: number
+          mutual_finished_count: number
+          quality_tag_counts: Json
+        }[]
+      }
       recompute_all_profile_reliability: { Args: never; Returns: undefined }
       recompute_profile_commitments: {
         Args: { p_profile_id: string }
@@ -2045,6 +2078,7 @@ export type Database = {
       court_structure: "glass" | "panoramic" | "concrete"
       court_surface: "grass" | "concrete"
       court_type: "indoor" | "outdoor" | "semi_indoor"
+      dominant_hand: "unspecified" | "right" | "left" | "ambidextrous"
       listing_status: "open" | "closed" | "archived"
       listing_type: "training_partner" | "team_search" | "coaching_offer"
       match_difficulty: "friendly" | "competitive"
@@ -2078,6 +2112,7 @@ export type Database = {
         | "under_review"
         | "verified"
         | "rejected"
+      profile_gender: "unspecified" | "male" | "female" | "hidden"
       rating_context: "standard" | "late_withdrawal" | "host_removal"
       registration_status: "pending" | "approved" | "rejected" | "withdrawn"
       reliability_event_type:
@@ -2260,6 +2295,7 @@ export const Constants = {
       court_structure: ["glass", "panoramic", "concrete"],
       court_surface: ["grass", "concrete"],
       court_type: ["indoor", "outdoor", "semi_indoor"],
+      dominant_hand: ["unspecified", "right", "left", "ambidextrous"],
       listing_status: ["open", "closed", "archived"],
       listing_type: ["training_partner", "team_search", "coaching_offer"],
       match_difficulty: ["friendly", "competitive"],
@@ -2296,6 +2332,7 @@ export const Constants = {
         "verified",
         "rejected",
       ],
+      profile_gender: ["unspecified", "male", "female", "hidden"],
       rating_context: ["standard", "late_withdrawal", "host_removal"],
       registration_status: ["pending", "approved", "rejected", "withdrawn"],
       reliability_event_type: [

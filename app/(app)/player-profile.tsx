@@ -1,147 +1,35 @@
-import { useCallback } from 'react';
-import { ActivityIndicator, BackHandler, StyleSheet, View as RNView } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, BackHandler, StyleSheet } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Circle } from 'react-native-svg';
 import { Pressable, ScrollView, Text, View } from '@/tw';
-import {
-  useProfile,
-  SKILL_LEVEL_COLORS,
-  SKILL_LEVEL_LABEL,
-  type SkillLevel,
-} from '@/features/profile/use-profile';
+import { useProfile } from '@/features/profile/use-profile';
 import { usePublicProfile } from '@/features/profile/use-public-profile';
+import { usePublicProfileStats } from '@/features/profile/use-public-profile-stats';
 import {
-  resolvePlayerProfileReturnRoute,
-} from '@/features/safety/safety-display';
+  formatMemberSince,
+  PlayingProfileSection,
+  ProfileAvatar,
+  ProfileDemographicsLine,
+  ProfileStatCard,
+  PROFILE_COLORS as C,
+  QualityHighlightChip,
+  RatingRing,
+  ReliabilityStatBlock,
+  SkillBadge,
+} from '@/features/profile/profile-display';
+import { ProfileStatsInfoSheet } from '@/features/profile/profile-stats-info-sheet';
+import { resolvePlayerProfileReturnRoute } from '@/features/safety/safety-display';
 import { useUserActionsSheet } from '@/features/safety/user-actions-sheet';
 import { SCREEN_PADDING } from '@/components/stack-screen-layout';
 
 const BACK_BUTTON_SIZE = 44;
 
-const C = {
-  background: '#0B0B0B',
-  surface1: '#141417',
-  surface3: '#232429',
-  primaryHi: '#5E70B8',
-  neutral: '#E4E4E4',
-  dim: 'rgba(228,228,228,0.60)',
-  faint: 'rgba(228,228,228,0.38)',
-  hair: 'rgba(228,228,228,0.10)',
-} as const;
-
-const AV_TONES: [string, string][] = [
-  ['#2B396D', '#E4E4E4'],
-  ['#3A4A86', '#E4E4E4'],
-  ['#202126', '#E4E4E4'],
-  ['#4458A6', '#0B0B0B'],
-  ['#2A2B30', '#E4E4E4'],
-  ['#1C2649', '#E4E4E4'],
-];
-
 function parseRouteParam(value: string | string[] | undefined): string | null {
   if (value === undefined) return null;
   if (Array.isArray(value)) return value[0] ?? null;
   return value.length > 0 ? value : null;
-}
-
-function Avatar({ name, size = 64 }: { name: string; size?: number }) {
-  const initials = name
-    .split(' ')
-    .map((word) => word[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-  const toneIdx =
-    ((name.charCodeAt(0) ?? 0) + (name.charCodeAt(1) ?? 0)) % AV_TONES.length;
-  const [bg, fg] = AV_TONES[toneIdx] ?? AV_TONES[0];
-
-  return (
-    <View
-      style={[
-        styles.avatar,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: bg,
-        },
-      ]}
-    >
-      <Text style={[styles.avatarText, { color: fg, fontSize: size * 0.36 }]}>{initials}</Text>
-    </View>
-  );
-}
-
-function SkillBadge({ skillLevel }: { skillLevel: SkillLevel }) {
-  const colors = SKILL_LEVEL_COLORS[skillLevel];
-  return (
-    <View style={[styles.skillBadge, { backgroundColor: colors.bg }]}>
-      <Text style={[styles.skillBadgeText, { color: colors.fg }]}>
-        {SKILL_LEVEL_LABEL[skillLevel]}
-      </Text>
-    </View>
-  );
-}
-
-function TrustRing({ value, max = 5, size = 92 }: { value: number; max?: number; size?: number }) {
-  const r = (size - 12) / 2;
-  const circ = 2 * Math.PI * r;
-  const pct = Math.min(value / max, 1);
-  const cx = size / 2;
-  const cy = size / 2;
-
-  return (
-    <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-        <Circle cx={cx} cy={cy} r={r} fill="none" stroke={C.surface3} strokeWidth={6} />
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke={C.primaryHi}
-          strokeWidth={6}
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={circ * (1 - pct)}
-        />
-      </Svg>
-      <RNView style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}>
-        <View style={styles.ringCenter}>
-          <Text style={styles.ringValue}>{value > 0 ? value.toFixed(1) : '—'}</Text>
-          <Text style={styles.ringLabel}>TRUST</Text>
-        </View>
-      </RNView>
-    </View>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.statCard}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-    </View>
-  );
-}
-
-function formatMemberSince(isoDate: string | null): string | null {
-  if (isoDate === null) return null;
-  const timestamp = Date.parse(isoDate);
-  if (Number.isNaN(timestamp)) return null;
-  const date = new Date(timestamp);
-  const month = date.toLocaleString('en', { month: 'short' });
-  const year = date.getFullYear();
-  return `Member since ${month} ${year}`;
-}
-
-function formatReliabilityLabel(score: number | null): string {
-  if (score === null) {
-    return 'New';
-  }
-  return `${Math.round(score)}%`;
 }
 
 export default function PlayerProfileScreen() {
@@ -157,14 +45,47 @@ export default function PlayerProfileScreen() {
   const matchId = parseRouteParam(params.matchId);
   const postId = parseRouteParam(params.postId);
 
+  const [statsInfoOpen, setStatsInfoOpen] = useState(false);
+
   const ownProfileQuery = useProfile();
   const publicProfileQuery = usePublicProfile(userId);
+  const publicStatsQuery = usePublicProfileStats(userId);
   const { open: openUserActions, sheet: userActionsSheet } = useUserActionsSheet();
 
   const headerTop = insets.top + 16;
   const isSelf = ownProfileQuery.data?.id === userId;
   const profile = publicProfileQuery.data;
   const displayName = profile?.display_name ?? 'Player';
+
+  const highlightTags = useMemo(() => {
+    const counts = publicStatsQuery.data?.qualityTagCounts ?? {};
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([tag]) => tag);
+  }, [publicStatsQuery.data?.qualityTagCounts]);
+
+  const footerMeta = useMemo(() => {
+    const parts: string[] = [];
+    const memberSince = formatMemberSince(profile?.created_at ?? null);
+    if (memberSince !== null) {
+      parts.push(memberSince);
+    }
+
+    const finishedCount = publicStatsQuery.data?.matchesFinishedCount ?? 0;
+    if (finishedCount > 0) {
+      parts.push(
+        `${finishedCount} match${finishedCount === 1 ? '' : 'es'} played`,
+      );
+    }
+
+    const mutualCount = publicStatsQuery.data?.mutualFinishedCount ?? 0;
+    if (mutualCount > 0 && !isSelf) {
+      parts.push(`Played together ${mutualCount} time${mutualCount === 1 ? '' : 's'}`);
+    }
+
+    return parts.join(' · ');
+  }, [profile?.created_at, publicStatsQuery.data, isSelf]);
 
   const exitProfile = useCallback((): void => {
     const returnRoute = resolvePlayerProfileReturnRoute({ matchId, postId });
@@ -239,17 +160,6 @@ export default function PlayerProfileScreen() {
           </Text>
         </View>
 
-        <Text className="font-grotesk font-extrabold text-[30px] text-neutral" style={styles.title}>
-          {displayName}
-        </Text>
-
-        {matchId !== null ? (
-          <View style={styles.contextChip}>
-            <Ionicons name="tennisball-outline" size={14} color={C.primaryHi} />
-            <Text style={styles.contextChipText}>In this match</Text>
-          </View>
-        ) : null}
-
         {postId !== null && matchId === null ? (
           <View style={styles.contextChip}>
             <Ionicons name="megaphone-outline" size={14} color={C.primaryHi} />
@@ -264,9 +174,13 @@ export default function PlayerProfileScreen() {
         ) : (
           <>
             <View style={styles.identityCard}>
-              <Avatar name={profile.display_name} size={64} />
+              <ProfileAvatar
+                name={profile.display_name}
+                avatarUrl={profile.avatar_url}
+                size={72}
+              />
               <View style={styles.identityMeta}>
-                <Text style={styles.identityName} numberOfLines={1}>
+                <Text style={styles.identityName} numberOfLines={2}>
                   {profile.display_name}
                 </Text>
                 {profile.username !== null && profile.username.length > 0 ? (
@@ -277,23 +191,63 @@ export default function PlayerProfileScreen() {
                 {profile.skill_level !== null ? (
                   <SkillBadge skillLevel={profile.skill_level} />
                 ) : null}
+                <ProfileDemographicsLine
+                  gender={profile.gender}
+                  ageYears={profile.age_years}
+                />
               </View>
-              <View style={styles.trustRing}>
-                <TrustRing value={profile.rating_avg ?? 0} />
+              <View style={styles.ratingRing}>
+                <RatingRing value={profile.rating_avg ?? 0} />
               </View>
             </View>
 
+            <PlayingProfileSection
+              parts={{
+                dominantHand: profile.dominant_hand,
+                courtSide: profile.court_side_preference,
+                yearsPlaying: profile.years_playing,
+              }}
+            />
+
+            <View style={styles.statsHeaderRow}>
+              <Text style={styles.sectionLabel}>TRUST</Text>
+              <Pressable
+                onPress={() => setStatsInfoOpen(true)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Learn about profile stats"
+              >
+                <Ionicons name="help-circle-outline" size={18} color={C.faint} />
+              </Pressable>
+            </View>
+
             <View style={styles.statsRow}>
-              <StatCard label="REVIEWS" value={String(profile.rating_count)} />
-              <StatCard
+              <ProfileStatCard label="REVIEWS" value={String(profile.rating_count)} />
+              <ProfileStatCard
                 label="RATING"
-                value={(profile.rating_avg ?? 0) > 0 ? (profile.rating_avg ?? 0).toFixed(1) : '—'}
+                value={
+                  (profile.rating_avg ?? 0) > 0
+                    ? (profile.rating_avg ?? 0).toFixed(1)
+                    : '—'
+                }
               />
-              <StatCard
-                label="RELIABILITY"
-                value={formatReliabilityLabel(profile.reliability_score)}
+              <ReliabilityStatBlock
+                reliabilityScore={profile.reliability_score}
+                penaltyCount={profile.penalty_count}
+                commitmentCount={profile.commitment_count}
               />
             </View>
+
+            {highlightTags.length > 0 ? (
+              <View style={styles.highlightsSection}>
+                <Text style={styles.sectionLabel}>HIGHLIGHTS</Text>
+                <View style={styles.highlightRow}>
+                  {highlightTags.map((tag) => (
+                    <QualityHighlightChip key={tag} label={tag} />
+                  ))}
+                </View>
+              </View>
+            ) : null}
 
             <Text style={styles.sectionLabel}>ABOUT</Text>
             <View style={styles.aboutCard}>
@@ -304,13 +258,14 @@ export default function PlayerProfileScreen() {
               </Text>
             </View>
 
-            {formatMemberSince(profile.created_at) !== null ? (
-              <Text style={styles.memberSince}>{formatMemberSince(profile.created_at)}</Text>
+            {footerMeta.length > 0 ? (
+              <Text style={styles.memberSince}>{footerMeta}</Text>
             ) : null}
           </>
         )}
       </ScrollView>
 
+      <ProfileStatsInfoSheet visible={statsInfoOpen} onClose={() => setStatsInfoOpen(false)} />
       {userActionsSheet}
     </View>
   );
@@ -338,10 +293,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingLeft: BACK_BUTTON_SIZE + 12,
     marginBottom: 4,
-  },
-  title: {
-    letterSpacing: -0.8,
-    marginBottom: 8,
   },
   contextChip: {
     alignSelf: 'flex-start',
@@ -383,15 +334,6 @@ const styles = StyleSheet.create({
     gap: 18,
     marginBottom: 16,
   },
-  avatar: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  avatarText: {
-    fontFamily: 'HankenGrotesk-Bold',
-    letterSpacing: 0.3,
-  },
   identityMeta: {
     flex: 1,
     flexShrink: 1,
@@ -409,67 +351,14 @@ const styles = StyleSheet.create({
     color: C.dim,
     letterSpacing: 0.5,
   },
-  skillBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  skillBadgeText: {
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 9,
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  trustRing: {
+  ratingRing: {
     flexShrink: 0,
   },
-  ringCenter: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringValue: {
-    fontFamily: 'SpaceMono-Bold',
-    fontSize: 22,
-    color: C.neutral,
-    lineHeight: 26,
-  },
-  ringLabel: {
-    fontFamily: 'Space Mono',
-    fontSize: 8.5,
-    color: C.dim,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginTop: 3,
-  },
-  statsRow: {
+  statsHeaderRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: C.surface1,
-    borderWidth: 1,
-    borderColor: C.hair,
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 10,
     alignItems: 'center',
-    gap: 4,
-  },
-  statLabel: {
-    fontFamily: 'Space Mono',
-    fontSize: 9,
-    letterSpacing: 1,
-    color: C.faint,
-    textTransform: 'uppercase',
-  },
-  statValue: {
-    fontFamily: 'HankenGrotesk-Bold',
-    fontSize: 18,
-    color: C.neutral,
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
   sectionLabel: {
     fontFamily: 'Space Mono',
@@ -478,6 +367,19 @@ const styles = StyleSheet.create({
     color: C.faint,
     textTransform: 'uppercase',
     marginBottom: 10,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+  },
+  highlightsSection: {
+    marginBottom: 20,
+  },
+  highlightRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   aboutCard: {
     backgroundColor: C.surface1,

@@ -53,6 +53,13 @@ import { formatMatchScheduleLabel } from '@/lib/match-time';
 import { resolveMatchLocationSubtitle } from '@/lib/match-location';
 import { UnsupportedSportError } from '@/lib/padel-sport';
 import { blockGuardMessage, useBlockPairStatus } from '@/features/blocks/use-user-blocks';
+import { useProfile } from '@/features/profile/use-profile';
+import {
+  computeAgeYearsFromBirthDate,
+  resolveMatchDemographicsCompatibility,
+  resolveMissingProfileDemographicsHint,
+  type DemographicsCompatibilityTone,
+} from '@/lib/profile-demographics';
 import type { Database } from '@/types/database';
 
 type PublicProfile = Database['public']['Views']['public_profiles']['Row'];
@@ -465,6 +472,29 @@ function OpenSpots({ count }: { count: number }) {
   );
 }
 
+function DemographicsHintBanner({
+  message,
+  tone,
+}: {
+  message: string;
+  tone: DemographicsCompatibilityTone;
+}) {
+  const isWarning = tone === 'warning';
+  return (
+    <View style={[styles.demographicsHint, isWarning && styles.demographicsHintWarning]}>
+      <Ionicons
+        name={isWarning ? 'alert-circle-outline' : 'information-circle-outline'}
+        size={16}
+        color={isWarning ? C.warning : C.dim}
+        style={styles.demographicsHintIcon}
+      />
+      <Text style={[styles.demographicsHintText, isWarning && styles.demographicsHintTextWarning]}>
+        {message}
+      </Text>
+    </View>
+  );
+}
+
 function FooterAction({
   match,
   scheduleNow,
@@ -476,6 +506,8 @@ function FooterAction({
   onCancelMatch,
   needsRating,
   onRatePlayers,
+  demographicsHint,
+  missingProfileHint,
 }: {
   match: MatchDetail;
   scheduleNow: number;
@@ -487,6 +519,8 @@ function FooterAction({
   onCancelMatch: () => void;
   needsRating: boolean;
   onRatePlayers: () => void;
+  demographicsHint: { message: string; tone: DemographicsCompatibilityTone } | null;
+  missingProfileHint: string | null;
 }) {
   const participant = match.currentUserParticipant;
   const pending = participant?.status === 'pending';
@@ -600,6 +634,15 @@ function FooterAction({
 
   return (
     <View style={styles.footerInner}>
+      {missingProfileHint !== null ? (
+        <DemographicsHintBanner message={missingProfileHint} tone="neutral" />
+      ) : null}
+      {demographicsHint !== null ? (
+        <DemographicsHintBanner
+          message={demographicsHint.message}
+          tone={demographicsHint.tone}
+        />
+      ) : null}
       <Pressable
         onPress={onRequest}
         disabled={isBusy || match.status !== 'open'}
@@ -638,6 +681,7 @@ export default function MatchDetailScreen() {
   const [message] = useState('');
   const [rosterInfoOpen, setRosterInfoOpen] = useState(false);
   const requestToJoin = useRequestToJoin(matchId ?? '');
+  const ownProfileQuery = useProfile();
   const updateStatus = useUpdateParticipantStatus(matchId ?? '');
   const cancelPending = useCancelPendingRequest(matchId ?? '');
   const cancelMatch = useCancelMatch(matchId ?? '');
@@ -705,6 +749,53 @@ export default function MatchDetailScreen() {
         .map((profile) => [profile.id, profile]),
     );
   }, [match?.participantProfiles]);
+
+  const joinDemographicsHints = useMemo(() => {
+    if (match === undefined || match.isHost) {
+      return { demographicsHint: null, missingProfileHint: null };
+    }
+
+    const participant = match.currentUserParticipant;
+    if (
+      participant?.status === 'accepted' ||
+      participant?.status === 'pending' ||
+      participant?.status === 'rejected'
+    ) {
+      return { demographicsHint: null, missingProfileHint: null };
+    }
+
+    if (match.status !== 'open') {
+      return { demographicsHint: null, missingProfileHint: null };
+    }
+
+    const profile = ownProfileQuery.data;
+    if (profile === undefined) {
+      return { demographicsHint: null, missingProfileHint: null };
+    }
+
+    const profileAgeYears = computeAgeYearsFromBirthDate(profile.birth_date);
+    const missingProfileHint = resolveMissingProfileDemographicsHint({
+      profileGender: profile.gender,
+      profileAgeYears,
+      matchAgeMin: match.age_min,
+      matchAgeMax: match.age_max,
+    });
+
+    const compatibility = resolveMatchDemographicsCompatibility({
+      profileGender: profile.gender,
+      profileAgeYears,
+      matchGenderPreference: match.gender_preference,
+      matchAgeMin: match.age_min,
+      matchAgeMax: match.age_max,
+    });
+
+    const demographicsHint =
+      compatibility !== null && compatibility.tone === 'warning'
+        ? { message: compatibility.message, tone: compatibility.tone }
+        : null;
+
+    return { demographicsHint, missingProfileHint };
+  }, [match, ownProfileQuery.data]);
 
   async function handleRequest(): Promise<void> {
     if (matchId === null) return;
@@ -1197,6 +1288,8 @@ export default function MatchDetailScreen() {
           onCancelMatch={handleCancelMatch}
           needsRating={needsRating}
           onRatePlayers={openRateMatch}
+          demographicsHint={joinDemographicsHints.demographicsHint}
+          missingProfileHint={joinDemographicsHints.missingProfileHint}
         />
       </View>
 
@@ -1790,6 +1883,34 @@ const styles = StyleSheet.create({
   },
   footerInner: {
     gap: 10,
+  },
+  demographicsHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(228,228,228,0.10)',
+    backgroundColor: C.surface1,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  demographicsHintWarning: {
+    borderColor: 'rgba(224,177,91,0.30)',
+    backgroundColor: 'rgba(224,177,91,0.08)',
+  },
+  demographicsHintIcon: {
+    marginTop: 1,
+  },
+  demographicsHintText: {
+    flex: 1,
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 13,
+    lineHeight: 18,
+    color: C.dim,
+  },
+  demographicsHintTextWarning: {
+    color: C.warning,
   },
   confirmedRow: {
     flexDirection: 'row',

@@ -3,22 +3,32 @@ import { View, Text, ScrollView, Pressable } from "@/tw";
 import { StyleSheet, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import Svg, { Circle } from "react-native-svg";
 import { useAppAlert } from "@/components/app-alert-dialog";
 import { NotificationBell } from "@/components/notification-bell";
-import {
-  formatReliabilityScore,
-  isLowReliability,
-} from "@/features/ratings/penalty-report";
+import { isLowReliability } from "@/features/ratings/penalty-report";
 import { supabase } from "@/lib/supabase";
 import {
   useProfile,
   useProfileSport,
   isModeratorRole,
-  SKILL_LEVEL_COLORS,
   SKILL_LEVEL_LABEL,
   type SkillLevel,
 } from "@/features/profile/use-profile";
+import {
+  PlayingProfileSection,
+  ProfileAvatar,
+  ProfileDemographicsLine,
+  ProfileStatCard,
+  RatingRing,
+  ReliabilityStatBlock,
+  SkillBadge,
+} from "@/features/profile/profile-display";
+import {
+  computeAgeYearsFromBirthDate,
+  formatDemographicsSummary,
+} from "@/lib/profile-demographics";
+import { usePlayingProfile } from "@/features/profile/use-playing-profile";
+import { formatPlayingProfileSummary } from "@/lib/padel-position";
 import {
   buildModerationRoute,
   buildMyPostsRoute,
@@ -47,113 +57,7 @@ const C = {
   warning: "#E0B15B",
 } as const;
 
-const AV_TONES: [string, string][] = [
-  ["#2B396D", "#E4E4E4"],
-  ["#3A4A86", "#E4E4E4"],
-  ["#202126", "#E4E4E4"],
-  ["#4458A6", "#0B0B0B"],
-  ["#2A2B30", "#E4E4E4"],
-  ["#1C2649", "#E4E4E4"],
-];
-
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-function Avatar({ name, size = 64 }: { name: string; size?: number }) {
-  const initials = name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-  const toneIdx =
-    ((name.charCodeAt(0) ?? 0) + (name.charCodeAt(1) ?? 0)) % AV_TONES.length;
-  const [bg, fg] = AV_TONES[toneIdx] ?? AV_TONES[0];
-
-  return (
-    <View
-      style={[
-        styles.avatar,
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: bg,
-        },
-      ]}
-    >
-      <Text style={[styles.avatarText, { color: fg, fontSize: size * 0.36 }]}>
-        {initials}
-      </Text>
-    </View>
-  );
-}
-
-function SkillBadge({ skillLevel }: { skillLevel: SkillLevel }) {
-  const colors = SKILL_LEVEL_COLORS[skillLevel];
-  return (
-    <View style={[styles.skillBadge, { backgroundColor: colors.bg }]}>
-      <Text style={[styles.skillBadgeText, { color: colors.fg }]}>
-        {SKILL_LEVEL_LABEL[skillLevel]}
-      </Text>
-    </View>
-  );
-}
-
-function TrustRing({
-  value,
-  max = 5,
-  size = 92,
-}: {
-  value: number;
-  max?: number;
-  size?: number;
-}) {
-  const r = (size - 12) / 2;
-  const circ = 2 * Math.PI * r;
-  const pct = Math.min(value / max, 1);
-  const cx = size / 2;
-  const cy = size / 2;
-
-  return (
-    <View style={{ width: size, height: size }}>
-      <Svg
-        width={size}
-        height={size}
-        style={{ transform: [{ rotate: "-90deg" }] }}
-      >
-        {/* Track */}
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke={C.surface3}
-          strokeWidth={6}
-        />
-        {/* Progress arc */}
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={r}
-          fill="none"
-          stroke={C.primaryHi}
-          strokeWidth={6}
-          strokeLinecap="round"
-          strokeDasharray={circ}
-          strokeDashoffset={circ * (1 - pct)}
-        />
-      </Svg>
-      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}>
-        <View style={styles.ringCenter}>
-          <Text style={styles.ringValue}>
-            {value > 0 ? value.toFixed(1) : "—"}
-          </Text>
-          <Text style={styles.ringLabel}>TRUST</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
 
 function SectionLabel({ children }: { children: string }) {
   return (
@@ -208,43 +112,6 @@ function PreferenceRow({
         <Ionicons name="chevron-forward" size={16} color={C.faint} />
       </View>
     </Pressable>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  sub,
-  showFlame = false,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  showFlame?: boolean;
-}) {
-  return (
-    <View style={styles.statCard}>
-      <Text
-        style={styles.statLabel}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.72}
-      >
-        {label}
-      </Text>
-      <View style={styles.statValueRow}>
-        <Text style={styles.statValue}>{value}</Text>
-        {sub !== undefined && <Text style={styles.statSub}>{sub}</Text>}
-        {showFlame && (
-          <Ionicons
-            name="flame"
-            size={17}
-            color={C.primaryHi}
-            style={{ marginLeft: 1 }}
-          />
-        )}
-      </View>
-    </View>
   );
 }
 
@@ -330,7 +197,13 @@ export default function ProfileScreen() {
     isRefetching: sportRefetching,
     refetch: refetchSport,
   } = useProfileSport();
-  const isRefetching = profileRefetching || sportRefetching;
+  const {
+    data: playingProfile,
+    isRefetching: playingRefetching,
+    refetch: refetchPlayingProfile,
+  } = usePlayingProfile();
+  const isRefetching =
+    profileRefetching || sportRefetching || playingRefetching;
   const signOut = useSignOut();
 
   const isModerator = profile !== undefined && isModeratorRole(profile.role);
@@ -353,10 +226,15 @@ export default function ProfileScreen() {
   const reliabilityScore = profile?.reliability_score ?? null;
   const penaltyCount = profile?.penalty_count ?? 0;
   const commitmentCount = profile?.commitment_count ?? 0;
-  const reliabilityLabel = formatReliabilityScore(
-    reliabilityScore,
-    commitmentCount,
-  );
+  const playingProfileSummary = formatPlayingProfileSummary({
+    dominantHand: playingProfile?.dominant_hand ?? null,
+    courtSide: playingProfile?.court_side_preference ?? null,
+    yearsPlaying: playingProfile?.years_playing ?? null,
+  });
+  const demographicsSummary = formatDemographicsSummary({
+    gender: profile?.gender ?? null,
+    ageYears: computeAgeYearsFromBirthDate(profile?.birth_date ?? null),
+  });
   const showReliabilityWarning = isLowReliability(
     reliabilityScore,
     penaltyCount,
@@ -373,7 +251,13 @@ export default function ProfileScreen() {
       refreshControl={
         <RefreshControl
           refreshing={isRefetching}
-          onRefresh={() => void Promise.all([refetchProfile(), refetchSport()])}
+          onRefresh={() =>
+            void Promise.all([
+              refetchProfile(),
+              refetchSport(),
+              refetchPlayingProfile(),
+            ])
+          }
           tintColor={C.neutral}
         />
       }
@@ -411,7 +295,11 @@ export default function ProfileScreen() {
               { marginHorizontal: 20, marginBottom: 16 },
             ]}
           >
-            <Avatar name={displayName} size={64} />
+            <ProfileAvatar
+              name={displayName}
+              avatarUrl={profile?.avatar_url}
+              size={64}
+            />
             <View style={styles.identityMeta}>
               <Text style={styles.identityName} numberOfLines={1}>
                 {displayName}
@@ -422,10 +310,26 @@ export default function ProfileScreen() {
                 </Text>
               )}
               <SkillBadge skillLevel={skillLevel} />
+              {profile !== undefined ? (
+                <ProfileDemographicsLine
+                  gender={profile.gender}
+                  ageYears={computeAgeYearsFromBirthDate(profile.birth_date)}
+                />
+              ) : null}
             </View>
             <View style={styles.trustRing}>
-              <TrustRing value={rating} />
+              <RatingRing value={rating} />
             </View>
+          </View>
+
+          <View style={{ marginHorizontal: 20, marginBottom: 16 }}>
+            <PlayingProfileSection
+              parts={{
+                dominantHand: playingProfile?.dominant_hand ?? null,
+                courtSide: playingProfile?.court_side_preference ?? null,
+                yearsPlaying: playingProfile?.years_playing ?? null,
+              }}
+            />
           </View>
 
           {showReliabilityWarning ? (
@@ -441,12 +345,16 @@ export default function ProfileScreen() {
 
           {/* Stats row */}
           <View style={styles.statsRow}>
-            <StatCard label="PLAYED" value={String(ratingCount)} />
-            <StatCard
+            <ProfileStatCard label="REVIEWS" value={String(ratingCount)} />
+            <ProfileStatCard
               label="RATING"
               value={rating > 0 ? rating.toFixed(1) : "—"}
             />
-            <StatCard label="RELIABILITY" value={reliabilityLabel} />
+            <ReliabilityStatBlock
+              reliabilityScore={reliabilityScore}
+              penaltyCount={penaltyCount}
+              commitmentCount={commitmentCount}
+            />
           </View>
 
           {/* Community */}
@@ -497,6 +405,16 @@ export default function ProfileScreen() {
             <PreferenceRow
               label="Skill Level"
               value={SKILL_LEVEL_LABEL[skillLevel]}
+            />
+            <PreferenceRow
+              label="Playing profile"
+              value={playingProfileSummary ?? "Not set yet"}
+              onPress={() => router.push("/(app)/edit-playing-profile")}
+            />
+            <PreferenceRow
+              label="Personal info"
+              value={demographicsSummary ?? "Add age & gender"}
+              onPress={() => router.push("/(app)/edit-personal-info")}
             />
             <PreferenceRow label="Location" value="Set location" />
           </View>

@@ -6,7 +6,7 @@ Padelcito ("we", "our", "the app") is a padel matchmaking application. This poli
 
 ## Data we collect
 
-- **Account data:** email address, display name, username, profile bio, skill level, avatar.
+- **Account data:** email address, display name, username, profile bio, skill level, avatar, optional self-reported gender, and optional birth date (used to derive age on your public profile — your full birthday is not shown to other users).
 - **Contact data:** WhatsApp phone number (stored on your profile; shared with match participants only through gated in-app flows).
 - **Location data:** home/search location and match or post coordinates when you pick a venue or use Discover.
 - **User content:** match details, community posts, ratings, reliability reports, moderation reports.

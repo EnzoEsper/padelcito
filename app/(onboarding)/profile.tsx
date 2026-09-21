@@ -20,6 +20,8 @@ import {
   type ProfileFormData,
 } from '@/features/onboarding/use-onboarding-profile';
 import type { Control } from 'react-hook-form';
+import { PlayingProfileFields } from '@/features/profile/playing-profile-fields';
+import { DemographicsFields } from '@/features/profile/demographics-fields';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -367,6 +369,12 @@ export default function ProfileSetupScreen() {
 
           {/* ── Padel skill level ────────────────────────────────────────── */}
           <SkillChips control={control} error={errors.skill_level?.message} />
+
+          {/* ── Playing preferences ──────────────────────────────────────── */}
+          <PlayingProfileFields control={control} errors={errors} />
+
+          {/* ── Match fit (optional) ───────────────────────────────────── */}
+          <DemographicsFields control={control} errors={errors} />
 
           {/* ── Submit CTA ──────────────────────────────────────────────── */}
           <Pressable
