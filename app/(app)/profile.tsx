@@ -11,7 +11,6 @@ import {
   useProfile,
   useProfileSport,
   isModeratorRole,
-  SKILL_LEVEL_LABEL,
   type SkillLevel,
 } from "@/features/profile/use-profile";
 import {
@@ -23,12 +22,8 @@ import {
   ReliabilityStatBlock,
   SkillBadge,
 } from "@/features/profile/profile-display";
-import {
-  computeAgeYearsFromBirthDate,
-  formatDemographicsSummary,
-} from "@/lib/profile-demographics";
+import { computeAgeYearsFromBirthDate } from "@/lib/profile-demographics";
 import { usePlayingProfile } from "@/features/profile/use-playing-profile";
-import { formatPlayingProfileSummary } from "@/lib/padel-position";
 import {
   buildModerationRoute,
   buildMyPostsRoute,
@@ -226,15 +221,6 @@ export default function ProfileScreen() {
   const reliabilityScore = profile?.reliability_score ?? null;
   const penaltyCount = profile?.penalty_count ?? 0;
   const commitmentCount = profile?.commitment_count ?? 0;
-  const playingProfileSummary = formatPlayingProfileSummary({
-    dominantHand: playingProfile?.dominant_hand ?? null,
-    courtSide: playingProfile?.court_side_preference ?? null,
-    yearsPlaying: playingProfile?.years_playing ?? null,
-  });
-  const demographicsSummary = formatDemographicsSummary({
-    gender: profile?.gender ?? null,
-    ageYears: computeAgeYearsFromBirthDate(profile?.birth_date ?? null),
-  });
   const showReliabilityWarning = isLowReliability(
     reliabilityScore,
     penaltyCount,
@@ -242,8 +228,6 @@ export default function ProfileScreen() {
   );
   const displayName = profile?.display_name ?? "Player";
   const username = profile?.username ?? "";
-  const bio = profile?.bio;
-
   return (
     <ScrollView
       className="flex-1 bg-background"
@@ -393,30 +377,19 @@ export default function ProfileScreen() {
             ) : null}
           </View>
 
-          {/* Preferences */}
-          <SectionLabel>PREFERENCES</SectionLabel>
+          {/* Profile */}
+          <SectionLabel>PROFILE</SectionLabel>
           <View
             style={[
               styles.prefCard,
               { marginHorizontal: 20, marginBottom: 16 },
             ]}
           >
-            <PreferenceRow label="Bio" value={bio ?? undefined} isFirst />
             <PreferenceRow
-              label="Skill Level"
-              value={SKILL_LEVEL_LABEL[skillLevel]}
+              label="Edit profile"
+              isFirst
+              onPress={() => router.push("/(app)/edit-profile")}
             />
-            <PreferenceRow
-              label="Playing profile"
-              value={playingProfileSummary ?? "Not set yet"}
-              onPress={() => router.push("/(app)/edit-playing-profile")}
-            />
-            <PreferenceRow
-              label="Personal info"
-              value={demographicsSummary ?? "Add age & gender"}
-              onPress={() => router.push("/(app)/edit-personal-info")}
-            />
-            <PreferenceRow label="Location" value="Set location" />
           </View>
 
           {/* Account */}

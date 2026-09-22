@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,17 +11,16 @@ import { useController } from 'react-hook-form';
 import { View, Text, Pressable, TextInput, ScrollView } from '@/tw';
 import {
   useOnboardingProfile,
-  SKILL_LEVELS,
   formatArgentinaWhatsAppLocal,
   composeArgentinaWhatsAppPhone,
   TEMP_ARGENTINA_WHATSAPP_PREFIX,
   TEMP_DEFAULT_WHATSAPP_LOCAL,
-  type SkillLevel,
   type ProfileFormData,
 } from '@/features/onboarding/use-onboarding-profile';
 import type { Control } from 'react-hook-form';
 import { PlayingProfileFields } from '@/features/profile/playing-profile-fields';
 import { DemographicsFields } from '@/features/profile/demographics-fields';
+import { SkillLevelChips } from '@/features/profile/skill-level-chips';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -199,121 +198,6 @@ function WhatsAppField({ control, error }: WhatsAppFieldProps) {
   );
 }
 
-// ─── Skill chip ───────────────────────────────────────────────────────────────
-
-type ChipMeta = {
-  label: string;
-  subtitle: string;
-  unselectedContainer: string;
-  unselectedText: string;
-};
-
-const CHIP_META: Record<SkillLevel, ChipMeta> = {
-  beginner: {
-    label: 'BEGINNER',
-    subtitle: 'Just starting',
-    unselectedContainer: 'bg-surface-3',
-    unselectedText: 'text-neutral/38',
-  },
-  intermediate: {
-    label: 'INTERMEDIATE',
-    subtitle: 'Some experience',
-    unselectedContainer: 'bg-surface-3',
-    unselectedText: 'text-neutral/60',
-  },
-  advanced: {
-    label: 'ADVANCED',
-    subtitle: 'Competitive play',
-    unselectedContainer: 'bg-surface-3 border border-neutral/20',
-    unselectedText: 'text-neutral',
-  },
-  expert: {
-    label: 'EXPERT',
-    subtitle: 'Tournament level',
-    unselectedContainer: 'border border-primary/50 bg-primary/10',
-    unselectedText: 'text-neutral',
-  },
-  pro: {
-    label: 'PRO',
-    subtitle: 'Elite level',
-    unselectedContainer: 'bg-primary',
-    unselectedText: 'text-neutral',
-  },
-};
-
-type SkillChipProps = {
-  level: SkillLevel;
-  isSelected: boolean;
-  onPress: (level: SkillLevel) => void;
-};
-
-function SkillChip({ level, isSelected, onPress }: SkillChipProps) {
-  const meta = CHIP_META[level];
-
-  const containerClass = isSelected
-    ? 'bg-primary border-2 border-primary-hi/60'
-    : meta.unselectedContainer;
-
-  const textClass = isSelected ? 'text-neutral' : meta.unselectedText;
-
-  return (
-    <Pressable
-      onPress={() => onPress(level)}
-      style={styles.chip}
-      className={['rounded-lg items-center justify-center', containerClass].join(' ')}
-      android_ripple={{ color: 'rgba(94,112,184,0.3)' }}
-    >
-      <Text className={['font-mono text-[11px] tracking-[0.13em] font-bold', textClass].join(' ')}>
-        {meta.label}
-      </Text>
-      <Text className={['font-grotesk text-xs mt-0.5', isSelected ? 'text-neutral/60' : 'text-neutral/38'].join(' ')}>
-        {meta.subtitle}
-      </Text>
-    </Pressable>
-  );
-}
-
-// ─── Skill chips row ──────────────────────────────────────────────────────────
-
-type SkillChipsProps = {
-  control: Control<ProfileFormData>;
-  error: string | undefined;
-};
-
-function SkillChips({ control, error }: SkillChipsProps) {
-  const { field } = useController({ control, name: 'skill_level' });
-
-  const handleSelect = useCallback(
-    (level: SkillLevel) => {
-      field.onChange(level);
-    },
-    [field],
-  );
-
-  return (
-    <View className="mb-8">
-      <SectionLabel>Padel Level</SectionLabel>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipsScrollContent}
-      >
-        {SKILL_LEVELS.map((level) => (
-          <SkillChip
-            key={level}
-            level={level}
-            isSelected={field.value === level}
-            onPress={handleSelect}
-          />
-        ))}
-      </ScrollView>
-      {error !== undefined && (
-        <Text className="font-grotesk text-sm text-warning mt-3 leading-5">{error}</Text>
-      )}
-    </View>
-  );
-}
-
 // ─── Profile setup screen ─────────────────────────────────────────────────────
 
 export default function ProfileSetupScreen() {
@@ -368,7 +252,7 @@ export default function ProfileSetupScreen() {
           <WhatsAppField control={control} error={errors.whatsapp_phone?.message} />
 
           {/* ── Padel skill level ────────────────────────────────────────── */}
-          <SkillChips control={control} error={errors.skill_level?.message} />
+          <SkillLevelChips control={control} errors={errors} />
 
           {/* ── Playing preferences ──────────────────────────────────────── */}
           <PlayingProfileFields control={control} errors={errors} />
@@ -435,14 +319,5 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 14,
     minHeight: 96,
-  },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginRight: 8,
-    minWidth: 90,
-  },
-  chipsScrollContent: {
-    paddingRight: 8,
   },
 });

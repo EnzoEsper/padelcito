@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
+import { publicProfileKeys } from '@/features/profile/use-public-profile';
 
 export type SkillLevel = Database['public']['Enums']['skill_level'];
 export type UserRole = Database['public']['Enums']['user_role'];
@@ -96,6 +97,36 @@ export function useProfileSport() {
       return fetchProfileSport(userId);
     },
     staleTime: 1000 * 60 * 5,
+  });
+}
+
+export type UpdateProfileBioInput = {
+  bio: string | null;
+};
+
+export function useUpdateProfileBio() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateProfileBioInput): Promise<void> => {
+      const userId = await fetchCurrentUserId();
+      const trimmed = input.bio?.trim() ?? '';
+      const { error } = await supabase
+        .from('profiles')
+        .update({ bio: trimmed.length > 0 ? trimmed : null })
+        .eq('id', userId);
+
+      if (error !== null) {
+        throw error;
+      }
+    },
+    onSuccess: async () => {
+      const userId = await fetchCurrentUserId();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['profile', 'me'] }),
+        queryClient.invalidateQueries({ queryKey: publicProfileKeys.detail(userId) }),
+      ]);
+    },
   });
 }
 
