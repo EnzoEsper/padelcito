@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useReturnAwareBack } from '@/lib/app-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, ScrollView, Text } from '@/tw';
@@ -28,13 +28,13 @@ export function StackScreenLayout({
   children,
 }: StackScreenLayoutProps) {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const goBack = useReturnAwareBack();
   const headerTop = insets.top + 16;
 
   return (
     <View style={styles.root}>
       <Pressable
-        onPress={() => router.back()}
+        onPress={goBack}
         style={[styles.backButton, { top: headerTop, left: SCREEN_PADDING }]}
         className="rounded-xl bg-surface-1 border border-neutral/10 items-center justify-center"
         accessibilityRole="button"

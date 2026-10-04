@@ -8,8 +8,8 @@ import { StackScreenLayout } from '@/components/stack-screen-layout';
 import { useAppAlert } from '@/components/app-alert-dialog';
 import { DemographicsFields } from '@/features/profile/demographics-fields';
 import { PlayingProfileFields } from '@/features/profile/playing-profile-fields';
-import { SkillLevelChips } from '@/features/profile/skill-level-chips';
-import { SKILL_LEVELS } from '@/features/onboarding/use-onboarding-profile';
+import { PadelCategoryField } from '@/features/profile/padel-category-field';
+import { clampPadelCategory, padelCategoryFieldSchema } from '@/lib/padel-category';
 import {
   useProfile,
   useProfileSport,
@@ -31,7 +31,7 @@ const BORDER_FOCUSED = 'rgba(228,228,228,0.60)';
 const BORDER_ERROR = 'rgba(224,177,91,0.60)';
 
 const editProfileSchema = z.object({
-  skill_level: z.enum(SKILL_LEVELS),
+  padel_category: padelCategoryFieldSchema,
   dominant_hand: z.enum(['unspecified', 'right', 'left', 'ambidextrous']),
   court_side_preference: z.enum(['any', 'drive', 'backhand']),
   years_playing: z
@@ -139,7 +139,7 @@ export default function EditProfileScreen() {
   } = useForm<EditProfileFormData>({
     resolver: zodResolver(editProfileSchema),
     defaultValues: {
-      skill_level: 'intermediate',
+      padel_category: 5,
       dominant_hand: 'unspecified',
       court_side_preference: 'any',
       years_playing: '',
@@ -157,7 +157,9 @@ export default function EditProfileScreen() {
     }
 
     reset({
-      skill_level: sport?.skill_level ?? playingProfile?.skill_level ?? 'intermediate',
+      padel_category: clampPadelCategory(
+        playingProfile?.padel_category ?? sport?.padel_category ?? 5,
+      ),
       dominant_hand: playingProfile?.dominant_hand ?? 'unspecified',
       court_side_preference: playingProfile?.court_side_preference ?? 'any',
       years_playing:
@@ -187,7 +189,7 @@ export default function EditProfileScreen() {
 
     void Promise.all([
       updatePlayingProfile.mutateAsync({
-        skill_level: data.skill_level,
+        padel_category: data.padel_category,
         dominant_hand: data.dominant_hand,
         court_side_preference: data.court_side_preference,
         years_playing: yearsPlaying,
@@ -224,7 +226,7 @@ export default function EditProfileScreen() {
         <ActivityIndicator color="#E4E4E4" style={styles.loader} />
       ) : (
         <>
-          <SkillLevelChips control={control} errors={errors} />
+          <PadelCategoryField control={control} errors={errors} sectionLabel="Padel category" />
           <PlayingProfileFields control={control} errors={errors} />
           <DemographicsFields control={control} errors={errors} showIntro={false} />
           <BioField control={control} error={errors.bio?.message} charCount={bioValue.length} />

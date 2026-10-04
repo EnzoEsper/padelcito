@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { FlashList, View, Text, Pressable } from "@/tw";
 import { useAppAlert } from "@/components/app-alert-dialog";
 import { NotificationBell } from "@/components/notification-bell";
+import { MATCHES_HOME_HREF } from "@/lib/app-navigation";
 import { ReliabilityBadge } from "@/components/reliability-badge";
 import {
   useMyMatches,
@@ -331,7 +332,7 @@ export default function MatchesScreen() {
               Calendar
             </Text>
           </View>
-          <NotificationBell />
+          <NotificationBell returnHref={MATCHES_HOME_HREF} />
         </View>
 
         <View className="mx-5 mb-4">

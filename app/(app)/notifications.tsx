@@ -16,6 +16,7 @@ import {
   useMarkNotificationRead,
   useNotifications,
 } from '@/features/notifications/use-notifications';
+import { useReturnAwareBack } from '@/lib/app-navigation';
 
 const C = {
   background: '#0B0B0B',
@@ -106,6 +107,7 @@ function NotificationSectionBlock({
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const goBack = useReturnAwareBack();
   const { data, isPending, isRefetching, refetch, error } = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
@@ -141,7 +143,7 @@ export default function NotificationsScreen() {
     () => (
       <View style={styles.header}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={goBack}
           style={styles.backButton}
           accessibilityLabel="Go back"
           accessibilityRole="button"
@@ -167,7 +169,7 @@ export default function NotificationsScreen() {
         )}
       </View>
     ),
-    [hasUnread, markAllRead, router],
+    [goBack, hasUnread, markAllRead],
   );
 
   const listEmpty = useMemo(() => {

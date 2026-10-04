@@ -138,7 +138,7 @@ export function formatMatchDurationHours(minutes: number): string {
 
 export function categoryAccentLevel(categoryMax: number): CategoryAccentLevel {
   const tier = categoryToTier(categoryMax);
-  if (tier === 'advanced') {
+  if (tier === 'expert') {
     return categoryMax <= 2 ? 'high' : 'mid';
   }
   return 'low';

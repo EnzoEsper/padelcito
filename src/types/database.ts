@@ -860,6 +860,7 @@ export type Database = {
           dominant_hand: Database["public"]["Enums"]["dominant_hand"]
           id: string
           notes: string | null
+          padel_category: number
           profile_id: string
           skill_level: Database["public"]["Enums"]["skill_level"]
           sport_id: string
@@ -871,6 +872,7 @@ export type Database = {
           dominant_hand?: Database["public"]["Enums"]["dominant_hand"]
           id?: string
           notes?: string | null
+          padel_category?: number
           profile_id: string
           skill_level?: Database["public"]["Enums"]["skill_level"]
           sport_id: string
@@ -882,6 +884,7 @@ export type Database = {
           dominant_hand?: Database["public"]["Enums"]["dominant_hand"]
           id?: string
           notes?: string | null
+          padel_category?: number
           profile_id?: string
           skill_level?: Database["public"]["Enums"]["skill_level"]
           sport_id?: string

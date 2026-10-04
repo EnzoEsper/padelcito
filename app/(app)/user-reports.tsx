@@ -11,6 +11,7 @@ import {
   buildMatchContextRoute,
   buildModerationBannedUsersRoute,
   buildPostContextRoute,
+  buildUserReportsRoute,
   formatReportRelativeTime,
 } from '@/features/safety/safety-display';
 import {
@@ -23,6 +24,7 @@ import {
   type UserReportSummary,
 } from '@/features/safety/use-user-reports';
 import { useAppContentTopPadding } from '@/lib/app-layout-insets';
+import { useAuxScreenReturnChain } from '@/lib/app-navigation';
 
 const C = {
   background: '#0B0B0B',
@@ -172,6 +174,7 @@ function GroupCard({
 
 export default function UserReportsScreen() {
   const router = useRouter();
+  const { goBack, pushWithCurrentAsReturn } = useAuxScreenReturnChain(buildUserReportsRoute());
   const insets = useSafeAreaInsets();
   const contentTopPadding = useAppContentTopPadding(16);
   const appAlert = useAppAlert();
@@ -250,7 +253,7 @@ export default function UserReportsScreen() {
                   { text: 'OK', style: 'cancel' },
                   {
                     text: 'View banned users',
-                    onPress: () => router.push(buildModerationBannedUsersRoute()),
+                    onPress: () => pushWithCurrentAsReturn(buildModerationBannedUsersRoute()),
                   },
                 ]),
               )
@@ -262,7 +265,7 @@ export default function UserReportsScreen() {
         },
       ]);
     },
-    [appAlert, banAuthor, router],
+    [appAlert, banAuthor, pushWithCurrentAsReturn],
   );
 
   const handleUnban = useCallback(
@@ -322,7 +325,7 @@ export default function UserReportsScreen() {
   const listHeader = useMemo(
     () => (
       <View className="px-5 pb-5">
-        <Pressable onPress={() => router.back()} style={styles.backLink}>
+        <Pressable onPress={goBack} style={styles.backLink}>
           <Ionicons name="chevron-back" size={20} color={C.mist} />
           <Text style={styles.backText}>Back</Text>
         </Pressable>
@@ -337,14 +340,14 @@ export default function UserReportsScreen() {
           Open abuse reports grouped by reported user, sorted by report count.
         </Text>
         <Pressable
-          onPress={() => router.push(buildModerationBannedUsersRoute())}
+          onPress={() => pushWithCurrentAsReturn(buildModerationBannedUsersRoute())}
           style={styles.manageBansLink}
         >
           <Text style={styles.manageBansLinkText}>Manage banned users</Text>
         </Pressable>
       </View>
     ),
-    [router],
+    [goBack, pushWithCurrentAsReturn],
   );
 
   const listEmpty = useMemo(() => {
@@ -373,7 +376,7 @@ export default function UserReportsScreen() {
   if (!isModerator) {
     return (
       <View style={[styles.root, { paddingTop: contentTopPadding }]}>
-        <Pressable onPress={() => router.back()} style={styles.backLink}>
+        <Pressable onPress={goBack} style={styles.backLink}>
           <Ionicons name="chevron-back" size={20} color={C.mist} />
           <Text style={styles.backText}>Back</Text>
         </Pressable>

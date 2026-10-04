@@ -12,6 +12,12 @@ Migrations `20260616120000_add_match_host_metadata`, `20260617120000_restrict_ma
 
 ---
 
+## Padel categories 1st–9th (2026-09-22)
+
+Player-facing skill is expressed as a **padel category** (1st = strongest, 9th = weakest), grouped in the app as Beginner (9–7), Intermediate (6–4), and Expert (3–1). Match hosts still set an accepted category band on `matches.category_min` / `category_max` (now 1–9). `profile_sports.padel_category` is the source of truth; `profile_sports.skill_level` stays in sync via trigger for existing `skill_min` / `skill_max` match columns. Migration `20260922150000_padel_nine_categories`. Reference: [`docs/padel-categories.md`](./padel-categories.md), [`src/lib/padel-category.ts`](../src/lib/padel-category.ts).
+
+---
+
 ## In-app notifications (2026-06-23 — M3)
 
 Match lifecycle events (join request, accept/reject, request cancel, withdraw, remove, match cancel, rating request) emit rows into a dedicated `notifications` table via `emit_notification()` from AFTER triggers — not from client code. Realtime keeps the bell badge live; recipients mark rows read via RLS-scoped UPDATE on `read_at` only. Migrations `20260623140000_create_notifications`, `20260623150000_notification_triggers`, and `20260627230000_join_request_cancelled_notification` (player cancels pending request → host inbox). Client: `src/features/notifications/`, `NotificationBell`, `app/(app)/notifications.tsx`.

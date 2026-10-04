@@ -1,47 +1,137 @@
+import { z } from 'zod';
 import type { Database } from '@/types/database';
 
 type SkillLevel = Database['public']['Enums']['skill_level'];
 
-export type PadelCategoryTier = 'advanced' | 'beginner' | 'intermediate';
+export type PadelCategoryNumber = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
-export type PadelCategory = {
-  number: number;
-  label: string;
+export type PadelCategoryTier = 'beginner' | 'intermediate' | 'expert';
+
+export type PadelCategoryGroup = {
   tier: PadelCategoryTier;
+  label: string;
+  numbers: readonly PadelCategoryNumber[];
 };
 
-export const PADEL_CATEGORIES: readonly PadelCategory[] = [
-  { number: 1, label: '1ª', tier: 'advanced' },
-  { number: 2, label: '2ª', tier: 'advanced' },
-  { number: 3, label: '3ª', tier: 'advanced' },
-  { number: 4, label: '4ª', tier: 'intermediate' },
-  { number: 5, label: '5ª', tier: 'intermediate' },
-  { number: 6, label: '6ª', tier: 'intermediate' },
-  { number: 7, label: '7ª', tier: 'beginner' },
-  { number: 8, label: '8ª', tier: 'beginner' },
+export const PADEL_CATEGORY_MIN = 1;
+export const PADEL_CATEGORY_MAX = 9;
+
+export const PADEL_CATEGORY_GROUPS: readonly PadelCategoryGroup[] = [
+  { tier: 'beginner', label: 'Beginner', numbers: [9, 8, 7] },
+  { tier: 'intermediate', label: 'Intermediate', numbers: [6, 5, 4] },
+  { tier: 'expert', label: 'Expert', numbers: [3, 2, 1] },
 ] as const;
 
-export const PADEL_CATEGORY_NUMBERS = PADEL_CATEGORIES.map((c) => c.number);
+export const PADEL_CATEGORIES: readonly PadelCategoryNumber[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-const CATEGORY_TO_SKILL: Record<number, SkillLevel> = {
-  1: 'pro',
-  2: 'expert',
-  3: 'advanced',
-  4: 'advanced',
-  5: 'intermediate',
-  6: 'intermediate',
-  7: 'beginner',
-  8: 'beginner',
+
+export const PADEL_CATEGORY_DESCRIPTIONS: Record<PadelCategoryNumber, string> = {
+  9: 'You are starting to play padel and getting familiar with the most basic aspects of the sport.',
+  8: 'You have some padel experience, know the basic fundamentals, and can join low-intensity matches.',
+  7: 'You are progressing—you know basic strokes and how the game works, but you are still building consistency and accuracy.',
+  6: 'You are moving from beginner to intermediate, starting to master basic strokes with more confidence in your game.',
+  5: 'You are at an intermediate level with good ball control, can hit a variety of shots with reasonable precision, and keep up consistent rallies at a good pace.',
+  4: 'You are at a competitive level and can play in registered fourth-category tournaments.',
+  3: 'You are at a competitive level and can play in registered third-category tournaments.',
+  2: 'You are at a professional level and compete in registered second-category pro tournaments.',
+  1: 'You are at a professional level and compete in registered first-category pro tournaments.',
 };
 
-export function formatCategoryLabel(number: number): string {
-  const found = PADEL_CATEGORIES.find((c) => c.number === number);
-  return found?.label ?? `${number}ª`;
+const CATEGORY_TO_SKILL: Record<PadelCategoryNumber, SkillLevel> = {
+  9: 'beginner',
+  8: 'beginner',
+  7: 'beginner',
+  6: 'intermediate',
+  5: 'intermediate',
+  4: 'intermediate',
+  3: 'advanced',
+  2: 'expert',
+  1: 'pro',
+};
+
+const TIER_BY_CATEGORY: Record<PadelCategoryNumber, PadelCategoryTier> = {
+  9: 'beginner',
+  8: 'beginner',
+  7: 'beginner',
+  6: 'intermediate',
+  5: 'intermediate',
+  4: 'intermediate',
+  3: 'expert',
+  2: 'expert',
+  1: 'expert',
+};
+
+export const CATEGORY_TIER_LABEL: Record<PadelCategoryTier, string> = {
+  beginner: 'Beginner',
+  intermediate: 'Intermediate',
+  expert: 'Expert',
+};
+
+function ordinalSuffix(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) {
+    return 'th';
+  }
+  switch (n % 10) {
+    case 1:
+      return 'st';
+    case 2:
+      return 'nd';
+    case 3:
+      return 'rd';
+    default:
+      return 'th';
+  }
 }
 
-/** e.g. "Categories 3ª to 5ª · 1ª is the highest level" */
+export function isPadelCategoryNumber(value: number): value is PadelCategoryNumber {
+  return Number.isInteger(value) && value >= PADEL_CATEGORY_MIN && value <= PADEL_CATEGORY_MAX;
+}
+
+export const padelCategoryFieldSchema = z.custom<PadelCategoryNumber>(
+  (value) => typeof value === 'number' && isPadelCategoryNumber(value),
+  'Select your padel category',
+);
+
+export const padelCategoryFormSchema = z.object({
+  padel_category: padelCategoryFieldSchema,
+});
+
+export function clampPadelCategory(value: number): PadelCategoryNumber {
+  const clamped = Math.min(PADEL_CATEGORY_MAX, Math.max(PADEL_CATEGORY_MIN, Math.round(value)));
+  return clamped as PadelCategoryNumber;
+}
+
+/** Display label, e.g. 1 → "1st" (strongest). */
+export function formatCategoryLabel(number: number): string {
+  const n = clampPadelCategory(number);
+  return `${n}${ordinalSuffix(n)}`;
+}
+
+export function getPadelCategoryDescription(number: number): string {
+  if (!isPadelCategoryNumber(number)) {
+    return '';
+  }
+  return PADEL_CATEGORY_DESCRIPTIONS[number];
+}
+
+export function categoryToTier(category: number): PadelCategoryTier {
+  if (!isPadelCategoryNumber(category)) {
+    return 'intermediate';
+  }
+  return TIER_BY_CATEGORY[category];
+}
+
+export function categoryToSkillLevel(category: number): SkillLevel {
+  if (!isPadelCategoryNumber(category)) {
+    return 'intermediate';
+  }
+  return CATEGORY_TO_SKILL[category];
+}
+
+/** e.g. "Categories 4th to 6th · 1st is the highest level" */
 export function formatCategoryRangeLabel(categoryMax: number, categoryMin: number): string {
-  const suffix = ' · 1ª is the highest level';
+  const suffix = ' · 1st is the highest level';
   if (categoryMax === categoryMin) {
     return `Category ${formatCategoryLabel(categoryMax)}${suffix}`;
   }
@@ -64,7 +154,7 @@ export function computeNextCategoryRange(
   categoryMin: number,
   tapped: number,
 ): CategoryRangeBounds {
-  const level = Math.min(8, Math.max(1, tapped));
+  const level = clampPadelCategory(tapped);
   const isSingle = categoryMax === categoryMin;
 
   if (isSingle && level === categoryMax) {
@@ -89,8 +179,8 @@ export function categoryRangeToSkillLevels(
   categoryMax: number,
   categoryMin: number,
 ): { skillMin: SkillLevel; skillMax: SkillLevel } {
-  const skillForStrongest = CATEGORY_TO_SKILL[categoryMax] ?? 'intermediate';
-  const skillForWeakest = CATEGORY_TO_SKILL[categoryMin] ?? 'intermediate';
+  const skillForStrongest = categoryToSkillLevel(categoryMax);
+  const skillForWeakest = categoryToSkillLevel(categoryMin);
 
   const order: SkillLevel[] = ['beginner', 'intermediate', 'advanced', 'expert', 'pro'];
   const minIndex = order.indexOf(skillForWeakest);
@@ -110,18 +200,7 @@ export function clampCategoryRange(
   categoryMax: number,
   categoryMin: number,
 ): { categoryMax: number; categoryMin: number } {
-  const max = Math.min(8, Math.max(1, categoryMax));
-  const min = Math.min(8, Math.max(1, categoryMin));
+  const max = clampPadelCategory(categoryMax);
+  const min = clampPadelCategory(categoryMin);
   return max <= min ? { categoryMax: max, categoryMin: min } : { categoryMax: min, categoryMin: max };
-}
-
-export const CATEGORY_TIER_LABEL: Record<PadelCategoryTier, string> = {
-  advanced: 'Advanced',
-  intermediate: 'Intermediate',
-  beginner: 'Beginner',
-};
-
-export function categoryToTier(categoryMax: number): PadelCategoryTier {
-  const category = PADEL_CATEGORIES.find((entry) => entry.number === categoryMax);
-  return category?.tier ?? 'intermediate';
 }

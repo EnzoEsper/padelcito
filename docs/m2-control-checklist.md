@@ -25,7 +25,8 @@ This document is the handoff point for M2 Core Matchmaking MVP sessions.
 - `public_profiles` is safe for other users; direct `profiles.whatsapp_phone` reads are not.
 - Padel sport is resolved via `PADEL_SPORT_SLUG` in `src/lib/padel-sport.ts`; match queries filter by padel `sport_id`.
 - `matches.court_count` and `matches.court_configs` (jsonb array) must stay aligned: array length equals `court_count`. Each element has `format`, `type`, `structure`, and `surface` (see `src/lib/padel-court.ts`). DB helpers `matches_court_configs_are_valid` and `matches_court_capacity_fits` enforce shape and that per-court slot totals do not exceed `capacity`.
-- `matches.category_min` / `matches.category_max` define the accepted padel category band (lower number = stronger player; `category_max <= category_min`).
+- `matches.category_min` / `matches.category_max` define the accepted padel category band (1st–9th; lower number = stronger player; `category_max <= category_min`). See [`docs/padel-categories.md`](./padel-categories.md).
+- Player onboarding and profile store `profile_sports.padel_category`; `skill_level` is DB-derived for legacy match skill filters.
 - `matches.gender_preference` is required: `male`, `female`, or `mixed` (no `open` value).
 - `matches.difficulty` is required: `friendly` or `competitive`.
 - `matches.position_preference` is required: `any`, `drive`, or `backhand` (replaces the removed `positions_sought` column).

@@ -29,6 +29,29 @@ export function formatProfileGenderLabel(gender: ProfileGender | null): string |
   return PROFILE_GENDER_OPTIONS.find((option) => option.value === gender)?.label ?? gender;
 }
 
+/** Public profile detail row, e.g. "32 years". */
+export function formatProfileAgeLabel(ageYears: number | null): string | null {
+  if (ageYears === null || ageYears <= 0) {
+    return null;
+  }
+  return ageYears === 1 ? '1 year' : `${ageYears} years`;
+}
+
+/** Joined date for profile DETAILS row, e.g. "Jul 2026". */
+export function formatProfileJoinedLabel(isoDate: string | null): string | null {
+  if (isoDate === null || isoDate.length === 0) {
+    return null;
+  }
+  const timestamp = Date.parse(isoDate);
+  if (Number.isNaN(timestamp)) {
+    return null;
+  }
+  const date = new Date(timestamp);
+  const month = date.toLocaleString('en', { month: 'short' });
+  const year = date.getFullYear();
+  return `${month} ${year}`;
+}
+
 export function formatDemographicsSummary(parts: {
   gender: ProfileGender | null;
   ageYears: number | null;

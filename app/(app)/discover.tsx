@@ -8,6 +8,7 @@ import { useDiscoverMatches } from '@/features/matches/use-matches';
 import { MatchSummaryCard } from '@/features/matches/components/match-summary-card';
 import { useDiscoverMatchesRealtime } from '@/features/matches/use-match-realtime';
 import { NotificationBell } from '@/components/notification-bell';
+import { DISCOVER_HOME_HREF } from '@/lib/app-navigation';
 import { DiscoverFilterBar } from '@/features/discover/components/discover-filter-bar';
 import { SearchRadiusSlider } from '@/features/discover/components/search-radius-slider';
 import { DiscoverMap } from '@/features/discover/components/discover-map';
@@ -269,7 +270,7 @@ export default function DiscoverScreen() {
           <Text style={styles.title}>Discover</Text>
         </View>
         <View style={styles.headerActions}>
-          <NotificationBell />
+          <NotificationBell returnHref={DISCOVER_HOME_HREF} />
         </View>
       </View>
 

@@ -12,6 +12,7 @@ import {
 import { useMyPosts } from '@/features/community/use-posts';
 import { useMyPostsRealtime } from '@/features/community/use-post-realtime';
 import { useProfile } from '@/features/profile/use-profile';
+import { useReturnAwareBack } from '@/lib/app-navigation';
 import type { PostSummary } from '@/features/community/use-posts';
 
 const C = {
@@ -24,6 +25,7 @@ const C = {
 
 export default function MyPostsScreen() {
   const router = useRouter();
+  const goBack = useReturnAwareBack();
   const insets = useSafeAreaInsets();
   const { data: profile } = useProfile();
   const postsQuery = useMyPosts();
@@ -34,7 +36,7 @@ export default function MyPostsScreen() {
     (postId: string) => {
       router.push(buildPostDetailRoute(postId));
     },
-    [router],
+    [goBack, insets.top],
   );
 
   const renderItem = useCallback(
@@ -50,7 +52,7 @@ export default function MyPostsScreen() {
     () => (
       <View style={{ paddingTop: insets.top + 12 }} className="px-5 pb-5">
         <Pressable
-          onPress={() => router.back()}
+          onPress={goBack}
           className="mb-4 h-10 w-10 rounded-xl bg-surface-1 border border-neutral/10 items-center justify-center"
           accessibilityLabel="Go back"
         >

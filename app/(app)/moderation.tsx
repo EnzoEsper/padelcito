@@ -8,9 +8,11 @@ import { useAppAlert } from '@/components/app-alert-dialog';
 import {
   POST_STATUS_LABELS,
   POST_TYPE_LABELS,
+  buildModerationRoute,
   buildPostDetailRoute,
   formatPostEventSchedule,
 } from '@/features/community/post-display';
+import { useAuxScreenReturnChain } from '@/lib/app-navigation';
 import {
   useBanPostAuthor,
   useModeratePost,
@@ -139,6 +141,7 @@ function ModerationCard({
 
 export default function ModerationScreen() {
   const router = useRouter();
+  const { goBack, pushWithCurrentAsReturn } = useAuxScreenReturnChain(buildModerationRoute());
   const insets = useSafeAreaInsets();
   const appAlert = useAppAlert();
   const contactGate = useProfileContactGate();
@@ -220,7 +223,7 @@ export default function ModerationScreen() {
                     { text: 'OK', style: 'cancel' },
                     {
                       text: 'View banned users',
-                      onPress: () => router.push(buildModerationBannedUsersRoute()),
+                      onPress: () => pushWithCurrentAsReturn(buildModerationBannedUsersRoute()),
                     },
                   ],
                 ),
@@ -233,7 +236,7 @@ export default function ModerationScreen() {
         },
       ]);
     },
-    [appAlert, banAuthor, router],
+    [appAlert, banAuthor, pushWithCurrentAsReturn],
   );
 
   const handleUnban = useCallback(
@@ -301,7 +304,7 @@ export default function ModerationScreen() {
   const listHeader = useMemo(
     () => (
       <View className="px-5 pb-5">
-        <Pressable onPress={() => router.back()} style={styles.backLink}>
+        <Pressable onPress={goBack} style={styles.backLink}>
           <Ionicons name="chevron-back" size={20} color={C.mist} />
           <Text style={styles.backText}>Back</Text>
         </Pressable>
@@ -316,14 +319,14 @@ export default function ModerationScreen() {
           Sorted by reports, then oldest pending submissions.
         </Text>
         <Pressable
-          onPress={() => router.push(buildModerationBannedUsersRoute())}
+          onPress={() => pushWithCurrentAsReturn(buildModerationBannedUsersRoute())}
           style={styles.manageBansLink}
         >
           <Text style={styles.manageBansLinkText}>Manage banned users</Text>
         </Pressable>
       </View>
     ),
-    [router],
+    [goBack, pushWithCurrentAsReturn],
   );
 
   const listEmpty = useMemo(() => {
@@ -352,7 +355,7 @@ export default function ModerationScreen() {
   if (!isModerator) {
     return (
       <View style={[styles.root, { paddingTop: insets.top + 16 }]}>
-        <Pressable onPress={() => router.back()} style={styles.backLink}>
+        <Pressable onPress={goBack} style={styles.backLink}>
           <Ionicons name="chevron-back" size={20} color={C.mist} />
           <Text style={styles.backText}>Back</Text>
         </Pressable>

@@ -43,7 +43,7 @@ export const WHEN_OPTIONS: readonly FilterOption<WhenPreset>[] = [
 
 export const LEVEL_OPTIONS: readonly FilterOption<LevelFilter>[] = [
   { value: 'All', label: 'All levels' },
-  { value: 'advanced', label: CATEGORY_TIER_LABEL.advanced },
+  { value: 'expert', label: CATEGORY_TIER_LABEL.expert },
   { value: 'intermediate', label: CATEGORY_TIER_LABEL.intermediate },
   { value: 'beginner', label: CATEGORY_TIER_LABEL.beginner },
 ];

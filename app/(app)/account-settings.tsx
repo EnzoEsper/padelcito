@@ -1,5 +1,6 @@
 import { Linking, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { hrefWithReturn, useOptionalReturnHref } from '@/lib/app-navigation';
 import { Text } from '@/tw';
 import { useAppAlert } from '@/components/app-alert-dialog';
 import { SettingsRow, SettingsSection } from '@/components/settings-list';
@@ -19,6 +20,7 @@ const C = {
 
 export default function AccountSettingsScreen() {
   const router = useRouter();
+  const optionalReturnHref = useOptionalReturnHref();
   const appAlert = useAppAlert();
   const deleteAccount = useDeleteAccount();
 
@@ -60,7 +62,13 @@ export default function AccountSettingsScreen() {
         <SettingsRow
           label="Blocked users"
           isFirst
-          onPress={() => router.push('/(app)/blocked-users')}
+          onPress={() => {
+            const settingsReturn =
+              optionalReturnHref !== undefined
+                ? (hrefWithReturn('/(app)/account-settings', optionalReturnHref) as string)
+                : '/(app)/account-settings';
+            router.push(hrefWithReturn('/(app)/blocked-users', settingsReturn));
+          }}
         />
       </SettingsSection>
 

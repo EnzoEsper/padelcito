@@ -23,8 +23,8 @@ export function CategoryRangePicker({
 
   return (
     <View>
-      <View className="rounded-xl bg-surface-1 border border-neutral/10 px-3 py-2.5 flex-row items-center">
-        {PADEL_CATEGORIES.map(({ number }) => {
+      <View className="rounded-xl bg-surface-1 border border-neutral/10 px-2 py-2.5 flex-row items-center">
+        {PADEL_CATEGORIES.map((number) => {
           const inRange = number >= categoryMax && number <= categoryMin;
           return (
             <Pressable
@@ -33,11 +33,11 @@ export function CategoryRangePicker({
               className="flex-1 items-center justify-center"
             >
               {inRange ? (
-                <View className="h-9 w-full max-w-[34px] rounded-lg bg-neutral items-center justify-center">
+                <View className="h-9 w-full max-w-[30px] rounded-lg bg-neutral items-center justify-center">
                   <Text className="font-mono text-sm font-bold text-background">{number}</Text>
                 </View>
               ) : (
-                <View className="h-9 w-full max-w-[34px] items-center justify-center">
+                <View className="h-9 w-full max-w-[30px] items-center justify-center">
                   <Text className="font-mono text-sm font-bold text-neutral/55">{number}</Text>
                 </View>
               )}

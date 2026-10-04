@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchPadelSport } from '@/lib/padel-sport';
 import { supabase } from '@/lib/supabase';
 import type { Database } from '@/types/database';
+import { clampPadelCategory, type PadelCategoryNumber } from '@/lib/padel-category';
 import type { SkillLevel } from '@/features/profile/use-profile';
 
 export type DominantHand = Database['public']['Enums']['dominant_hand'];
@@ -23,6 +24,7 @@ export type PublicProfileSummary = {
   created_at: string | null;
   gender: ProfileGender | null;
   age_years: number | null;
+  padel_category: PadelCategoryNumber | null;
   skill_level: SkillLevel | null;
   dominant_hand: DominantHand | null;
   court_side_preference: CourtSidePreference | null;
@@ -51,6 +53,7 @@ async function fetchPublicProfile(userId: string): Promise<PublicProfileSummary 
     return null;
   }
 
+  let padelCategory: PadelCategoryNumber | null = null;
   let skillLevel: SkillLevel | null = null;
   let dominantHand: DominantHand | null = null;
   let courtSide: CourtSidePreference | null = null;
@@ -62,7 +65,7 @@ async function fetchPublicProfile(userId: string): Promise<PublicProfileSummary 
     const { data: sportProfile, error: sportError } = await supabase
       .from('profile_sports')
       .select(
-        'skill_level, dominant_hand, court_side_preference, years_playing, notes',
+        'padel_category, skill_level, dominant_hand, court_side_preference, years_playing, notes',
       )
       .eq('profile_id', userId)
       .eq('sport_id', padelSport.id)
@@ -72,12 +75,17 @@ async function fetchPublicProfile(userId: string): Promise<PublicProfileSummary 
       throw sportError;
     }
 
+    padelCategory =
+      sportProfile?.padel_category !== null && sportProfile?.padel_category !== undefined
+        ? clampPadelCategory(sportProfile.padel_category)
+        : null;
     skillLevel = sportProfile?.skill_level ?? null;
     dominantHand = sportProfile?.dominant_hand ?? null;
     courtSide = sportProfile?.court_side_preference ?? null;
     yearsPlaying = sportProfile?.years_playing ?? null;
     notes = sportProfile?.notes ?? null;
   } catch {
+    padelCategory = null;
     skillLevel = null;
     dominantHand = null;
     courtSide = null;
@@ -99,6 +107,7 @@ async function fetchPublicProfile(userId: string): Promise<PublicProfileSummary 
     gender: profile.gender,
     age_years: profile.age_years,
     created_at: profile.created_at,
+    padel_category: padelCategory,
     skill_level: skillLevel,
     dominant_hand: dominantHand,
     court_side_preference: courtSide,

@@ -1,5 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { hrefWithReturn } from '@/lib/app-navigation';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View } from '@/tw';
 import { useUnreadNotificationCount } from '@/features/notifications/use-notifications';
@@ -12,14 +13,27 @@ const C = {
   hair: 'rgba(228,228,228,0.10)',
 } as const;
 
-export function NotificationBell() {
+type NotificationBellProps = {
+  /** When set, back from notifications returns here (e.g. profile tab). */
+  returnHref?: string;
+};
+
+export function NotificationBell({ returnHref }: NotificationBellProps) {
   const router = useRouter();
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
   const hasUnread = unreadCount > 0;
 
+  const openNotifications = () => {
+    if (returnHref !== undefined && returnHref.length > 0) {
+      router.push(hrefWithReturn('/(app)/notifications', returnHref));
+      return;
+    }
+    router.push('/(app)/notifications');
+  };
+
   return (
     <Pressable
-      onPress={() => router.push('/(app)/notifications')}
+      onPress={openNotifications}
       style={styles.headerIcon}
       accessibilityLabel={
         hasUnread ? `Notifications, ${unreadCount} unread` : 'Notifications'

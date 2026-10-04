@@ -8,18 +8,29 @@ import { useProfile } from '@/features/profile/use-profile';
 import { usePublicProfile } from '@/features/profile/use-public-profile';
 import { usePublicProfileStats } from '@/features/profile/use-public-profile-stats';
 import {
-  formatMemberSince,
-  PlayingProfileSection,
-  ProfileAvatar,
-  ProfileDemographicsLine,
-  ProfileStatCard,
+  buildPlayingRows,
+  playingSectionHasAnyData,
+  ProfileIdentityCard,
+  ProfileListRow,
+  ProfileListSection,
+  ProfileMetricStrip,
+  ProfileOrganizerBadge,
+  formatReliabilityStripCaption,
   PROFILE_COLORS as C,
+  PROFILE_LAYOUT as L,
   QualityHighlightChip,
-  RatingRing,
-  ReliabilityStatBlock,
-  SkillBadge,
 } from '@/features/profile/profile-display';
+import { PadelLevelSheet } from '@/features/profile/padel-level-sheet';
 import { ProfileStatsInfoSheet } from '@/features/profile/profile-stats-info-sheet';
+import {
+  formatReliabilityScore,
+  isLowReliability,
+} from '@/features/ratings/penalty-report';
+import {
+  formatProfileAgeLabel,
+  formatProfileGenderLabel,
+  formatProfileJoinedLabel,
+} from '@/lib/profile-demographics';
 import { resolvePlayerProfileReturnRoute } from '@/features/safety/safety-display';
 import { useUserActionsSheet } from '@/features/safety/user-actions-sheet';
 import { SCREEN_PADDING } from '@/components/stack-screen-layout';
@@ -46,6 +57,7 @@ export default function PlayerProfileScreen() {
   const postId = parseRouteParam(params.postId);
 
   const [statsInfoOpen, setStatsInfoOpen] = useState(false);
+  const [levelSheetOpen, setLevelSheetOpen] = useState(false);
 
   const ownProfileQuery = useProfile();
   const publicProfileQuery = usePublicProfile(userId);
@@ -65,27 +77,7 @@ export default function PlayerProfileScreen() {
       .map(([tag]) => tag);
   }, [publicStatsQuery.data?.qualityTagCounts]);
 
-  const footerMeta = useMemo(() => {
-    const parts: string[] = [];
-    const memberSince = formatMemberSince(profile?.created_at ?? null);
-    if (memberSince !== null) {
-      parts.push(memberSince);
-    }
-
-    const finishedCount = publicStatsQuery.data?.matchesFinishedCount ?? 0;
-    if (finishedCount > 0) {
-      parts.push(
-        `${finishedCount} match${finishedCount === 1 ? '' : 'es'} played`,
-      );
-    }
-
-    const mutualCount = publicStatsQuery.data?.mutualFinishedCount ?? 0;
-    if (mutualCount > 0 && !isSelf) {
-      parts.push(`Played together ${mutualCount} time${mutualCount === 1 ? '' : 's'}`);
-    }
-
-    return parts.join(' · ');
-  }, [profile?.created_at, publicStatsQuery.data, isSelf]);
+  const mutualCount = publicStatsQuery.data?.mutualFinishedCount ?? 0;
 
   const exitProfile = useCallback((): void => {
     const returnRoute = resolvePlayerProfileReturnRoute({ matchId, postId });
@@ -121,6 +113,61 @@ export default function PlayerProfileScreen() {
     });
   };
 
+  const showOrganizerBadge = postId !== null && matchId === null;
+
+  const bioText =
+    profile?.bio !== null && profile?.bio !== undefined && profile.bio.trim().length > 0
+      ? profile.bio.trim()
+      : null;
+
+  const playingParts =
+    profile !== undefined && profile !== null
+      ? {
+          dominantHand: profile.dominant_hand,
+          courtSide: profile.court_side_preference,
+          yearsPlaying: profile.years_playing,
+        }
+      : { dominantHand: null, courtSide: null, yearsPlaying: null };
+
+  const showPlayingSection = playingSectionHasAnyData(playingParts);
+  const playingRows = buildPlayingRows(playingParts);
+
+  const detailRows = useMemo(() => {
+    if (profile === undefined || profile === null) {
+      return [];
+    }
+    const rows: { key: string; label: string; value: string }[] = [];
+    const age = formatProfileAgeLabel(profile.age_years);
+    if (age !== null) {
+      rows.push({ key: 'age', label: 'Age', value: age });
+    }
+    const gender = formatProfileGenderLabel(profile.gender);
+    if (gender !== null) {
+      rows.push({ key: 'gender', label: 'Gender', value: gender });
+    }
+    const joined = formatProfileJoinedLabel(profile.created_at);
+    if (joined !== null) {
+      rows.push({ key: 'joined', label: 'Joined', value: joined });
+    }
+    if (mutualCount > 0 && !isSelf) {
+      rows.push({
+        key: 'mutual',
+        label: 'Played together',
+        value: `${mutualCount} time${mutualCount === 1 ? '' : 's'}`,
+      });
+    }
+    return rows;
+  }, [profile, mutualCount, isSelf]);
+
+  const reliabilityLow =
+    profile !== undefined && profile !== null
+      ? isLowReliability(
+          profile.reliability_score,
+          profile.penalty_count,
+          profile.commitment_count,
+        )
+      : false;
+
   return (
     <View style={styles.root}>
       <Pressable
@@ -148,99 +195,61 @@ export default function PlayerProfileScreen() {
       <ScrollView
         className="flex-1 bg-background"
         contentContainerStyle={{
-          paddingTop: headerTop,
+          paddingTop: headerTop + BACK_BUTTON_SIZE + 8,
           paddingBottom: insets.bottom + 24,
           paddingHorizontal: SCREEN_PADDING,
         }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerMetaRow}>
-          <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38">
-            PLAYER PROFILE
-          </Text>
-        </View>
-
-        {postId !== null && matchId === null ? (
-          <View style={styles.contextChip}>
-            <Ionicons name="megaphone-outline" size={14} color={C.primaryHi} />
-            <Text style={styles.contextChipText}>Post organizer</Text>
-          </View>
-        ) : null}
-
         {publicProfileQuery.isPending ? (
           <ActivityIndicator color={C.neutral} style={styles.loader} />
         ) : profile === undefined || profile === null ? (
           <Text style={styles.emptyText}>This player profile is not available.</Text>
         ) : (
-          <>
-            <View style={styles.identityCard}>
-              <ProfileAvatar
-                name={profile.display_name}
-                avatarUrl={profile.avatar_url}
-                size={72}
-              />
-              <View style={styles.identityMeta}>
-                <Text style={styles.identityName} numberOfLines={2}>
-                  {profile.display_name}
-                </Text>
-                {profile.username !== null && profile.username.length > 0 ? (
-                  <Text style={styles.username} numberOfLines={1}>
-                    @{profile.username}
-                  </Text>
-                ) : null}
-                {profile.skill_level !== null ? (
-                  <SkillBadge skillLevel={profile.skill_level} />
-                ) : null}
-                <ProfileDemographicsLine
-                  gender={profile.gender}
-                  ageYears={profile.age_years}
-                />
-              </View>
-              <View style={styles.ratingRing}>
-                <RatingRing value={profile.rating_avg ?? 0} />
-              </View>
-            </View>
-
-            <PlayingProfileSection
-              parts={{
-                dominantHand: profile.dominant_hand,
-                courtSide: profile.court_side_preference,
-                yearsPlaying: profile.years_playing,
-              }}
+          <View style={styles.body}>
+            <ProfileIdentityCard
+              name={profile.display_name}
+              username={profile.username}
+              avatarUrl={profile.avatar_url}
+              badge={showOrganizerBadge ? <ProfileOrganizerBadge /> : undefined}
+              rating={profile.rating_avg ?? 0}
+              reviewCount={profile.rating_count}
+              avatarSize={72}
             />
 
-            <View style={styles.statsHeaderRow}>
-              <Text style={styles.sectionLabel}>TRUST</Text>
-              <Pressable
-                onPress={() => setStatsInfoOpen(true)}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Learn about profile stats"
-              >
-                <Ionicons name="help-circle-outline" size={18} color={C.faint} />
-              </Pressable>
-            </View>
+            <ProfileMetricStrip
+              data={{
+                category: profile.padel_category,
+                reliabilityValue: formatReliabilityScore(
+                  profile.reliability_score,
+                  profile.commitment_count,
+                ),
+                reliabilityCaption: formatReliabilityStripCaption(profile.commitment_count),
+                reliabilityLow,
+                matchesPlayed: publicStatsQuery.data?.matchesFinishedCount ?? 0,
+              }}
+              onLevelPress={() => setLevelSheetOpen(true)}
+              onStatsHelpPress={() => setStatsInfoOpen(true)}
+            />
 
-            <View style={styles.statsRow}>
-              <ProfileStatCard label="REVIEWS" value={String(profile.rating_count)} />
-              <ProfileStatCard
-                label="RATING"
-                value={
-                  (profile.rating_avg ?? 0) > 0
-                    ? (profile.rating_avg ?? 0).toFixed(1)
-                    : '—'
-                }
-              />
-              <ReliabilityStatBlock
-                reliabilityScore={profile.reliability_score}
-                penaltyCount={profile.penalty_count}
-                commitmentCount={profile.commitment_count}
-              />
-            </View>
+            {showPlayingSection ? (
+              <ProfileListSection title="PLAYING STYLE">
+                {playingRows
+                  .filter((row) => !row.missing)
+                  .map((row, index) => (
+                    <ProfileListRow
+                      key={row.label}
+                      label={row.label}
+                      value={row.value}
+                      isFirst={index === 0}
+                    />
+                  ))}
+              </ProfileListSection>
+            ) : null}
 
             {highlightTags.length > 0 ? (
-              <View style={styles.highlightsSection}>
-                <Text style={styles.sectionLabel}>HIGHLIGHTS</Text>
+              <View style={styles.highlightsBlock}>
+                <Text style={styles.sectionTitle}>HIGHLIGHTS</Text>
                 <View style={styles.highlightRow}>
                   {highlightTags.map((tag) => (
                     <QualityHighlightChip key={tag} label={tag} />
@@ -249,21 +258,36 @@ export default function PlayerProfileScreen() {
               </View>
             ) : null}
 
-            <Text style={styles.sectionLabel}>ABOUT</Text>
-            <View style={styles.aboutCard}>
-              <Text style={styles.aboutText}>
-                {profile.bio !== null && profile.bio.trim().length > 0
-                  ? profile.bio
-                  : 'No bio yet.'}
-              </Text>
-            </View>
-
-            {footerMeta.length > 0 ? (
-              <Text style={styles.memberSince}>{footerMeta}</Text>
+            {bioText !== null ? (
+              <View style={styles.aboutBlock}>
+                <Text style={styles.sectionTitle}>ABOUT</Text>
+                <Text style={styles.aboutText}>{bioText}</Text>
+              </View>
             ) : null}
-          </>
+
+            {detailRows.length > 0 ? (
+              <ProfileListSection title="DETAILS">
+                {detailRows.map((row, index) => (
+                  <ProfileListRow
+                    key={row.key}
+                    label={row.label}
+                    value={row.value}
+                    isFirst={index === 0}
+                  />
+                ))}
+              </ProfileListSection>
+            ) : null}
+          </View>
         )}
       </ScrollView>
+
+      {profile?.padel_category !== null && profile?.padel_category !== undefined ? (
+        <PadelLevelSheet
+          visible={levelSheetOpen}
+          onClose={() => setLevelSheetOpen(false)}
+          category={profile.padel_category}
+        />
+      ) : null}
 
       <ProfileStatsInfoSheet visible={statsInfoOpen} onClose={() => setStatsInfoOpen(false)} />
       {userActionsSheet}
@@ -288,31 +312,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerMetaRow: {
-    height: BACK_BUTTON_SIZE,
-    justifyContent: 'center',
-    paddingLeft: BACK_BUTTON_SIZE + 12,
-    marginBottom: 4,
-  },
-  contextChip: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(94,112,184,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(94,112,184,0.25)',
-  },
-  contextChipText: {
-    fontFamily: 'Hanken Grotesk',
-    fontSize: 12,
-    fontWeight: '600',
-    color: C.primaryHi,
-  },
   loader: {
     marginTop: 32,
   },
@@ -323,82 +322,30 @@ const styles = StyleSheet.create({
     color: C.dim,
     marginTop: 24,
   },
-  identityCard: {
-    backgroundColor: C.surface1,
-    borderWidth: 1,
-    borderColor: C.hair,
-    borderRadius: 22,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 18,
-    marginBottom: 16,
+  body: {
+    gap: L.sectionGap,
   },
-  identityMeta: {
-    flex: 1,
-    flexShrink: 1,
-    minWidth: 0,
-    gap: 5,
-  },
-  identityName: {
-    fontFamily: 'HankenGrotesk-Bold',
-    fontSize: 19,
-    color: C.neutral,
-  },
-  username: {
-    fontFamily: 'Space Mono',
-    fontSize: 11,
-    color: C.dim,
-    letterSpacing: 0.5,
-  },
-  ratingRing: {
-    flexShrink: 0,
-  },
-  statsHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  sectionLabel: {
+  sectionTitle: {
     fontFamily: 'Space Mono',
     fontSize: 10,
     letterSpacing: 1.5,
     color: C.faint,
     textTransform: 'uppercase',
-    marginBottom: 10,
+    marginBottom: L.labelGap,
+    paddingHorizontal: 4,
   },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  highlightsSection: {
-    marginBottom: 20,
-  },
+  highlightsBlock: {},
   highlightRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  aboutCard: {
-    backgroundColor: C.surface1,
-    borderWidth: 1,
-    borderColor: C.hair,
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 16,
-  },
+  aboutBlock: {},
   aboutText: {
     fontFamily: 'Hanken Grotesk',
     fontSize: 14,
     lineHeight: 21,
     color: C.dim,
-  },
-  memberSince: {
-    fontFamily: 'Hanken Grotesk',
-    fontSize: 12,
-    color: C.faint,
-    textAlign: 'center',
+    paddingHorizontal: 4,
   },
 });

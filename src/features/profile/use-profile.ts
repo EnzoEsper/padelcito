@@ -14,6 +14,7 @@ export type ProfileRow = {
   display_name: string;
   avatar_url: string | null;
   bio: string | null;
+  created_at: string;
   gender: ProfileGender;
   birth_date: string | null;
   rating_avg: number | null;
@@ -28,6 +29,7 @@ export type ProfileRow = {
 };
 
 export type ProfileSport = {
+  padel_category: number;
   skill_level: SkillLevel;
   sport_name: string;
 };
@@ -47,7 +49,7 @@ async function fetchProfile(userId: string): Promise<ProfileRow> {
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, username, display_name, avatar_url, bio, gender, birth_date, rating_avg, rating_count, reliability_score, penalty_count, commitment_count, role, banned_at, whatsapp_phone, whatsapp_verified_at',
+      'id, username, display_name, avatar_url, bio, created_at, gender, birth_date, rating_avg, rating_count, reliability_score, penalty_count, commitment_count, role, banned_at, whatsapp_phone, whatsapp_verified_at',
     )
     .eq('id', userId)
     .single();
@@ -59,7 +61,7 @@ async function fetchProfile(userId: string): Promise<ProfileRow> {
 async function fetchProfileSport(userId: string): Promise<ProfileSport | null> {
   const { data, error } = await supabase
     .from('profile_sports')
-    .select('skill_level, sports(name)')
+    .select('padel_category, skill_level, sports(name)')
     .eq('profile_id', userId)
     .limit(1)
     .maybeSingle();
@@ -73,6 +75,7 @@ async function fetchProfileSport(userId: string): Promise<ProfileSport | null> {
       : 'Padel';
 
   return {
+    padel_category: data.padel_category,
     skill_level: data.skill_level,
     sport_name: sportName,
   };
