@@ -14,7 +14,13 @@ import {
   useProfile,
   useProfileSport,
   useUpdateProfileBio,
+  useUpdateProfileWhatsApp,
 } from '@/features/profile/use-profile';
+import {
+  ARGENTINA_CALLING_CODE,
+  formatArgentinaWhatsAppLocalInput,
+  parseArgentinaWhatsAppLocalToNullableE164,
+} from '@/lib/argentina-whatsapp-phone';
 import {
   useProfileDemographics,
   useUpdateProfileDemographics,
@@ -54,6 +60,17 @@ const editProfileSchema = z.object({
       ),
     ),
   bio: z.string().max(500, 'Bio cannot exceed 500 characters'),
+  whatsapp_phone_local: z.string().superRefine((val, ctx) => {
+    try {
+      parseArgentinaWhatsAppLocalToNullableE164(val);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Enter a valid Argentine mobile number, e.g. 11 2345-6789';
+      ctx.addIssue({ code: 'custom', message });
+    }
+  }),
 });
 
 type EditProfileFormData = z.infer<typeof editProfileSchema>;
@@ -78,6 +95,50 @@ type BioFieldProps = {
   error: string | undefined;
   charCount: number;
 };
+
+type WhatsAppFieldProps = {
+  control: Control<EditProfileFormData>;
+  error: string | undefined;
+};
+
+function WhatsAppField({ control, error }: WhatsAppFieldProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const { field } = useController({
+    control,
+    name: 'whatsapp_phone_local',
+    defaultValue: '',
+  });
+
+  const borderColor = error ? BORDER_ERROR : isFocused ? BORDER_FOCUSED : BORDER_DEFAULT;
+
+  return (
+    <View className="mb-6">
+      <SectionLabel>WhatsApp — Optional</SectionLabel>
+      <Text className="font-grotesk text-sm text-neutral/50 mb-3 leading-5">
+        Used for match contact and community posts. Argentine mobile numbers only.
+      </Text>
+      <View style={[styles.phoneRow, { borderColor }]}>
+        <Text style={styles.phonePrefix}>{ARGENTINA_CALLING_CODE}</Text>
+        <TextInput
+          value={field.value}
+          onChangeText={(text) => field.onChange(text.replace(/[^\d\s-]/g, ''))}
+          onBlur={() => {
+            field.onBlur();
+            setIsFocused(false);
+          }}
+          onFocus={() => setIsFocused(true)}
+          keyboardType="phone-pad"
+          placeholder="9 11 2345-6789"
+          placeholderTextColor={PLACEHOLDER_COLOR}
+          style={styles.phoneInput}
+          className="flex-1 font-grotesk text-base text-neutral"
+          accessibilityLabel="WhatsApp mobile number"
+        />
+      </View>
+      <FieldError message={error} />
+    </View>
+  );
+}
 
 function BioField({ control, error, charCount }: BioFieldProps) {
   const [isFocused, setIsFocused] = useState(false);
@@ -126,6 +187,7 @@ export default function EditProfileScreen() {
   const updatePlayingProfile = useUpdatePlayingProfile();
   const updateDemographics = useUpdateProfileDemographics();
   const updateBio = useUpdateProfileBio();
+  const updateWhatsApp = useUpdateProfileWhatsApp();
 
   const isLoading =
     profilePending || sportPending || playingPending || demographicsPending;
@@ -146,6 +208,7 @@ export default function EditProfileScreen() {
       gender: 'unspecified',
       birth_date: '',
       bio: '',
+      whatsapp_phone_local: '',
     },
   });
 
@@ -170,6 +233,7 @@ export default function EditProfileScreen() {
       gender: demographics?.gender ?? profile?.gender ?? 'unspecified',
       birth_date: demographics?.birth_date ?? profile?.birth_date ?? '',
       bio: profile?.bio ?? '',
+      whatsapp_phone_local: formatArgentinaWhatsAppLocalInput(profile?.whatsapp_phone),
     });
   }, [
     demographics,
@@ -187,6 +251,10 @@ export default function EditProfileScreen() {
     const yearsPlaying =
       parsedYears !== null && !Number.isNaN(parsedYears) ? parsedYears : null;
 
+    const whatsappPhone = parseArgentinaWhatsAppLocalToNullableE164(
+      data.whatsapp_phone_local,
+    );
+
     void Promise.all([
       updatePlayingProfile.mutateAsync({
         padel_category: data.padel_category,
@@ -199,6 +267,7 @@ export default function EditProfileScreen() {
         birth_date: data.birth_date.length > 0 ? data.birth_date : null,
       }),
       updateBio.mutateAsync({ bio: data.bio }),
+      updateWhatsApp.mutateAsync({ whatsapp_phone: whatsappPhone }),
     ])
       .then(() => {
         setShowSavedBanner(true);
@@ -214,7 +283,8 @@ export default function EditProfileScreen() {
     isSubmitting ||
     updatePlayingProfile.isPending ||
     updateDemographics.isPending ||
-    updateBio.isPending;
+    updateBio.isPending ||
+    updateWhatsApp.isPending;
 
   return (
     <StackScreenLayout
@@ -229,6 +299,10 @@ export default function EditProfileScreen() {
           <PadelCategoryField control={control} errors={errors} sectionLabel="Padel category" />
           <PlayingProfileFields control={control} errors={errors} />
           <DemographicsFields control={control} errors={errors} showIntro={false} />
+          <WhatsAppField
+            control={control}
+            error={errors.whatsapp_phone_local?.message}
+          />
           <BioField control={control} error={errors.bio?.message} charCount={bioValue.length} />
 
           <Pressable
@@ -274,6 +348,24 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 14,
     minHeight: 96,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    minHeight: 52,
+    backgroundColor: '#232429',
+  },
+  phonePrefix: {
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 16,
+    color: 'rgba(228,228,228,0.60)',
+    marginRight: 8,
+  },
+  phoneInput: {
+    paddingVertical: 14,
   },
   savedBanner: {
     marginTop: 16,

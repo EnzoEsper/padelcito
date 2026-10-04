@@ -40,6 +40,7 @@
     "expo-secure-store": "~56.0.4",
     "expo-splash-screen": "~56.0.14",
     "expo-status-bar": "~56.0.4",
+    "libphonenumber-js": "^1.13.14",
     "nativewind": "5.0.0-preview.4",
     "react": "19.2.3",
     "react-hook-form": "^7.78.0",

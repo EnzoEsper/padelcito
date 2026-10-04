@@ -133,6 +133,36 @@ export function useUpdateProfileBio() {
   });
 }
 
+export type UpdateProfileWhatsAppInput = {
+  whatsapp_phone: string | null;
+};
+
+export function useUpdateProfileWhatsApp() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: UpdateProfileWhatsAppInput): Promise<void> => {
+      const userId = await fetchCurrentUserId();
+      const { error } = await supabase
+        .from('profiles')
+        .update({ whatsapp_phone: input.whatsapp_phone })
+        .eq('id', userId);
+
+      if (error !== null) {
+        throw error;
+      }
+    },
+    onSuccess: async () => {
+      const userId = await fetchCurrentUserId();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['profile', 'me'] }),
+        queryClient.invalidateQueries({ queryKey: ['profile', 'contact-gate'] }),
+        queryClient.invalidateQueries({ queryKey: publicProfileKeys.detail(userId) }),
+      ]);
+    },
+  });
+}
+
 export function isModeratorRole(role: UserRole): boolean {
   return role === 'moderator' || role === 'admin';
 }
