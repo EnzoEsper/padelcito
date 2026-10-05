@@ -17,6 +17,7 @@ import {
   useCreatePost,
   useProfileContactGate,
 } from '@/features/community/use-posts';
+import { usePhoneVerification } from '@/features/profile/phone-verification-provider';
 import { uploadPostImage } from '@/lib/post-storage';
 import type { useCreatePostForm } from '@/features/community/create-post/use-create-post-form';
 import { PostFlyerImage } from '@/features/community/components/post-flyer-image';
@@ -420,29 +421,15 @@ export function CreatePostPublishFooter({ form }: CreatePostPublishFooterProps) 
   const createPost = useCreatePost();
   const attachPostImage = useAttachPostImage();
   const contactGate = useProfileContactGate();
+  const { requireVerifiedWhatsApp } = usePhoneVerification();
   const appAlert = useAppAlert();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function handlePublish(): Promise<void> {
+  async function submitPublish(): Promise<void> {
     if (isSubmitting) return;
-    if (contactGate.data?.isBanned === true) {
-      appAlert('Cannot publish', 'Your account cannot publish community posts.');
-      return;
-    }
 
     const phone = contactGate.data?.whatsappPhone ?? '';
     if (phone.length === 0) {
-      appAlert(
-        'WhatsApp required',
-        'Add your WhatsApp number to your profile before publishing a post.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Go to profile',
-            onPress: () => router.push('/(app)/profile'),
-          },
-        ],
-      );
       return;
     }
 
@@ -502,9 +489,37 @@ export function CreatePostPublishFooter({ form }: CreatePostPublishFooterProps) 
     }
   }
 
+  function handlePublish(): void {
+    if (isSubmitting) return;
+    if (contactGate.data?.isBanned === true) {
+      appAlert('Cannot publish', 'Your account cannot publish community posts.');
+      return;
+    }
+
+    const phone = contactGate.data?.whatsappPhone ?? '';
+    if (phone.length === 0) {
+      appAlert(
+        'WhatsApp required',
+        'Add your WhatsApp number to your profile before publishing a post.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Go to profile',
+            onPress: () => router.push('/(app)/profile'),
+          },
+        ],
+      );
+      return;
+    }
+
+    requireVerifiedWhatsApp(() => {
+      void submitPublish();
+    });
+  }
+
   return (
     <Pressable
-      onPress={() => void handlePublish()}
+      onPress={handlePublish}
       disabled={isSubmitting}
       className="h-14 rounded-2xl bg-primary border border-primary-hi items-center justify-center"
       style={{ opacity: isSubmitting ? 0.7 : 1 }}

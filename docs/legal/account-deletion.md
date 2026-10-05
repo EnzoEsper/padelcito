@@ -1,6 +1,6 @@
 # Account Deletion — Padelcito
 
-**Last updated:** August 30, 2026
+**Last updated:** October 4, 2026
 
 You can delete your Padelcito account at any time.
 
@@ -23,6 +23,10 @@ If you cannot access the app, email **support@padelcito.app** from the address l
 - Community posts, reports you filed, blocks, push tokens, notifications.
 
 Some anonymized or legally required records may be retained where applicable.
+
+## Third-party processors after deletion
+
+When you delete your account, Padelcito removes your profile and related data from our Supabase database (including your stored WhatsApp number and verification timestamp). **Bird** (and, when the WhatsApp channel is used, **Meta** infrastructure behind that channel) may retain verification logs or message metadata under their own policies and retention schedules. We do not control those systems; see [Bird's privacy documentation](https://bird.com/privacy) for details.
 
 ## Data export
 

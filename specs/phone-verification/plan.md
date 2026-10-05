@@ -84,3 +84,105 @@ flowchart LR
 - **Custom regex only (no libphonenumber-js):** rejected in spec — caused `+54`/`9` bugs.
 - **Capture in onboarding or create-post inline:** rejected (Q2) — Edit profile only for increment 1.
 - **Server-side RPC for save:** unnecessary — RLS already allows owner UPDATE; validation is client-first with DB CHECK as backstop.
+
+---
+
+# Implementation plan: Phone verification — increment 2 (OTP, gates, badges)
+
+- **Spec:** [spec.md](./spec.md) (decisions Q9–Q11, Q14–Q15 resolved 2026-10-04)
+- **Status:** Ready
+- **Scope:** Bird Verify via `verify-phone`, verified-required gates (match create/join, community publish), full-screen verify flow + resume, Profile/public badges, legal + architecture docs. **Depends on increment 1** (Argentine capture, normalization trigger, `libphonenumber-js`).
+
+## Current-state findings (increment 2 touchpoints)
+
+**Verified facts**
+
+- **Quota pattern:** [`20260730120000_places_search_rate_limit.sql`](../../supabase/migrations/20260730120000_places_search_rate_limit.sql) — append-only rate table, RLS deny-all for clients, `consume_places_search_quota()` SECURITY DEFINER called from Edge Function.
+- **Edge Function pattern:** [`supabase/functions/places-search/index.ts`](../../supabase/functions/places-search/index.ts) — CORS, JWT via `createClient` + `auth.getUser()`, RPC quota before external API, generic errors (no secret leakage).
+- **Match gates:** [`20260830190000_ban_enforcement_and_moderation_refinement.sql`](../../supabase/migrations/20260830190000_ban_enforcement_and_moderation_refinement.sql) — policy `"Authenticated users can host matches"` (`host_id = auth.uid() and not is_banned()`); `validate_match_participant_insert()` (ban + block checks only today).
+- **Community gate:** [`20260711010000_create_community_posts.sql`](../../supabase/migrations/20260711010000_create_community_posts.sql) — `enforce_community_post_limits()` requires non-null `whatsapp_phone`, snapshots `contact_verified_at` from profile; **no verified check yet**.
+- **`public_profiles`:** Latest rebuild in [`20260920100000_profile_demographics.sql`](../../supabase/migrations/20260920100000_profile_demographics.sql) (drop/create view). No `whatsapp_verified` column yet.
+- **Verification writer:** `whatsapp_verified_at` still client-protected by `protect_profile_fields()`; increment 1 trigger clears it on phone change ([`20261004160000_whatsapp_phone_normalize_and_verification_reset.sql`](../../supabase/migrations/20261004160000_whatsapp_phone_normalize_and_verification_reset.sql)). Internal updates use `padelcito.profile_internal_update` ([`20260830120000_security_hardening.sql`](../../supabase/migrations/20260830120000_security_hardening.sql)).
+- **Client gates (phone only):** [`useProfileContactGate`](../../src/features/community/use-posts.ts) returns `whatsappPhone` only; [`create-post-form.tsx`](../../src/features/community/create-post/create-post-form.tsx) uses `AppBottomSheet` for missing number.
+- **Action entry points (no verify yet):** center FAB → `create-match` in [`src/components/tab-bar.tsx`](../../src/components/tab-bar.tsx); join flow in [`app/(app)/match-detail.tsx`](../../app/(app)/match-detail.tsx) (`useRequestToJoin`); Profile / Edit profile / [`player-profile.tsx`](../../app/(app)/player-profile.tsx) and roster rows (badge TBD).
+
+**Assumptions**
+
+- Increment 1 migration and Edit profile WhatsApp field are merged/applied locally before increment 2 DB work.
+- Bird wallet/API key until manual setup (Q15); local stack uses dev mode below for E2E without sends.
+
+## Proposed approach
+
+1. **Migration — quotas:** `phone_verify_quota` (or split user-window + per-number daily tables) with RLS deny-all; `consume_phone_verify_quota(p_phone_hash text)` — **5 sends / 10 min / user**, **10 sends / day / number** (hash only, e.g. SHA-256 of E.164 + server pepper via DB secret or fixed app salt documented in migration comment).
+2. **Migration — verification RPC:** `set_whatsapp_verified(p_phone text)` SECURITY DEFINER: assert JWT user; `not is_banned()`; validate E.164 AR mobile (reuse CHECK or helper); **phone must match** current `profiles.whatsapp_phone` for caller; set `padelcito.profile_internal_update`; set `whatsapp_verified_at := now()` (and optionally align phone if RPC accepts normalized input).
+3. **Migration — helpers and gates:** `has_verified_whatsapp()` SECURITY DEFINER (same pattern as `is_banned()`); extend `"Authenticated users can host matches"` with `has_verified_whatsapp()`; extend `validate_match_participant_insert()` for joining `profile_id` when not host self-insert; extend `enforce_community_post_limits()` to require `whatsapp_verified_at is not null` with clear exception message.
+4. **Migration — public surface:** Rebuild `public_profiles` adding `whatsapp_verified boolean` (`whatsapp_verified_at is not null`) — **not** phone or timestamp.
+5. **Edge Function `verify-phone`:** Actions `start` and `check`. JWT + ban check; server-side format validation; call `consume_phone_verify_quota` before Bird send; Bird Verify REST (`POST /v1/verify/verifications` with `channels: ["whatsapp"]`, `check`) with **10s fetch timeout**. `start` supports `resend`. On successful `check`, call `set_whatsapp_verified` via authenticated RPC using user's JWT.
+6. **Local dev mode (Q15):** Env `VERIFY_PHONE_DEV_MODE=true` **only** when running against **local** Supabase. `start` returns success without Bird; `check` accepts **`000000`** only. Refuse dev mode if URL looks hosted. Document in `docs/phone-verification-setup.md` — **never** set flag in hosted secrets.
+7. **Client:** `use-phone-verification.ts` (TanStack mutations → Edge Function); shared `VerifyWhatsAppSheet` (`AppBottomSheet`) with optional number entry (reuse `argentina-whatsapp-phone` Zod); `useRequireVerifiedWhatsApp({ onVerified })` for gates with **resume once** semantics.
+8. **Wire gates:** tab-bar FAB → verify then navigate `create-match`; match-detail join; create-post submit; Profile status card + Edit profile pill.
+9. **Badges:** Profile identity check badge; player profile + roster **Verified** when `public_profiles.whatsapp_verified`.
+10. **Docs:** Q10 legal; Q11 `docs/decisions.md` + `ai-architecture-context.md`; setup guide for Bird API key, Argentina countries, wallet, `BIRD_API_KEY` / `BIRD_API_HOST`.
+
+```mermaid
+flowchart TD
+  Gate["Create / Join / Publish / Profile Verify"] --> Sheet["VerifyWhatsAppSheet"]
+  Sheet --> EF["verify-phone Edge Function"]
+  EF --> Quota["consume_phone_verify_quota"]
+  Quota --> Bird["Bird Verify REST"]
+  Bird --> Check["check action"]
+  Check --> RPC["set_whatsapp_verified"]
+  RPC --> Profile["profiles.whatsapp_verified_at"]
+  Profile --> Resume["Resume blocked action once"]
+```
+
+## Expected changes
+
+| Area | Expected files/systems | Reason |
+| --- | --- | --- |
+| Database | `supabase/migrations/<timestamp>_phone_verify_quota_and_gates.sql` (name TBD) | Quota, RPCs, gates, `public_profiles` |
+| Edge Function | `supabase/functions/verify-phone/index.ts` | Bird proxy + dev mode |
+| Client hooks | `src/features/profile/use-phone-verification.ts`, `use-require-verified-whatsapp.ts` | OTP + gate helper |
+| Client UI | `src/features/profile/verify-whatsapp-sheet.tsx` (or similar) | Shared sheet |
+| Client wiring | `tab-bar.tsx`, `match-detail.tsx`, `create-post-form.tsx`, `profile.tsx`, `edit-profile.tsx`, roster/player profile components | Gates + badges |
+| Community | `use-posts.ts` (`useProfileContactGate` adds verified flag) | Client mirror of DB gate |
+| Docs | `docs/phone-verification-setup.md`, `docs/legal/*`, `docs/decisions.md`, `ai-architecture-context.md` | Q10, Q11, ops |
+| Generated types | `src/types/database.ts` | After migration (developer CLI) |
+| Tests | Unit tests for phone hash/quota helpers if extracted; existing `argentina-whatsapp-phone` unchanged | Regression |
+
+**Explicitly not changed:** Auth providers; onboarding; `match_contact_details()` contract; uniqueness of phone numbers (Q8); retroactive revocation of existing match participations.
+
+## Data, security, and lifecycle
+
+- **RLS:** Quota tables remain invisible to clients; only SECURITY DEFINER RPCs + Edge Function (service/ user JWT) consume quota.
+- **Secrets:** `BIRD_API_KEY`, `BIRD_API_HOST` — Supabase Edge secrets only.
+- **Logging:** No plaintext phone in logs or analytics; quota uses hash; aggregate metrics by channel/outcome only (spec §6).
+- **Banned users:** Cannot pass verify flow or set verification; gates still respect `is_banned()`.
+- **Phone change:** Increment 1 trigger clears verification; gates re-apply until user re-verifies.
+- **Rollout (Q14):** Immediate DB enforcement; Profile card is the sole proactive prompt (no first-launch modal).
+
+## Risks, dependencies, and mitigations
+
+| Risk / dependency | Mitigation |
+| --- | --- |
+| No Bird wallet (Q15) | Local dev mode; setup doc; real channel test after wallet top-up |
+| Dev mode enabled in production | Hard guard on `SUPABASE_URL`; code review + setup doc warning |
+| `protect_profile_fields` vs RPC | `set_whatsapp_verified` sets `padelcito.profile_internal_update` |
+| Per-number quota without storing phone | Hash E.164 with documented algorithm; never store plaintext in quota table |
+| Client/server format drift | Share validation rules; reject before quota/Bird |
+| Bundle / UX | Single sheet; OTP autofill where supported |
+
+## Verification plan
+
+- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test`
+- [ ] Local Supabase: migration up; RPC `set_whatsapp_verified` rejects wrong user/phone; direct client UPDATE of `whatsapp_verified_at` fails; SQL insert match/join/post without verify fails
+- [ ] Local dev mode: `start`/`check` with `000000` sets verified; gates resume
+- [ ] With Bird wallet: WhatsApp and SMS fallback; Argentina country enabled
+- [ ] Two-device manual: public badge on player profile/roster; Profile card hides after verify; publish shows Verified contact when snapshot set
+- [ ] Spec §3 scenarios tagged **[Inc 2]**
+
+## Alternatives considered
+
+- **Defer match gates to client-only:** rejected — spec requires RLS + trigger enforcement.
+- **Fourth Edge Function for business logic:** rejected — verification completion stays in Postgres RPC (Q11 proxy-only EF).
+- **Skip dev mode and mock Twilio in tests only:** rejected for Q15 — developers need full stack without billing account.

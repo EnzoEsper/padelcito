@@ -268,6 +268,7 @@ type ProfileIdentityCardProps = {
   username: string | null;
   avatarUrl?: string | null;
   badge?: ReactNode;
+  nameTrailing?: ReactNode;
   rating: number;
   reviewCount: number;
   avatarSize?: number;
@@ -279,6 +280,7 @@ export function ProfileIdentityCard({
   username,
   avatarUrl,
   badge,
+  nameTrailing,
   rating,
   reviewCount,
   avatarSize = 64,
@@ -291,9 +293,12 @@ export function ProfileIdentityCard({
     <View style={[styles.identityCard, containerStyle]}>
       <ProfileAvatar name={name} avatarUrl={avatarUrl} size={avatarSize} />
       <View style={styles.identityMeta}>
-        <Text style={styles.identityName} numberOfLines={1}>
-          {name}
-        </Text>
+        <View style={styles.identityNameRow}>
+          <Text style={styles.identityName} numberOfLines={1}>
+            {name}
+          </Text>
+          {nameTrailing ?? null}
+        </View>
         {handle !== null ? (
           <Text style={styles.identityHandle} numberOfLines={1}>
             {handle}
@@ -311,6 +316,19 @@ export function ProfileOrganizerBadge() {
     <View style={styles.organizerBadge}>
       <Ionicons name="megaphone-outline" size={12} color={PROFILE_COLORS.primaryHi} />
       <Text style={styles.organizerBadgeText}>Post organizer</Text>
+    </View>
+  );
+}
+
+export function ProfileWhatsAppVerifiedBadge() {
+  return (
+    <View
+      style={styles.verifiedBadge}
+      accessibilityRole="text"
+      accessibilityLabel="WhatsApp verified"
+    >
+      <Ionicons name="checkmark-circle" size={14} color={PROFILE_COLORS.success} />
+      <Text style={styles.verifiedBadgeText}>Verified</Text>
     </View>
   );
 }
@@ -676,7 +694,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: 5,
   },
+  identityNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 0,
+  },
   identityName: {
+    flexShrink: 1,
     fontFamily: 'HankenGrotesk-Bold',
     fontSize: 19,
     color: PROFILE_COLORS.neutral,
@@ -738,6 +763,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: PROFILE_COLORS.primaryHi,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(123,200,158,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(123,200,158,0.25)',
+  },
+  verifiedBadgeText: {
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 11,
+    fontWeight: '600',
+    color: PROFILE_COLORS.success,
   },
   metricStrip: {
     flexDirection: 'row',

@@ -24,6 +24,7 @@ export type PublicProfileSummary = {
   created_at: string | null;
   gender: ProfileGender | null;
   age_years: number | null;
+  whatsapp_verified: boolean;
   padel_category: PadelCategoryNumber | null;
   skill_level: SkillLevel | null;
   dominant_hand: DominantHand | null;
@@ -40,7 +41,7 @@ async function fetchPublicProfile(userId: string): Promise<PublicProfileSummary 
   const { data: profile, error: profileError } = await supabase
     .from('public_profiles')
     .select(
-      'id, display_name, username, avatar_url, bio, rating_avg, rating_count, reliability_score, penalty_count, commitment_count, gender, age_years, created_at',
+      'id, display_name, username, avatar_url, bio, rating_avg, rating_count, reliability_score, penalty_count, commitment_count, gender, age_years, whatsapp_verified, created_at',
     )
     .eq('id', userId)
     .maybeSingle();
@@ -106,6 +107,7 @@ async function fetchPublicProfile(userId: string): Promise<PublicProfileSummary 
     commitment_count: profile.commitment_count ?? 0,
     gender: profile.gender,
     age_years: profile.age_years,
+    whatsapp_verified: profile.whatsapp_verified === true,
     created_at: profile.created_at,
     padel_category: padelCategory,
     skill_level: skillLevel,

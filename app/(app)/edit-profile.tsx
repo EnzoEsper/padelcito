@@ -30,6 +30,7 @@ import {
   useUpdatePlayingProfile,
 } from '@/features/profile/use-playing-profile';
 import { isBirthDateEligible, MIN_PROFILE_AGE_YEARS } from '@/lib/profile-demographics';
+import { usePhoneVerification } from '@/features/profile/phone-verification-provider';
 
 const PLACEHOLDER_COLOR = 'rgba(228,228,228,0.20)';
 const BORDER_DEFAULT = 'rgba(228,228,228,0.10)';
@@ -101,7 +102,15 @@ type WhatsAppFieldProps = {
   error: string | undefined;
 };
 
-function WhatsAppField({ control, error }: WhatsAppFieldProps) {
+function WhatsAppField({
+  control,
+  error,
+  isVerified,
+  onVerifyPress,
+}: WhatsAppFieldProps & {
+  isVerified: boolean;
+  onVerifyPress: () => void;
+}) {
   const [isFocused, setIsFocused] = useState(false);
   const { field } = useController({
     control,
@@ -136,6 +145,17 @@ function WhatsAppField({ control, error }: WhatsAppFieldProps) {
         />
       </View>
       <FieldError message={error} />
+      <Pressable
+        onPress={onVerifyPress}
+        className="active:opacity-70"
+        style={[styles.verifyPill, isVerified && styles.verifyPillVerified]}
+        accessibilityRole="button"
+        accessibilityLabel={isVerified ? 'WhatsApp verified' : 'Verify WhatsApp'}
+      >
+        <Text style={[styles.verifyPillText, isVerified && styles.verifyPillTextVerified]}>
+          {isVerified ? 'Verified' : 'Not verified · Verify'}
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -188,6 +208,8 @@ export default function EditProfileScreen() {
   const updateDemographics = useUpdateProfileDemographics();
   const updateBio = useUpdateProfileBio();
   const updateWhatsApp = useUpdateProfileWhatsApp();
+  const { openVerifySheet } = usePhoneVerification();
+  const isWhatsAppVerified = profile?.whatsapp_verified_at !== null;
 
   const isLoading =
     profilePending || sportPending || playingPending || demographicsPending;
@@ -302,6 +324,8 @@ export default function EditProfileScreen() {
           <WhatsAppField
             control={control}
             error={errors.whatsapp_phone_local?.message}
+            isVerified={isWhatsAppVerified}
+            onVerifyPress={openVerifySheet}
           />
           <BioField control={control} error={errors.bio?.message} charCount={bioValue.length} />
 
@@ -380,5 +404,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#7BC89E',
     textAlign: 'center',
+  },
+  verifyPill: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(94,112,184,0.35)',
+    backgroundColor: 'rgba(94,112,184,0.12)',
+  },
+  verifyPillText: {
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5E70B8',
+  },
+  verifyPillVerified: {
+    borderColor: 'rgba(123,200,158,0.35)',
+    backgroundColor: 'rgba(123,200,158,0.10)',
+  },
+  verifyPillTextVerified: {
+    color: '#7BC89E',
   },
 });

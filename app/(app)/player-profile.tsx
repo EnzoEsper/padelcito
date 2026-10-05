@@ -11,6 +11,7 @@ import {
   buildPlayingRows,
   playingSectionHasAnyData,
   ProfileIdentityCard,
+  ProfileWhatsAppVerifiedBadge,
   ProfileListRow,
   ProfileListSection,
   ProfileMetricStrip,
@@ -211,6 +212,9 @@ export default function PlayerProfileScreen() {
               name={profile.display_name}
               username={profile.username}
               avatarUrl={profile.avatar_url}
+              nameTrailing={
+                profile.whatsapp_verified ? <ProfileWhatsAppVerifiedBadge /> : null
+              }
               badge={showOrganizerBadge ? <ProfileOrganizerBadge /> : undefined}
               rating={profile.rating_avg ?? 0}
               reviewCount={profile.rating_count}

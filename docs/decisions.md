@@ -87,3 +87,11 @@ Discover tab map view replaces the M4 placeholder. Uses `nearby_matches` RPC coo
 ## Push notifications via Expo Push Service (2026-08-23)
 
 Remote push layers on the existing `notifications` fan-out — no duplicate trigger logic. Clients register Expo push tokens in `push_tokens` (`20260823120000_create_push_tokens`); AFTER INSERT on `notifications` dispatches via pg_net to Edge Function `push` (`20260823130000_push_on_notification_trigger`), which maps copy/routes and calls Expo Push Service. Scoped second Edge Function exception alongside `places-search` (integration proxy holding `EXPO_ACCESS_TOKEN`, not business logic). Client: `use-push-registration.ts` in `app/(app)/_layout.tsx`. Requires EAS dev build + Firebase `google-services.json` (Android) + Vault webhook secrets. Setup: `docs/push-setup.md`.
+
+## Phone verification (Bird Verify)
+
+WhatsApp ownership verification for match create/join and community publish uses Bird Verify behind Edge Function `verify-phone` (third integration-proxy exception). Bird API credentials stay in Supabase only; `consume_phone_verify_quota()` and `set_whatsapp_verified()` live in Postgres. Public badge via `public_profiles.whatsapp_verified` boolean only. Setup: `docs/phone-verification-setup.md`.
+
+**2026-10-04:** Provider switched from Twilio Verify to Bird Verify (shared WhatsApp sender, lower list cost for Argentina WhatsApp OTP, 10s outbound timeout). Client and schema unchanged; only the integration proxy vendor changed.
+
+**2026-10-05:** OTP delivery **WhatsApp-only** for MVP (~$0.03/send vs ~$0.09 SMS in AR). SMS fallback removed from UI and Edge Function channel list; can restore without schema changes.

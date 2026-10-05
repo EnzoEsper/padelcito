@@ -149,15 +149,21 @@ async function fetchProfileRole(userId: string): Promise<{
   };
 }
 
-async function fetchProfileWhatsApp(userId: string): Promise<string | null> {
+async function fetchProfileContact(userId: string): Promise<{
+  whatsappPhone: string | null;
+  whatsappVerified: boolean;
+}> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('whatsapp_phone')
+    .select('whatsapp_phone, whatsapp_verified_at')
     .eq('id', userId)
     .single();
 
   if (error !== null) throw error;
-  return data.whatsapp_phone;
+  return {
+    whatsappPhone: data.whatsapp_phone,
+    whatsappVerified: data.whatsapp_verified_at !== null,
+  };
 }
 
 function isModeratorRole(role: Database['public']['Enums']['user_role']): boolean {
@@ -366,11 +372,12 @@ export function useProfileContactGate() {
     queryKey: ['profile', 'contact-gate'],
     queryFn: async () => {
       const userId = await getCurrentUserId();
-      const phone = await fetchProfileWhatsApp(userId);
+      const contact = await fetchProfileContact(userId);
       const roleInfo = await fetchProfileRole(userId);
       return {
         userId,
-        whatsappPhone: phone,
+        whatsappPhone: contact.whatsappPhone,
+        whatsappVerified: contact.whatsappVerified,
         isBanned: roleInfo.bannedAt !== null,
         role: roleInfo.role,
         isModerator: isModeratorRole(roleInfo.role),

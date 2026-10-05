@@ -31,9 +31,9 @@ Players reach each other only through WhatsApp: a `wa.me` link to the host or to
 
 ### Increment 2 — Ownership verification, gating, and badges
 
-- **Twilio Verify** via a new Edge Function `verify-phone` (integration proxy holding Twilio secrets). **WhatsApp first, SMS fallback** per verification attempt.
+- **Bird Verify** via Edge Function `verify-phone` (integration proxy holding Bird API secrets). **WhatsApp-only** OTP for MVP (SMS fallback deferred — see decisions 2026-10-05).
 - **SECURITY DEFINER RPC** (e.g. `set_whatsapp_verified`) sets `padelcito.profile_internal_update` then updates `whatsapp_phone` (if needed) and `whatsapp_verified_at`; client cannot set verification directly.
-- **Server quotas** (e.g. `consume_phone_verify_quota()`), aligned with Q9 defaults when confirmed.
+- **Server quotas** via `consume_phone_verify_quota()` per Q9 (per-user window + per-number daily cap on hashed number).
 - **Helper `has_verified_whatsapp()`** (SECURITY DEFINER, `is_banned()` pattern): true when caller's profile has non-null `whatsapp_verified_at` (and optionally non-null `whatsapp_phone`).
 - **Match gating:** hosting blocked unless verified — extend RLS policy `"Authenticated users can host matches"` (`host_id = auth.uid() and not is_banned()`) with `has_verified_whatsapp()`. Join requests blocked in `validate_match_participant_insert()` for the joining user. Existing matches and roster rows are not retroactively revoked.
 - **Community gate:** publishing requires **`whatsapp_verified_at` not null** — enforced in `enforce_community_post_limits()` and mirrored in `useProfileContactGate` and create-post UI.
@@ -110,7 +110,7 @@ Given a player with a saved, unverified number, when they request a code (WhatsA
 - [ ] [Inc 2] Verification succeeds only if the verified number matches the profile's current `whatsapp_phone`.
 - [ ] [Inc 2] Wrong, expired, or over-limit codes show clear errors; number stays unverified.
 - [ ] [Inc 2] Resend cooldown in UI; per-user (and per-number, if implemented) limits enforced server-side.
-- [ ] [Inc 2] WhatsApp delivery failure offers SMS fallback where configured.
+- [ ] [Inc 2] ~~WhatsApp delivery failure offers SMS fallback~~ **Deferred** — WhatsApp-only MVP (2026-10-05).
 - [ ] [Inc 2] Unauthenticated or banned users cannot start verification.
 
 ### Scenario: Host a match [Inc 2]
@@ -190,29 +190,32 @@ Given a match member whose counterpart has no number, when they tap WhatsApp, th
 | Q1 | **Two increments:** (1) entry + AR validation + normalization; (2) OTP + verified-required gates + badge UX. |
 | Q2 | **Capture in Edit profile only** — not onboarding, not inline create-post. |
 | Q3 | **Verified number required** to publish community posts, **create matches, and request to join matches** — enforced in increment 2. |
-| Q4 / Q5 | **Twilio Verify** via new Edge Function `verify-phone`; **WhatsApp first, SMS fallback**. |
+| Q4 / Q5 | **Bird Verify** via Edge Function `verify-phone`; **WhatsApp-only** for MVP (2026-10-05). |
 | Q6 | **Argentina only** at launch (`+54` / `+549…` mobile). |
 | Q7 | **Normalize existing values in a migration** where safely detectable; leave ambiguous rows untouched. |
 | Q8 | **Allow duplicate numbers** across profiles, including multiple verified profiles on the same number. |
 | Q12 | **Gate both match create and join** (not create-only). |
 | Q13 | **Owner:** status card + name badge + Edit profile pill; **public:** `whatsapp_verified` boolean on `public_profiles`, badge on player profile and roster — never the phone number. |
+| Q9 | **Abuse limits (2026-10-04):** 5 OTP sends per 10 minutes per user; **10 sends per calendar day per number** (counter keyed by **hash of E.164**, never plaintext). Bird **Countries: Argentina only**. Cost scales with active players (≈ **$0.03** list WhatsApp OTP in AR on Bird vs higher Twilio list — recheck at launch; Bird SMS AR rate may require sales quote). |
+| Q10 | **Legal (2026-10-04):** Update [`docs/legal/privacy-policy.md`](../../docs/legal/privacy-policy.md) and [`docs/legal/account-deletion.md`](../../docs/legal/account-deletion.md) for **Bird** (and Meta WhatsApp channel) as processors. On account deletion the app deletes our data; **Bird-side retention follows Bird's policy** and the legal docs say so. |
+| Q11 | **Edge Function exception (2026-10-04):** `verify-phone` is approved as the **third integration-proxy** Edge Function (Bird API secrets only; no business logic beyond validation, quota, and Verify REST). Record in [`docs/decisions.md`](../../docs/decisions.md) and [`ai-architecture-context.md`](../../ai-architecture-context.md) (section 4 exception list and do-not-regress item 6). |
+| Q14 | **Rollout (2026-10-04):** **Enforce immediately** — no grace period. There are **no real users yet**; existing test accounts may be deleted. **Profile status card only** for prompting; **no** one-time in-app notice on first launch after release. |
+| Q15 | **Provider (2026-10-04, updated):** **Bird Verify** with funded wallet for live OTP; **local dev mode** on `verify-phone` for stack E2E without sends (see [plan.md](./plan.md) § Increment 2). |
 
-### Open questions (resolve before increment 2 plan / launch)
+### Open questions
 
-- [ ] **Q9. Budget and abuse limits (product/ops).** Proposed defaults: 5 OTP sends per 10 minutes per user; per-number daily cap TBD; Twilio geo-permissions restricted to Argentina. **Cost scales with active players** (each player verifies once ≈ $0.076 list WhatsApp+Verify in AR; e.g. 1,000 active players ≈ $76 one-time at list — recheck at launch), not only community posters.
-- [ ] **Q10. Legal (product).** Update [`docs/legal/privacy-policy.md`](../../docs/legal/privacy-policy.md) and [`docs/legal/account-deletion.md`](../../docs/legal/account-deletion.md) for Twilio (and Meta WhatsApp) as processors; define provider-side retention on account deletion.
-- [ ] **Q11. Edge Function exception (tech lead).** Record `verify-phone` as a third integration-proxy Edge Function in [`docs/decisions.md`](../../docs/decisions.md) and [`ai-architecture-context.md`](../../ai-architecture-context.md) when increment 2 is implemented.
-- [ ] **Q14. Rollout for existing users (product).** When increment 2 ships, unverified players cannot host or join until they verify. **Recommended:** no grace period; show Profile status card + one-time in-app notice on first launch after release. **Alternative:** fixed grace window (e.g. 14 days) before DB enforcement.
+None — increment 2 plan and tasks may proceed.
 
 ### Assumptions
 
-- Normalization migration rules will be validated against a **read-only query of hosted data** before the migration SQL is finalized (row counts, sample of non-`+549` patterns).
-- No profile has `whatsapp_verified_at` set today because no writer exists (confirm on hosted data before increment 2).
+- Normalization migration rules were validated against hosted/read-only data before increment 1 migration SQL (row counts, non-`+549` patterns).
+- No profile has `whatsapp_verified_at` set today because no writer exists (confirm on hosted data before increment 2 ships).
+- Until Bird is configured on hosted projects, developers use **local-only** `VERIFY_PHONE_DEV_MODE` (never in hosted secrets) to exercise the client and RPC path.
 
 ## 6. Non-functional requirements
 
 - **Privacy/security:** numbers not logged or sent to analytics; provider secrets in Supabase only; JWT on verify endpoints; rate limits; banned users cannot verify. Increment 2: no OTP send without prior format validation and quota check.
-- **Cost:** paid OTP sends only after validation + quota (increment 2). Budget planning uses **active player count × per-verification list cost** (see Q9). Twilio Fraud Guard / geo where configured.
+- **Cost:** paid OTP sends only after validation + quota (increment 2). Budget planning uses **active player count × per-verification list cost** (see Q9). Bird bills each send; code check is free.
 - **Accessibility:** phone-pad keyboard; labeled fields; errors not color-only; OTP autofill where supported. Verification badge has accessible name **WhatsApp verified**; Profile status card is screen-reader reachable.
 - **Performance:** increment 1 validation on-device; `libphonenumber-js` bundle size reviewed (prefer minimal metadata build).
 - **Offline:** save/verify require network; no silent paid retries.
@@ -224,11 +227,11 @@ Given a match member whose counterpart has no number, when they tap WhatsApp, th
 - **Automated:** `pnpm typecheck`, `pnpm lint`, `pnpm test`. Unit tests for Argentine parsing/normalization (`0`, `15`, `+54 9`; invalid/non-mobile). No root CI workflow in repo.
 - **Manual/backend [Inc 1]:** Edit profile save/clear; migration spot-check; `whatsapp_verified_at` clears on number change; publish with valid unverified number still works.
 - **Manual/backend [Inc 2]:** OTP WhatsApp/SMS sandbox; direct `whatsapp_verified_at` update fails; publish blocked until verified; **unverified host blocked from create-match then resumes after verify**; **unverified joiner blocked then resumes**; public badge visible on second device; direct SQL insert rejected for `matches` and join `match_participants`; badge on approved posts; `match_contact_details()` unchanged.
-- **Risks/rollout:** Twilio + WhatsApp sender setup; Q10 legal; Q11 architecture doc update; Q14 existing-user rollout; normalization of legacy data; provider cost from first live send.
+- **Risks/rollout:** Bird wallet + Argentina country enablement (Q15); shared sender branding; legal doc updates (Q10) and architecture doc update (Q11); immediate enforcement (Q14); provider cost from first live send; dev mode must not ship enabled on hosted projects.
 
 ## 8. Review of the prior plan and alternatives
 
-The 2026-08-07 plan recommended Twilio Verify behind `verify-phone`, WhatsApp primary and SMS fallback. Core reasoning still holds: contact numbers must not become auth identities, and Supabase `updateUser({ phone })` is SMS-only for phone change.
+The 2026-08-07 plan recommended managed Verify behind `verify-phone`, WhatsApp primary and SMS fallback. **2026-10-04:** provider is **Bird Verify** (was Twilio). Core reasoning still holds: contact numbers must not become auth identities, and Supabase `updateUser({ phone })` is SMS-only for phone change.
 
 | Plan premise | Current state | Impact |
 | --- | --- | --- |
@@ -246,7 +249,7 @@ The 2026-08-07 plan recommended Twilio Verify behind `verify-phone`, WhatsApp pr
 
 ### Ownership verification (increment 2) — chosen
 
-- **A. Twilio Verify + Edge Function `verify-phone`:** **chosen** (Q4/Q5). Managed OTP, WhatsApp then SMS, ~$0.076/list WhatsApp verification in AR plus Verify fee (recheck pricing at launch). Requires Q11 exception.
+- **A. Bird Verify + Edge Function `verify-phone`:** **chosen** (Q4/Q5, 2026-10-04 switch from Twilio). Managed OTP, WhatsApp then SMS via shared sender, ~$0.03/list WhatsApp OTP estimate in AR (recheck pricing at launch). Requires Q11 exception.
 
 ### Considered and rejected (fallbacks if cost/volume changes)
 
@@ -254,4 +257,4 @@ The 2026-08-07 plan recommended Twilio Verify behind `verify-phone`, WhatsApp pr
 - **C. WhatsApp Cloud API direct + custom OTP storage:** rejected for MVP build/compliance cost; revisit at high volume (~$0.026/msg AR auth template only).
 - **D. Reverse OTP (user messages business WhatsApp):** rejected for unfamiliar UX and inbound webhook work; credible if WhatsApp-only cost optimization is needed later.
 
-**Next artifact:** [plan.md](./plan.md) and [tasks.md](./tasks.md) for **increment 1** are drafted — implement via tasks when approved. Increment 2 plan waits on Q9, Q10, Q11, and Q14.
+**Next artifact:** [plan.md](./plan.md) and [tasks.md](./tasks.md) cover **increment 1** (implemented) and **increment 2** (ready to implement per tasks T11+).

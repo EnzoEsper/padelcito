@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from 'expo-router/build/react-navigation/bottom-tabs';
+import { usePhoneVerification } from '@/features/profile/phone-verification-provider';
 
 // Design tokens (Void Eclipse)
 const C = {
@@ -32,9 +33,36 @@ const TABS: TabConfig[] = [
 
 // ── Custom Tab Bar ────────────────────────────────────────────────────────────
 
-export function TabBar({ state, navigation }: BottomTabBarProps) {
+function isTabBarHidden(
+  state: BottomTabBarProps['state'],
+  descriptors: BottomTabBarProps['descriptors'],
+): boolean {
+  const activeRoute = state.routes[state.index];
+  if (activeRoute === undefined) {
+    return false;
+  }
+  const options = descriptors[activeRoute.key]?.options;
+  const tabBarStyle = options?.tabBarStyle;
+  if (
+    tabBarStyle !== undefined &&
+    tabBarStyle !== null &&
+    typeof tabBarStyle === 'object' &&
+    'display' in tabBarStyle &&
+    tabBarStyle.display === 'none'
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const activeRouteName = state.routes[state.index]?.name ?? '';
+  const { requireVerifiedWhatsApp } = usePhoneVerification();
+
+  if (isTabBarHidden(state, descriptors)) {
+    return null;
+  }
 
   function handleTabPress(routeName: string) {
     const target = state.routes.find((r) => r.name === routeName)?.key ?? '';
@@ -75,7 +103,11 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
         {/* Center FAB (+) */}
         <View style={styles.fabWrapper}>
           <Pressable
-            onPress={() => handleTabPress('create-match')}
+            onPress={() =>
+              requireVerifiedWhatsApp(() => {
+                handleTabPress('create-match');
+              })
+            }
             style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
             accessibilityLabel="Create"
             accessibilityRole="button"

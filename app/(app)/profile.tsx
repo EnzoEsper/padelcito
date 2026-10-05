@@ -22,6 +22,7 @@ import {
   ProfileListRow,
   ProfileListSection,
   ProfileMetricStrip,
+  ProfileWhatsAppVerifiedBadge,
   formatReliabilityStripCaption,
   PROFILE_COLORS as C,
   PROFILE_LAYOUT as L,
@@ -50,6 +51,7 @@ import { useBannedUsers } from '@/features/safety/use-banned-users';
 import { useOpenUserReports } from '@/features/safety/use-user-reports';
 import { useAppContentTopPadding } from '@/lib/app-layout-insets';
 import { PROFILE_HOME_HREF, pushFromProfileTab } from '@/lib/app-navigation';
+import { usePhoneVerification } from '@/features/profile/phone-verification-provider';
 
 interface PreferenceRowProps {
   label: string;
@@ -145,6 +147,12 @@ export default function ProfileScreen() {
   const isRefetching =
     profileRefetching || sportRefetching || playingRefetching || statsRefetching;
   const signOut = useSignOut();
+  const { openVerifySheet } = usePhoneVerification();
+  const isWhatsAppVerified = profile?.whatsapp_verified_at !== null;
+  const hasWhatsAppNumber =
+    profile?.whatsapp_phone !== null &&
+    profile?.whatsapp_phone !== undefined &&
+    profile.whatsapp_phone.length > 0;
 
   const isModerator = profile !== undefined && isModeratorRole(profile.role);
   const moderationQuery = useModerationQueue({ enabled: isModerator });
@@ -248,9 +256,34 @@ export default function ProfileScreen() {
             name={displayName}
             username={username.length > 0 ? username : null}
             avatarUrl={profile?.avatar_url}
+            nameTrailing={isWhatsAppVerified ? <ProfileWhatsAppVerifiedBadge /> : null}
             rating={rating}
             reviewCount={ratingCount}
           />
+
+          {!isWhatsAppVerified ? (
+            <Pressable
+              onPress={openVerifySheet}
+              className="active:opacity-85"
+              style={styles.verifyCard}
+              accessibilityRole="button"
+              accessibilityLabel="Verify WhatsApp"
+            >
+              <View style={styles.verifyCardCopy}>
+                <Text style={styles.verifyCardTitle}>
+                  {hasWhatsAppNumber
+                    ? 'Verify your WhatsApp to play and publish'
+                    : 'Add and verify WhatsApp to play and publish'}
+                </Text>
+                <Text style={styles.verifyCardSubtitle}>
+                  Required to create matches, join, and post in Community.
+                </Text>
+              </View>
+              <View style={styles.verifyCardButton}>
+                <Text style={styles.verifyCardButtonText}>Verify</Text>
+              </View>
+            </Pressable>
+          ) : null}
 
           <ProfileMetricStrip
             containerStyle={styles.strip}
@@ -422,6 +455,45 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: C.warning,
     marginTop: -12,
+  },
+  verifyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    borderRadius: L.groupRadius,
+    backgroundColor: C.surface1,
+    borderWidth: 1,
+    borderColor: C.hair,
+  },
+  verifyCardCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  verifyCardTitle: {
+    fontFamily: 'HankenGrotesk-Medium',
+    fontSize: 14,
+    color: C.neutral,
+    lineHeight: 19,
+  },
+  verifyCardSubtitle: {
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 12,
+    color: C.dim,
+    lineHeight: 16,
+  },
+  verifyCardButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: '#2B396D',
+    borderWidth: 1,
+    borderColor: C.primaryHi,
+  },
+  verifyCardButtonText: {
+    fontFamily: 'HankenGrotesk-Medium',
+    fontSize: 14,
+    color: C.neutral,
   },
   profileActions: {
     flexDirection: 'row',

@@ -1,12 +1,13 @@
-import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Keyboard, Platform, StyleSheet, View } from 'react-native';
 import {
   BottomSheetBackdrop,
+  BottomSheetFooter,
   BottomSheetModal,
   BottomSheetScrollView,
   BottomSheetView,
   type BottomSheetBackdropProps,
+  type BottomSheetFooterProps,
 } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,12 +25,54 @@ type AppBottomSheetProps = {
   maxHeight?: `${number}%`;
   /** When false, children render in a static view (e.g. date pickers). Defaults to true. */
   scrollable?: boolean;
+  /** Lift the sheet with the keyboard and allow scrolling form content. */
+  keyboardAware?: boolean;
+  /** Pinned above the keyboard (keyboard-aware sheets only). */
+  footer?: ReactNode;
 };
 
 function parseSnapPercent(maxHeight: `${number}%`): number {
   const parsed = Number.parseInt(maxHeight.replace('%', ''), 10);
   if (Number.isNaN(parsed)) return 52;
   return Math.min(Math.max(parsed, 25), 90);
+}
+
+type SheetHeaderProps = {
+  title?: string;
+  showClose: boolean;
+  onClosePress: () => void;
+  variant: 'stacked' | 'inline';
+};
+
+function SheetHeader({ title, showClose, onClosePress, variant }: SheetHeaderProps) {
+  if (title === undefined && !showClose) {
+    return null;
+  }
+
+  return (
+    <View style={variant === 'inline' ? styles.inlineHeader : styles.compactHeader}>
+      <View style={styles.headerRow}>
+        {title !== undefined ? (
+          <Text style={styles.title} numberOfLines={2}>
+            {title}
+          </Text>
+        ) : (
+          <View style={styles.titleSpacer} />
+        )}
+        {showClose ? (
+          <Pressable
+            onPress={onClosePress}
+            hitSlop={8}
+            style={styles.closeButton}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <Ionicons name="close" size={20} color="rgba(228,228,228,0.55)" />
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
 }
 
 /** Compact gorhom sheet for pickers and short option lists. */
@@ -41,6 +84,8 @@ export function AppBottomSheet({
   showClose = false,
   maxHeight = '52%',
   scrollable = true,
+  keyboardAware = false,
+  footer,
 }: AppBottomSheetProps) {
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheetModal>(null);
@@ -48,6 +93,29 @@ export function AppBottomSheet({
   const snapPoints = useMemo(() => [`${parseSnapPercent(maxHeight)}%`], [maxHeight]);
   const bottomInset = Math.max(insets.bottom, 16);
   const hasHeader = title !== undefined || showClose;
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
+  useEffect(() => {
+    if (!keyboardAware || !mounted) {
+      setKeyboardInset(0);
+      return;
+    }
+
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (event) => {
+      setKeyboardInset(event.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardInset(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [keyboardAware, mounted]);
 
   useEffect(() => {
     if (visible) {
@@ -90,8 +158,63 @@ export function AppBottomSheet({
     [],
   );
 
+  const renderFormFooter = useCallback(
+    (props: BottomSheetFooterProps) => {
+      if (footer === undefined) {
+        return null;
+      }
+
+      return (
+        <BottomSheetFooter {...props} bottomInset={bottomInset}>
+          <View style={styles.footerContainer}>{footer}</View>
+        </BottomSheetFooter>
+      );
+    },
+    [footer, bottomInset],
+  );
+
   if (!mounted) {
     return null;
+  }
+
+  if (keyboardAware) {
+    const formSnapPercent = Math.max(parseSnapPercent(maxHeight), 58);
+
+    return (
+      <BottomSheetModal
+        ref={sheetRef}
+        snapPoints={[`${formSnapPercent}%`]}
+        enableDynamicSizing={false}
+        enablePanDownToClose
+        bottomInset={bottomInset}
+        onDismiss={handleDismiss}
+        backdropComponent={renderBackdrop}
+        backgroundStyle={styles.sheetBackground}
+        handleIndicatorStyle={styles.handle}
+        keyboardBehavior="interactive"
+        keyboardBlurBehavior="restore"
+        android_keyboardInputMode="adjustResize"
+        footerComponent={footer !== undefined ? renderFormFooter : undefined}
+      >
+        <BottomSheetScrollView
+          contentContainerStyle={[
+            styles.scrollContent,
+            styles.scrollContentForm,
+            { paddingBottom: 12 + keyboardInset * 0.15 },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <SheetHeader
+            title={title}
+            showClose={showClose}
+            onClosePress={handleClosePress}
+            variant="inline"
+          />
+          {children}
+        </BottomSheetScrollView>
+      </BottomSheetModal>
+    );
   }
 
   return (
@@ -107,26 +230,12 @@ export function AppBottomSheet({
       handleIndicatorStyle={styles.handle}
     >
       {hasHeader ? (
-        <BottomSheetView style={styles.compactHeader}>
-          <View style={styles.headerRow}>
-            {title !== undefined ? (
-              <Text style={styles.title}>{title}</Text>
-            ) : (
-              <View style={styles.titleSpacer} />
-            )}
-            {showClose ? (
-              <Pressable
-                onPress={handleClosePress}
-                hitSlop={8}
-                style={styles.closeButton}
-                accessibilityRole="button"
-                accessibilityLabel="Close"
-              >
-                <Ionicons name="close" size={20} color="rgba(228,228,228,0.55)" />
-              </Pressable>
-            ) : null}
-          </View>
-        </BottomSheetView>
+        <SheetHeader
+          title={title}
+          showClose={showClose}
+          onClosePress={handleClosePress}
+          variant="stacked"
+        />
       ) : null}
 
       {scrollable ? (
@@ -165,7 +274,11 @@ const styles = StyleSheet.create({
   },
   compactHeader: {
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingBottom: 8,
+    paddingTop: 4,
+    paddingBottom: 12,
+  },
+  inlineHeader: {
+    paddingBottom: 12,
   },
   headerRow: {
     minHeight: 40,
@@ -197,8 +310,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: HORIZONTAL_PADDING,
     paddingTop: 4,
   },
+  scrollContentForm: {
+    flexGrow: 0,
+  },
+  footerContainer: {
+    paddingHorizontal: HORIZONTAL_PADDING,
+    paddingTop: 12,
+    paddingBottom: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(228,228,228,0.10)',
+    backgroundColor: SHEET_BG,
+  },
   staticBody: {
     paddingHorizontal: HORIZONTAL_PADDING,
-    paddingTop: 4,
+    paddingTop: 0,
   },
 });

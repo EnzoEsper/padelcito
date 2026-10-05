@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
+import { usePhoneVerification } from '@/features/profile/phone-verification-provider';
 import { ScrollView, View, Text, Pressable } from '@/tw';
 import { showAppAlert, useAppAlert } from '@/components/app-alert-dialog';
 import { useDiscoverLocation } from '@/features/discover/use-discover-location';
@@ -334,6 +335,7 @@ function PlayerRow({
   index,
   host = false,
   you = false,
+  whatsappVerified = false,
   onPressProfile,
   onRemove,
   onWhatsApp,
@@ -342,6 +344,7 @@ function PlayerRow({
   index: number;
   host?: boolean;
   you?: boolean;
+  whatsappVerified?: boolean;
   onPressProfile?: () => void;
   onRemove?: () => void;
   onWhatsApp?: () => void;
@@ -357,6 +360,16 @@ function PlayerRow({
           {host ? (
             <View style={styles.hostPill}>
               <Text style={styles.hostPillText}>Host</Text>
+            </View>
+          ) : null}
+          {whatsappVerified ? (
+            <View
+              style={styles.rosterVerifiedPill}
+              accessibilityLabel="WhatsApp verified"
+              accessibilityRole="text"
+            >
+              <Ionicons name="checkmark-circle" size={12} color={C.success} />
+              <Text style={styles.rosterVerifiedText}>Verified</Text>
             </View>
           ) : null}
         </View>
@@ -667,6 +680,7 @@ export default function MatchDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const appAlert = useAppAlert();
+  const { requireVerifiedWhatsApp } = usePhoneVerification();
   const queryClient = useQueryClient();
   const { coords: userCoords } = useDiscoverLocation();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -797,7 +811,7 @@ export default function MatchDetailScreen() {
     return { demographicsHint, missingProfileHint };
   }, [match, ownProfileQuery.data]);
 
-  async function handleRequest(): Promise<void> {
+  async function submitJoinRequest(): Promise<void> {
     if (matchId === null) return;
     const participant = match?.currentUserParticipant;
     const existingParticipantId =
@@ -810,6 +824,12 @@ export default function MatchDetailScreen() {
       const text = requestError instanceof Error ? requestError.message : 'Could not send request.';
       appAlert('Request failed', text);
     }
+  }
+
+  function handleRequest(): void {
+    requireVerifiedWhatsApp(() => {
+      void submitJoinRequest();
+    });
   }
 
   async function handleParticipantStatus(
@@ -1153,6 +1173,7 @@ export default function MatchDetailScreen() {
               index={0}
               host
               you={match.isHost}
+              whatsappVerified={match.host?.whatsapp_verified === true}
               onPressProfile={
                 !match.isHost
                   ? () =>
@@ -1185,6 +1206,7 @@ export default function MatchDetailScreen() {
                     name={name}
                     index={match.offlineConfirmedCount + index + 1}
                     you={isSelf}
+                    whatsappVerified={profile?.whatsapp_verified === true}
                     onPressProfile={
                       !isSelf
                         ? () =>
@@ -1281,7 +1303,7 @@ export default function MatchDetailScreen() {
           match={match}
           scheduleNow={scheduleNow}
           isBusy={requestToJoin.isPending}
-          onRequest={() => void handleRequest()}
+          onRequest={handleRequest}
           onCancelRequest={confirmCancelRequest}
           onWithdraw={confirmWithdraw}
           onMessageHost={() => void openHostContact()}
@@ -1623,6 +1645,23 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: C.blueHi,
     textTransform: 'uppercase',
+  },
+  rosterVerifiedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(91,224,166,0.35)',
+    backgroundColor: 'rgba(91,224,166,0.08)',
+  },
+  rosterVerifiedText: {
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 10,
+    fontWeight: '600',
+    color: C.success,
   },
   trustRow: {
     flexDirection: 'row',

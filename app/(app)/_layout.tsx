@@ -12,6 +12,8 @@ import { useModerationPostsRealtime } from "@/features/community/use-post-realti
 import { useProfileContactGate } from "@/features/community/use-posts";
 import { ensurePadelSport } from "@/lib/padel-sport";
 import { BannedUserBanner } from "@/components/banned-user-banner";
+import { PhoneVerificationProvider } from "@/features/profile/phone-verification-provider";
+import { KeyboardDoneAccessory } from "@/components/keyboard-done-accessory";
 
 function PadelSportPrefetch() {
   const queryClient = useQueryClient();
@@ -42,7 +44,8 @@ function PostsModerationRealtime() {
 
 export default function AppLayout() {
   return (
-    <>
+    <PhoneVerificationProvider>
+      <KeyboardDoneAccessory />
       <PadelSportPrefetch />
       <NotificationsRealtime />
       <PushNotifications />
@@ -79,11 +82,19 @@ export default function AppLayout() {
         <Tabs.Screen name="account-settings" options={{ href: null }} />
         <Tabs.Screen name="edit-profile" options={{ href: null }} />
         <Tabs.Screen name="blocked-users" options={{ href: null }} />
+        <Tabs.Screen
+          name="verify-whatsapp-intro"
+          options={{ href: null, tabBarStyle: { display: "none" } }}
+        />
+        <Tabs.Screen
+          name="verify-whatsapp"
+          options={{ href: null, tabBarStyle: { display: "none" } }}
+        />
           </Tabs>
         </View>
         <BannedUserBanner />
       </View>
-    </>
+    </PhoneVerificationProvider>
   );
 }
 

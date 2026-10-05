@@ -1,13 +1,13 @@
 # Privacy Policy — Padelcito
 
-**Last updated:** August 30, 2026
+**Last updated:** October 4, 2026
 
 Padelcito ("we", "our", "the app") is a padel matchmaking application. This policy describes what data we collect, why we use it, and your choices.
 
 ## Data we collect
 
 - **Account data:** email address, display name, username, profile bio, skill level, avatar, optional self-reported gender, and optional birth date (used to derive age on your public profile — your full birthday is not shown to other users).
-- **Contact data:** WhatsApp phone number (stored on your profile; shared with match participants only through gated in-app flows).
+- **Contact data:** WhatsApp phone number (stored on your profile; shared with match participants only through gated in-app flows). We may send one-time verification codes via Bird on WhatsApp to confirm you control the number.
 - **Location data:** home/search location and match or post coordinates when you pick a venue or use Discover.
 - **User content:** match details, community posts, ratings, reliability reports, moderation reports.
 - **Device data:** push notification tokens (if you enable notifications), crash/error diagnostics if Sentry is configured.
@@ -23,7 +23,7 @@ Padelcito ("we", "our", "the app") is a padel matchmaking application. This poli
 
 We do not sell personal data. We share data only with:
 
-- **Service providers:** Supabase (database, auth, storage, push delivery), Google (Maps/Places when you search venues), Apple/Google (sign-in), Expo (push delivery), optional Sentry (crash reporting).
+- **Service providers:** Supabase (database, auth, storage, push delivery), Google (Maps/Places when you search venues), Apple/Google (sign-in), Expo (push delivery), Bird (phone verification OTP delivery; WhatsApp channel may involve Meta infrastructure), optional Sentry (crash reporting).
 - **Other users:** public profile fields, match/post content, and WhatsApp contact per product rules (1:1 match contact; public contact on approved community posts).
 
 ## Retention

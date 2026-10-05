@@ -81,6 +81,18 @@ export function parseArgentinaWhatsAppToE164(input: string): ArgentinaWhatsAppPa
   return { ok: true, e164 };
 }
 
+/** Returns canonical +549… E.164 or null (never throws). */
+export function tryParseArgentinaWhatsAppToE164(input: string | null | undefined): string | null {
+  if (input === null || input === undefined || input.trim() === '') {
+    return null;
+  }
+  const result = parseArgentinaWhatsAppToE164(input.trim());
+  if (!result.ok || result.e164.length === 0) {
+    return null;
+  }
+  return result.e164;
+}
+
 /** Digits shown after the fixed +54 label (includes mobile 9 when present). */
 export function formatArgentinaWhatsAppLocalInput(e164: string | null | undefined): string {
   if (e164 === null || e164 === undefined || e164.trim() === '') {
