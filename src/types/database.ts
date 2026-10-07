@@ -335,6 +335,7 @@ export type Database = {
           sport_id: string
           status: Database["public"]["Enums"]["community_post_status"]
           subtype: Database["public"]["Enums"]["community_post_subtype"] | null
+          subtype_note: string | null
           tags: Database["public"]["Enums"]["community_post_tag"][]
           title: string
           type: Database["public"]["Enums"]["community_post_type"]
@@ -374,6 +375,7 @@ export type Database = {
           sport_id: string
           status?: Database["public"]["Enums"]["community_post_status"]
           subtype?: Database["public"]["Enums"]["community_post_subtype"] | null
+          subtype_note?: string | null
           tags?: Database["public"]["Enums"]["community_post_tag"][]
           title: string
           type: Database["public"]["Enums"]["community_post_type"]
@@ -413,6 +415,7 @@ export type Database = {
           sport_id?: string
           status?: Database["public"]["Enums"]["community_post_status"]
           subtype?: Database["public"]["Enums"]["community_post_subtype"] | null
+          subtype_note?: string | null
           tags?: Database["public"]["Enums"]["community_post_tag"][]
           title?: string
           type?: Database["public"]["Enums"]["community_post_type"]
@@ -2291,7 +2294,7 @@ export type Database = {
         | "archived"
       community_post_subtype:
         | "elimination"
-        | "groups_knockout"
+        | "traditional"
         | "round_robin"
         | "americano"
         | "teams"
@@ -2308,6 +2311,7 @@ export type Database = {
         | "festival"
         | "corporate"
         | "other"
+        | "suma"
       community_post_tag:
         | "welcome_kit"
         | "tshirt"
@@ -2570,7 +2574,7 @@ export const Constants = {
       ],
       community_post_subtype: [
         "elimination",
-        "groups_knockout",
+        "traditional",
         "round_robin",
         "americano",
         "teams",
@@ -2587,6 +2591,7 @@ export const Constants = {
         "festival",
         "corporate",
         "other",
+        "suma",
       ],
       community_post_tag: [
         "welcome_kit",

@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View, Text } from '@/tw';
 import { CachedRemoteImage } from '@/components/cached-remote-image';
@@ -31,28 +32,33 @@ const C = {
 
 type PostSummaryCardProps = {
   post: PostSummary;
-  onPress: () => void;
+  onPress?: () => void;
   showStatus?: boolean;
+  localFlyerUri?: string | null;
 };
 
 export const PostSummaryCard = memo(function PostSummaryCard({
   post,
   onPress,
   showStatus = false,
+  localFlyerUri = null,
 }: PostSummaryCardProps) {
   const imageUrl = buildPostImageUrl(post.image_path);
+  const hasLocalFlyer = localFlyerUri !== null && localFlyerUri.length > 0;
   const distanceLabel = formatPostDistanceKm(post.distanceM);
   const scheduleLabel = formatPostEventSchedule(post.event_start, post.event_end);
   const verified = hasConfirmedOrganizerContact(post.contacts);
   const statusColors = POST_STATUS_COLORS[post.status];
-  const typeLine = formatPostTypeLine(post.type, post.subtype);
+  const typeLine = formatPostTypeLine(post.type, post.subtype, post.subtype_note);
   const divisionsLine = formatDivisions(post.divisions, 2);
   const feeLine = formatPostFee(post.entry_fee, post.fee_unit, post.divisions.length > 0);
   const highlightTags = post.tags.slice(0, 3);
 
   return (
-    <Pressable onPress={onPress} style={styles.card}>
-      {imageUrl !== null ? (
+    <Pressable onPress={onPress} style={styles.card} disabled={onPress === undefined}>
+      {hasLocalFlyer ? (
+        <Image source={{ uri: localFlyerUri }} style={styles.image} contentFit="cover" />
+      ) : imageUrl !== null ? (
         <CachedRemoteImage uri={imageUrl} style={styles.image} contentFit="cover" />
       ) : (
         <View style={styles.imagePlaceholder}>

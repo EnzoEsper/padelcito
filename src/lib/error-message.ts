@@ -46,6 +46,33 @@ export function toUserFacingError(error: unknown, fallback: string): string {
     return 'Please sign in to continue.';
   }
 
+  if (lower.includes('awaiting review') || lower.includes('community_posts awaiting')) {
+    return 'You already have two posts waiting for moderation. Wait until one is approved or rejected before submitting another.';
+  }
+
+  if (lower.includes('at most 5 community_posts per 24 hours')) {
+    return 'You can submit at most five community posts every 24 hours. Try again later.';
+  }
+
+  if (lower.includes('verify your whatsapp') || lower.includes('whatsapp number')) {
+    return message;
+  }
+
+  if (lower.includes('cannot publish community_posts')) {
+    return 'Your account cannot publish community posts.';
+  }
+
+  if (
+    lower.includes('community_post_divisions') &&
+    (lower.includes('check constraint') || lower.includes('violates check'))
+  ) {
+    return 'One or more category rows are invalid. Open Categories and fix the range or sum, then try again.';
+  }
+
+  if (lower.includes('invalid category range')) {
+    return 'One or more category ranges are invalid. Strongest level must be the lower number (e.g. 5 to 7).';
+  }
+
   // Auth API errors with safe, known messages can pass through.
   if (isLikelyAuthClientMessage(message)) {
     return message;

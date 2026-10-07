@@ -10,6 +10,7 @@ import { roundCoordsForKey, type Coords } from '@/lib/location';
 import { supabase } from '@/lib/supabase';
 import {
   POST_DISCOVERY_RADIUS_M,
+  normalizeCommunityPostDivision,
   type CommunityPostContactInput,
   type CommunityPostContactRow,
   type CommunityPostDivisionInput,
@@ -17,6 +18,7 @@ import {
 } from '@/features/community/post-display';
 import type { Database, Json } from '@/types/database';
 import { uploadPostImage } from '@/lib/post-storage';
+import { logger } from '@/lib/logger';
 
 type CommunityPostRow = Database['public']['Tables']['community_posts']['Row'];
 type CommunityPostInsert = Database['public']['Tables']['community_posts']['Insert'];
@@ -32,6 +34,7 @@ type SportRow = Database['public']['Tables']['sports']['Row'];
 
 export type PostEventDetails = {
   subtype: CommunityPostSubtype | null;
+  subtypeNote: string | null;
   tags: CommunityPostTag[];
   scoringFormat: CommunityPostScoringFormat | null;
   goldenPoint: boolean | null;
@@ -74,6 +77,7 @@ export type CreatePostInput = {
   eventEnd: string | null;
   contacts: CommunityPostContactInput[];
   subtype: CommunityPostSubtype | null;
+  subtypeNote: string | null;
   tags: CommunityPostTag[];
   scoringFormat: CommunityPostScoringFormat | null;
   goldenPoint: boolean | null;
@@ -99,6 +103,7 @@ export type UpdatePostInput = {
   eventEnd: string | null;
   resubmit?: boolean;
   subtype: CommunityPostSubtype | null;
+  subtypeNote: string | null;
   tags: CommunityPostTag[];
   scoringFormat: CommunityPostScoringFormat | null;
   goldenPoint: boolean | null;
@@ -136,7 +141,64 @@ export const postKeys = {
   detail: (postId: string) => ['community_posts', postId] as const,
   mine: ['community_posts', 'mine'] as const,
   moderation: ['community_posts', 'moderation'] as const,
+  publishLimits: ['community_posts', 'publish-limits'] as const,
 };
+
+/** Matches enforce_community_post_limits() in Postgres. */
+export const COMMUNITY_POST_MAX_PENDING_REVIEW = 2;
+export const COMMUNITY_POST_MAX_PER_24H = 5;
+
+export type CommunityPublishLimits = {
+  pendingReviewCount: number;
+  postsLast24Hours: number;
+  canPublish: boolean;
+  pendingReviewBlocked: boolean;
+  dailyLimitBlocked: boolean;
+};
+
+async function fetchCommunityPublishLimits(userId: string): Promise<CommunityPublishLimits> {
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const [pendingResult, recentResult] = await Promise.all([
+    supabase
+      .from('community_posts')
+      .select('*', { count: 'exact', head: true })
+      .eq('author_id', userId)
+      .eq('status', 'pending_review'),
+    supabase
+      .from('community_posts')
+      .select('*', { count: 'exact', head: true })
+      .eq('author_id', userId)
+      .gte('created_at', since24h),
+  ]);
+
+  if (pendingResult.error !== null) throw pendingResult.error;
+  if (recentResult.error !== null) throw recentResult.error;
+
+  const pendingReviewCount = pendingResult.count ?? 0;
+  const postsLast24Hours = recentResult.count ?? 0;
+  const pendingReviewBlocked = pendingReviewCount >= COMMUNITY_POST_MAX_PENDING_REVIEW;
+  const dailyLimitBlocked = postsLast24Hours >= COMMUNITY_POST_MAX_PER_24H;
+
+  return {
+    pendingReviewCount,
+    postsLast24Hours,
+    canPublish: !pendingReviewBlocked && !dailyLimitBlocked,
+    pendingReviewBlocked,
+    dailyLimitBlocked,
+  };
+}
+
+export function useCommunityPublishLimits() {
+  return useQuery({
+    queryKey: postKeys.publishLimits,
+    queryFn: async (): Promise<CommunityPublishLimits> => {
+      const userId = await getCurrentUserId();
+      return fetchCommunityPublishLimits(userId);
+    },
+    staleTime: 1000 * 15,
+  });
+}
 
 async function getCurrentUserId(): Promise<string> {
   const {
@@ -272,15 +334,18 @@ async function fetchDivisionsByPostIds(
 }
 
 function divisionsToRpcPayload(divisions: CommunityPostDivisionInput[]): Json {
-  return divisions.map((division) => ({
-    gender: division.gender,
-    category_min: division.category_min,
-    category_max: division.category_max,
-    category_sum: division.category_sum,
-    age_min: division.age_min,
-    age_max: division.age_max,
-    label: division.label,
-  })) as Json;
+  return divisions.map((division) => {
+    const normalized = normalizeCommunityPostDivision(division);
+    return {
+      gender: normalized.gender,
+      category_min: normalized.category_min,
+      category_max: normalized.category_max,
+      category_sum: normalized.category_sum,
+      age_min: normalized.age_min,
+      age_max: normalized.age_max,
+      label: normalized.label,
+    };
+  }) as Json;
 }
 
 function contactsToRpcPayload(contacts: CommunityPostContactInput[]): Json {
@@ -293,6 +358,7 @@ function contactsToRpcPayload(contacts: CommunityPostContactInput[]): Json {
 function buildEventPatch(input: PostEventDetails): Partial<CommunityPostInsert> {
   return {
     subtype: input.subtype,
+    subtype_note: input.subtypeNote,
     tags: input.tags,
     scoring_format: input.scoringFormat,
     golden_point: input.goldenPoint,
@@ -626,17 +692,30 @@ export function useCreatePost() {
 
       if (error !== null) throw error;
 
-      await Promise.all([
-        syncPostDivisions(data.id, input.divisions),
-        syncPostContacts(data.id, input.contacts),
-      ]);
-      return data.id;
+      const postId = data.id;
+      try {
+        await Promise.all([
+          syncPostDivisions(postId, input.divisions),
+          syncPostContacts(postId, input.contacts),
+        ]);
+      } catch (syncError) {
+        const { error: deleteError } = await supabase
+          .from('community_posts')
+          .delete()
+          .eq('id', postId);
+        if (deleteError !== null) {
+          logger.error('rollback community post after sync failure', deleteError);
+        }
+        throw syncError;
+      }
+      return postId;
     },
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: postKeys.all }),
         queryClient.invalidateQueries({ queryKey: postKeys.mine }),
         queryClient.invalidateQueries({ queryKey: postKeys.moderation }),
+        queryClient.invalidateQueries({ queryKey: postKeys.publishLimits }),
       ]);
     },
   });

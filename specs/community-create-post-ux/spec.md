@@ -1,6 +1,6 @@
 # Feature specification: Create post progressive disclosure
 
-- **Status:** Implementing
+- **Status:** Superseded by [`specs/community-create-post-flow/spec.md`](../community-create-post-flow/spec.md)
 - **Related:** [`create-post-form.tsx`](../../src/features/community/create-post/create-post-form.tsx)
 
 ## Outcome

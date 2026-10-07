@@ -3,15 +3,20 @@ import type { Database } from '@/types/database';
 import type { Coords } from '@/lib/location';
 import type { CreatePostInput, RulesImageUpload } from '@/features/community/use-posts';
 import {
-  DEFAULT_SUBTYPE_BY_TYPE,
+  DATE_OPTIONAL_TYPES,
   SUBTYPES_BY_TYPE,
-  isSubtypeAllowed,
   scoringAllowedForType,
-  type CommunityPostContactInput,
   type CommunityPostDivisionInput,
   type CommunityPostTag,
 } from '@/features/community/post-display';
-import { parseArgentinaWhatsAppToE164 } from '@/lib/argentina-whatsapp-phone';
+import {
+  buildOrganizerContactsFromDrafts,
+  type OrganizerContactDraft,
+} from '@/features/community/create-post/create-post-organizers';
+import {
+  validateCreatePostForm,
+  type CreatePostValidationFailure,
+} from '@/features/community/create-post/create-post-validation';
 
 type CommunityPostType = Database['public']['Enums']['community_post_type'];
 type CommunityPostSubtype = Database['public']['Enums']['community_post_subtype'];
@@ -39,7 +44,8 @@ function defaultTimePart(): Date {
 function createInitialFormState(): CreatePostFormState {
   return {
     type: 'tournament',
-    subtype: DEFAULT_SUBTYPE_BY_TYPE.tournament,
+    subtype: null,
+    subtypeNote: '',
     tags: [],
     scoringFormat: 'two_sets_super_tiebreak',
     goldenPoint: true,
@@ -82,45 +88,8 @@ function combineDateAndTime(datePart: Date, timePart: Date): Date {
   return combined;
 }
 
-export type OrganizerContactDraft = {
-  phoneText: string;
-  label: string;
-  isAuthorSlot: boolean;
-};
-
-export function buildOrganizerContactsFromDrafts(
-  drafts: OrganizerContactDraft[],
-):
-  | { ok: true; contacts: CommunityPostContactInput[] }
-  | { ok: false; message: string } {
-  if (drafts.length < 1 || drafts.length > 3) {
-    return { ok: false, message: 'Add between 1 and 3 organizer WhatsApp numbers.' };
-  }
-
-  const phones = new Set<string>();
-  const contacts: CommunityPostContactInput[] = [];
-
-  for (const draft of drafts) {
-    const parsed = parseArgentinaWhatsAppToE164(draft.phoneText);
-    if (!parsed.ok || parsed.e164.length === 0) {
-      return { ok: false, message: parsed.ok ? 'Each organizer needs a WhatsApp number.' : parsed.message };
-    }
-    if (phones.has(parsed.e164)) {
-      return { ok: false, message: 'Organizer numbers must be unique.' };
-    }
-    phones.add(parsed.e164);
-    const label = draft.label.trim();
-    if (label.length > 40) {
-      return { ok: false, message: 'Organizer labels cannot exceed 40 characters.' };
-    }
-    contacts.push({
-      phone: parsed.e164,
-      label: label.length > 0 ? label : null,
-    });
-  }
-
-  return { ok: true, contacts };
-}
+export type { OrganizerContactDraft } from '@/features/community/create-post/create-post-organizers';
+export { buildOrganizerContactsFromDrafts } from '@/features/community/create-post/create-post-organizers';
 
 function parseEntryFee(text: string): number | null {
   const trimmed = text.trim();
@@ -134,7 +103,8 @@ function parseEntryFee(text: string): number | null {
 
 export type CreatePostFormState = {
   type: CommunityPostType;
-  subtype: CommunityPostSubtype;
+  subtype: CommunityPostSubtype | null;
+  subtypeNote: string;
   tags: CommunityPostTag[];
   scoringFormat: CommunityPostScoringFormat | null;
   goldenPoint: boolean | null;
@@ -173,6 +143,7 @@ export type CreatePostFormState = {
 export type CreatePostFormActions = {
   setType: (value: CommunityPostType) => void;
   setSubtype: (value: CommunityPostSubtype) => void;
+  setSubtypeNote: (value: string) => void;
   toggleTag: (tag: CommunityPostTag) => void;
   setScoringFormat: (value: CommunityPostScoringFormat | null) => void;
   setGoldenPoint: (value: boolean | null) => void;
@@ -209,9 +180,12 @@ export type CreatePostFormActions = {
   setOrganizersExpanded: (value: boolean) => void;
   expandPanel: (panel: 'details' | 'rules' | 'organizers') => void;
   reset: () => void;
+  validate: (step?: 'type' | 'details' | 'publish') =>
+    | { ok: true }
+    | CreatePostValidationFailure;
   buildSubmitInput: () =>
     | { ok: true; input: Omit<CreatePostInput, 'imagePath'> & { imageUri: string | null } }
-    | { ok: false; message: string };
+    | CreatePostValidationFailure;
 };
 
 export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions {
@@ -221,7 +195,9 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
     setState((prev) => ({
       ...prev,
       type: value,
-      subtype: DEFAULT_SUBTYPE_BY_TYPE[value],
+      subtype: null,
+      subtypeNote: '',
+      hasEventDate: DATE_OPTIONAL_TYPES.includes(value) ? prev.hasEventDate : true,
       scoringFormat: scoringAllowedForType(value) ? prev.scoringFormat ?? 'two_sets_super_tiebreak' : null,
       goldenPoint: scoringAllowedForType(value) ? prev.goldenPoint : null,
       guaranteedMatches: scoringAllowedForType(value) ? prev.guaranteedMatches : null,
@@ -229,7 +205,15 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
   }, []);
 
   const setSubtype = useCallback((value: CommunityPostSubtype) => {
-    setState((prev) => ({ ...prev, subtype: value }));
+    setState((prev) => ({
+      ...prev,
+      subtype: value,
+      subtypeNote: value === 'other' ? prev.subtypeNote : '',
+    }));
+  }, []);
+
+  const setSubtypeNote = useCallback((value: string) => {
+    setState((prev) => ({ ...prev, subtypeNote: value }));
   }, []);
 
   const toggleTag = useCallback((tag: CommunityPostTag) => {
@@ -394,12 +378,49 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
     setState(createInitialFormState());
   }, []);
 
+  const validate = useCallback(
+    (step?: 'type' | 'details' | 'publish') =>
+      validateCreatePostForm(
+        {
+          type: state.type,
+          subtype: state.subtype,
+          subtypeNote: state.subtypeNote,
+          title: state.title,
+          description: state.description,
+          coords: state.coords,
+          hasEventDate: state.hasEventDate,
+          datePart: state.datePart,
+          timePart: state.timePart,
+          hasEventEnd: state.hasEventEnd,
+          endDatePart: state.endDatePart,
+          endTimePart: state.endTimePart,
+          divisions: state.divisions,
+          scoringFormat: state.scoringFormat,
+          rulesNote: state.rulesNote,
+          entryFeeText: state.entryFeeText,
+          hasRegistrationDeadline: state.hasRegistrationDeadline,
+          registrationDatePart: state.registrationDatePart,
+          registrationTimePart: state.registrationTimePart,
+          contacts: state.contacts,
+          tags: state.tags,
+        },
+        { step },
+      ),
+    [state],
+  );
+
   const buildSubmitInput = useCallback(():
     | { ok: true; input: Omit<CreatePostInput, 'imagePath'> & { imageUri: string | null } }
-    | { ok: false; message: string } => {
+    | CreatePostValidationFailure => {
+      const validation = validate('publish');
+      if (!validation.ok) {
+        return validation;
+      }
+
       const {
         type,
         subtype,
+        subtypeNote,
         tags,
         scoringFormat,
         goldenPoint,
@@ -427,74 +448,41 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
         endTimePart,
       } = state;
 
-      const trimmedTitle = title.trim();
-      if (trimmedTitle.length < 3) {
-        return { ok: false, message: 'Add a title of at least 3 characters.' };
-      }
-      if (trimmedTitle.length > 120) {
-        return { ok: false, message: 'Title cannot exceed 120 characters.' };
-      }
-
-      const trimmedDescription = description.trim();
-      if (trimmedDescription.length > 2000) {
-        return { ok: false, message: 'Description cannot exceed 2000 characters.' };
-      }
-
-      if (!isSubtypeAllowed(type, subtype)) {
-        return { ok: false, message: 'Pick a format that matches the event type.' };
-      }
-
-      if (divisions.length > 12) {
-        return { ok: false, message: 'At most 12 divisions are allowed.' };
-      }
-
-      if (tags.length > 12) {
-        return { ok: false, message: 'At most 12 tags are allowed.' };
-      }
-
-      if (coords === null) {
-        return { ok: false, message: 'Pick a location so players can find this event.' };
+      if (subtype === null || coords === null) {
+        return {
+          ok: false,
+          field: 'subtype',
+          section: 'type',
+          message: 'Complete the required fields.',
+        };
       }
 
       const contactResult = buildOrganizerContactsFromDrafts(contacts);
       if (!contactResult.ok) {
-        return { ok: false, message: contactResult.message };
+        return {
+          ok: false,
+          field: 'contacts',
+          section: 'organizers',
+          message: contactResult.message,
+        };
       }
 
+      const trimmedTitle = title.trim();
+      const trimmedDescription = description.trim();
       const trimmedRulesNote = rulesNote.trim();
-      if (trimmedRulesNote.length > 500) {
-        return { ok: false, message: 'Rules note cannot exceed 500 characters.' };
-      }
-
+      const trimmedNote = subtypeNote.trim();
       const allowsScoring = scoringAllowedForType(type);
-      if (!allowsScoring && scoringFormat !== null) {
-        return { ok: false, message: 'Scoring is not available for this event type.' };
-      }
-
-      if (allowsScoring && scoringFormat === 'other' && trimmedRulesNote.length === 0) {
-        return { ok: false, message: 'Describe the rules when using the Other scoring format.' };
-      }
-
       const entryFee = parseEntryFee(entryFeeText);
-      if (entryFeeText.trim().length > 0 && entryFee === null) {
-        return { ok: false, message: 'Enter a valid entry fee or leave it empty.' };
-      }
 
       let eventStart: string | null = null;
       let eventEnd: string | null = null;
 
       if (hasEventDate) {
         const startDate = combineDateAndTime(datePart, timePart);
-        if (startDate.getTime() <= Date.now()) {
-          return { ok: false, message: 'Pick a future event start date and time.' };
-        }
         eventStart = startDate.toISOString();
 
         if (hasEventEnd) {
           const endDate = combineDateAndTime(endDatePart, endTimePart);
-          if (endDate.getTime() <= startDate.getTime()) {
-            return { ok: false, message: 'Event end must be after the start time.' };
-          }
           eventEnd = endDate.toISOString();
         }
       }
@@ -502,9 +490,6 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
       let registrationDeadline: string | null = null;
       if (hasRegistrationDeadline) {
         const deadline = combineDateAndTime(registrationDatePart, registrationTimePart);
-        if (eventStart !== null && deadline.getTime() > new Date(eventStart).getTime()) {
-          return { ok: false, message: 'Registration deadline must be on or before the event start.' };
-        }
         registrationDeadline = deadline.toISOString();
       }
 
@@ -518,6 +503,7 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
         input: {
           type,
           subtype,
+          subtypeNote: subtype === 'other' ? trimmedNote : null,
           tags,
           scoringFormat: allowsScoring ? scoringFormat : null,
           goldenPoint: allowsScoring ? goldenPoint : null,
@@ -540,13 +526,14 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
         },
       };
     },
-    [state],
+    [state, validate],
   );
 
   return {
     ...state,
     setType,
     setSubtype,
+    setSubtypeNote,
     toggleTag,
     setScoringFormat,
     setGoldenPoint,
@@ -583,6 +570,7 @@ export function useCreatePostForm(): CreatePostFormState & CreatePostFormActions
     setOrganizersExpanded,
     expandPanel,
     reset,
+    validate,
     buildSubmitInput,
   };
 }

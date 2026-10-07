@@ -165,7 +165,7 @@ export default function PostDetailScreen() {
         >
           <View style={styles.headerMetaRow}>
             <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38">
-              {formatPostTypeLine(post.type, post.subtype).toUpperCase()}
+              {formatPostTypeLine(post.type, post.subtype, post.subtype_note).toUpperCase()}
             </Text>
           </View>
 

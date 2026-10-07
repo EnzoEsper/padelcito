@@ -12,7 +12,7 @@ import {
 import { PostFlyerImage } from '@/features/community/components/post-flyer-image';
 import { PostImageViewer } from '@/features/community/components/post-image-viewer';
 import { buildPostImageUrl } from '@/lib/post-storage';
-import type { PostDetail } from '@/features/community/use-posts';
+import type { PostSummary } from '@/features/community/use-posts';
 
 const C = {
   mist: '#E4E4E4',
@@ -20,7 +20,7 @@ const C = {
   faint: 'rgba(228,228,228,0.38)',
 } as const;
 
-export function PostEventDetailSections({ post }: { post: PostDetail }) {
+export function PostEventDetailSections({ post }: { post: PostSummary }) {
   const [rulesViewerUri, setRulesViewerUri] = useState<string | null>(null);
 
   const feeLine = formatPostFee(post.entry_fee, post.fee_unit, post.divisions.length > 0);

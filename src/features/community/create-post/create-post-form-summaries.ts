@@ -1,15 +1,17 @@
 import {
   FEE_UNIT_LABELS,
-  POST_SUBTYPE_LABELS,
   POST_TAG_LABELS,
+  POST_TYPE_LABELS,
   SCORING_FORMAT_LABELS,
   scoringAllowedForType,
+  formatPostTypeLine,
   type CommunityPostScoringFormat,
   type CommunityPostSubtype,
   type CommunityPostTag,
   type CommunityPostType,
 } from '@/features/community/post-display';
-import type { OrganizerContactDraft } from '@/features/community/create-post/use-create-post-form';
+import type { OrganizerContactDraft } from '@/features/community/create-post/create-post-organizers';
+import type { CreatePostValidationSection } from '@/features/community/create-post/create-post-validation';
 
 export type CreatePostCollapsiblePanel = 'details' | 'rules' | 'organizers';
 
@@ -99,6 +101,24 @@ export function summarizeOrganizersPanel(
   return `Main: ${mainLabel} · +${contacts.length - 1} more`;
 }
 
+export function validationSectionToPanel(
+  section: CreatePostValidationSection,
+): CreatePostCollapsiblePanel | null {
+  switch (section) {
+    case 'rules':
+      return 'rules';
+    case 'organizers':
+      return 'organizers';
+    case 'basics':
+      return 'details';
+    case 'price':
+      return 'details';
+    default:
+      return null;
+  }
+}
+
+/** @deprecated Use validationSectionToPanel with validate() result */
 export function mapPublishValidationToPanel(message: string): CreatePostCollapsiblePanel | null {
   const lower = message.toLowerCase();
   if (
@@ -117,6 +137,7 @@ export function mapPublishValidationToPanel(message: string): CreatePostCollapsi
   }
   if (
     lower.includes('division') ||
+    lower.includes('categor') ||
     lower.includes('description') ||
     lower.includes('tag') ||
     lower.includes('entry fee') ||
@@ -129,8 +150,12 @@ export function mapPublishValidationToPanel(message: string): CreatePostCollapsi
 
 export function formatTypeSubtypeLine(
   type: CommunityPostType,
-  subtype: CommunityPostSubtype,
-  typeLabel: string,
+  subtype: CommunityPostSubtype | null,
+  subtypeNote: string,
 ): string {
-  return `${typeLabel} · ${POST_SUBTYPE_LABELS[subtype]}`;
+  if (subtype === null) {
+    return POST_TYPE_LABELS[type];
+  }
+  const note = subtype === 'other' ? subtypeNote.trim() : '';
+  return formatPostTypeLine(type, subtype, note.length > 0 ? note : null);
 }

@@ -23,6 +23,44 @@ export type CommunityPostDivisionInput = {
   label: string | null;
 };
 
+/** Ensures DB check: sum XOR category range (not both); range uses max=strongest, min=weakest. */
+export function normalizeCommunityPostDivision(
+  division: CommunityPostDivisionInput,
+): CommunityPostDivisionInput {
+  const label =
+    division.label !== null && division.label.trim().length === 0 ? null : division.label;
+
+  if (division.category_sum !== null) {
+    return {
+      ...division,
+      label,
+      category_min: null,
+      category_max: null,
+    };
+  }
+
+  let categoryMin = division.category_min;
+  let categoryMax = division.category_max;
+
+  if (
+    categoryMin !== null &&
+    categoryMax !== null &&
+    categoryMax > categoryMin
+  ) {
+    const swappedMin = categoryMax;
+    categoryMax = categoryMin;
+    categoryMin = swappedMin;
+  }
+
+  return {
+    ...division,
+    label,
+    category_sum: null,
+    category_min: categoryMin,
+    category_max: categoryMax,
+  };
+}
+
 export const POST_DISCOVERY_RADIUS_M = 50_000;
 
 export const SCORING_ALLOWED_TYPES: readonly CommunityPostType[] = [
@@ -39,42 +77,103 @@ export const POST_TYPE_LABELS: Record<CommunityPostType, string> = {
   special_event: 'Special event',
 };
 
+export const POST_TYPE_DESCRIPTIONS: Record<CommunityPostType, string> = {
+  tournament: 'Compete for a title in a one-off event',
+  social: 'Play many games and meet people',
+  league: 'Compete over several weeks',
+  training: 'Learn or improve',
+  special_event: 'Something different around padel',
+};
+
+/** Legacy enum values kept in Postgres but not offered in create-post UI. */
+export const LEGACY_SUBTYPES: readonly CommunityPostSubtype[] = [
+  'elimination',
+  'round_robin',
+  'suma',
+] as const;
+
 export const POST_SUBTYPE_LABELS: Record<CommunityPostSubtype, string> = {
   elimination: 'Elimination',
-  groups_knockout: 'Groups + knockout',
+  traditional: 'Traditional',
+  suma: 'Sum',
   round_robin: 'Round robin',
   americano: 'Americano',
   teams: 'Teams',
   mexicano: 'Mexicano',
-  pozo: 'Pozo',
+  pozo: 'King of the court',
   mixer: 'Mixer',
-  pairs: 'Pairs',
+  pairs: 'Fixed pairs',
   ladder: 'Ladder',
-  clinic: 'Clinic',
-  group_class: 'Group class',
+  clinic: 'Clinic / masterclass',
+  group_class: 'Group classes',
   camp: 'Camp',
   coach_course: 'Coach course',
   exhibition: 'Exhibition',
-  festival: 'Festival',
+  festival: 'Padel fest',
   corporate: 'Corporate',
   other: 'Other',
 };
 
+export const SUBTYPE_DESCRIPTIONS_BY_TYPE: Record<
+  CommunityPostType,
+  Partial<Record<CommunityPostSubtype, string>>
+> = {
+  tournament: {
+    traditional: 'Group stage, then a knockout bracket.',
+    teams: 'Squads face off; each tie is several pair matches.',
+    americano: 'Everyone partners with everyone in short games; individual points decide.',
+    other: 'Custom format — describe it below.',
+  },
+  social: {
+    americano: 'Rotate partners every game; points add up per player.',
+    mexicano: 'Like Americano, but each round pairs players with similar scores so games stay even.',
+    pozo: 'Win and move up a court, lose and move down. Also called Pozo.',
+    mixer: 'Casual rotation that mixes levels and genders to meet new players.',
+    other: 'Custom format — describe it below.',
+  },
+  league: {
+    pairs: 'Same partner all season, with weekly fixtures.',
+    teams: 'Squads play weekly ties.',
+    ladder: 'Challenge players ranked above you to climb.',
+    other: 'Custom format — describe it below.',
+  },
+  training: {
+    clinic: 'Single session on a skill (bandeja, vibora…).',
+    group_class: 'Recurring small-group classes.',
+    camp: 'Intensive multi-day program.',
+    coach_course: 'Course or certification for instructors.',
+    other: 'Custom format — describe it below.',
+  },
+  special_event: {
+    festival: 'Padel plus music, food or an after party.',
+    exhibition: 'Pros or guests play a show match.',
+    corporate: 'Company or brand event.',
+    other: 'Custom format — describe it below.',
+  },
+};
+
 export const SUBTYPES_BY_TYPE: Record<CommunityPostType, readonly CommunityPostSubtype[]> = {
-  tournament: ['elimination', 'groups_knockout', 'round_robin', 'americano', 'teams'],
-  social: ['americano', 'mexicano', 'pozo', 'mixer'],
-  league: ['pairs', 'teams', 'ladder'],
-  training: ['clinic', 'group_class', 'camp', 'coach_course'],
-  special_event: ['exhibition', 'festival', 'corporate', 'other'],
+  tournament: ['traditional', 'teams', 'americano', 'other'],
+  social: ['americano', 'mexicano', 'pozo', 'mixer', 'other'],
+  league: ['pairs', 'teams', 'ladder', 'other'],
+  training: ['clinic', 'group_class', 'camp', 'coach_course', 'other'],
+  special_event: ['festival', 'exhibition', 'corporate', 'other'],
 };
 
 export const DEFAULT_SUBTYPE_BY_TYPE: Record<CommunityPostType, CommunityPostSubtype> = {
-  tournament: 'groups_knockout',
+  tournament: 'traditional',
   social: 'americano',
   league: 'pairs',
   training: 'clinic',
   special_event: 'festival',
 };
+
+export const DIVISION_REQUIRED_TYPES: readonly CommunityPostType[] = [
+  'tournament',
+  'league',
+] as const;
+
+export const DATE_OPTIONAL_TYPES: readonly CommunityPostType[] = ['training'] as const;
 
 export type PostTagGroupId = 'included' | 'services' | 'prizes' | 'vibe';
 
@@ -328,13 +427,25 @@ export function formatScoring(
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+export function formatSubtypeLabel(
+  type: CommunityPostType,
+  subtype: CommunityPostSubtype,
+  subtypeNote: string | null,
+): string {
+  if (subtype === 'other' && subtypeNote !== null && subtypeNote.trim().length > 0) {
+    return subtypeNote.trim();
+  }
+  return POST_SUBTYPE_LABELS[subtype];
+}
+
 export function formatPostTypeLine(
   type: CommunityPostType,
   subtype: CommunityPostSubtype | null,
+  subtypeNote: string | null = null,
 ): string {
   const base = POST_TYPE_LABELS[type];
   if (subtype === null) return base;
-  return `${base} · ${POST_SUBTYPE_LABELS[subtype]}`;
+  return `${base} · ${formatSubtypeLabel(type, subtype, subtypeNote)}`;
 }
 
 export function formatPostDistanceKm(distanceM: number | undefined): string | null {
