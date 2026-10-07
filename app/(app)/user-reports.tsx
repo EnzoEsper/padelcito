@@ -173,7 +173,6 @@ function GroupCard({
 }
 
 export default function UserReportsScreen() {
-  const router = useRouter();
   const { goBack, pushWithCurrentAsReturn } = useAuxScreenReturnChain(buildUserReportsRoute());
   const insets = useSafeAreaInsets();
   const contentTopPadding = useAppContentTopPadding(16);

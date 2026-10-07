@@ -48,6 +48,18 @@ The initial reliability model incremented `commitment_count` on every host cance
 
 ---
 
+## Community post organizer contacts (2026-10-06)
+
+Organizer WhatsApp numbers live in `community_post_contacts` (1–3 per post, ordered). Extra numbers are free-entry; moderators confirm organizers via prefilled `wa.me` verification messages (no Bird Business API). Approval requires ≥1 confirmed contact; public readers see confirmed contacts only. Legacy `community_posts.contact_phone` is deprecated. Migration `20261006100000_community_post_contacts`.
+
+---
+
+## Community event taxonomy (2026-10-05)
+
+Community posts expanded beyond `tournament` | `training` to five types with optional subtype, up to 12 **divisions** (child table + `set_community_post_divisions` RPC), scoring presets with free-text/image rules for edge cases, grouped amenity **tags**, fee, and registration deadline. Scoring applies only to tournament/social/league; in-app registration remains deferred to future `tournaments` graduation. Category bands on divisions reuse match semantics (`category_max` = stronger / lower number). Reference: [`docs/event-types.md`](./event-types.md). Migrations `20261005230000`–`20261005260000`.
+
+---
+
 ## Community posts rename + listings deferral (2026-07-11 — M5)
 
 The Community tab originally shipped as moderated **flyers** (`flyers` table). Product/architecture reconciliation renamed the entity to **`community_posts`** to distinguish it from dormant **`listings`** (future response-inbox classifieds) and from future **`tournaments`** graduation. Enums: `community_post_type`, `community_post_status`, `community_post_report_reason`; reports table `community_post_reports`; RPC `nearby_community_posts`; Storage bucket **`community-posts`**; notification types `community_post_*` with FK `notifications.community_post_id`. Client code uses ergonomic **post** naming inside `src/features/community/` while all DB calls hit `community_posts`. **`listings` / `listing_responses` stay in schema but have no client UI** — deferred to M5b+. Tournament-to-post linking (`linked_tournament_id`) is deferred to M6+. Migrations rewritten in place under `202607110*`. After applying locally: `npx supabase db reset` then `npx supabase gen types typescript --local > src/types/database.ts`.

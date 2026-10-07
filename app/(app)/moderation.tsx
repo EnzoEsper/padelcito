@@ -11,6 +11,7 @@ import {
   buildModerationRoute,
   buildPostDetailRoute,
   formatPostEventSchedule,
+  hasConfirmedOrganizerContact,
 } from '@/features/community/post-display';
 import { useAuxScreenReturnChain } from '@/lib/app-navigation';
 import {
@@ -44,6 +45,7 @@ type ModerationCardProps = {
   onRejectReasonChange: (value: string) => void;
   onStartReject: () => void;
   onCancelReject: () => void;
+  canApprove: boolean;
   onApprove: () => void;
   onReject: () => void;
   onBan: () => void;
@@ -59,6 +61,7 @@ function ModerationCard({
   onRejectReasonChange,
   onStartReject,
   onCancelReject,
+  canApprove,
   onApprove,
   onReject,
   onBan,
@@ -91,6 +94,9 @@ function ModerationCard({
           {post.venue_name ?? post.formatted_address ?? 'No venue label'}
         </Text>
         <Text style={styles.cardSub}>By {post.author?.display_name ?? 'Player'}</Text>
+        {!canApprove && post.status === 'pending_review' ? (
+          <Text style={styles.warningHint}>Confirm at least one organizer on the post preview.</Text>
+        ) : null}
 
         <Pressable onPress={onPreview}>
           <Text style={styles.previewLink}>Open preview</Text>
@@ -117,7 +123,11 @@ function ModerationCard({
           </View>
         ) : (
           <View style={styles.actionRow}>
-            <Pressable onPress={onApprove} style={styles.approveAction}>
+            <Pressable
+              onPress={onApprove}
+              disabled={!canApprove}
+              style={[styles.approveAction, !canApprove ? styles.approveActionDisabled : null]}
+            >
               <Text style={styles.approveActionText}>Approve</Text>
             </Pressable>
             <Pressable onPress={onStartReject} style={styles.rejectAction}>
@@ -280,6 +290,7 @@ export default function ModerationScreen() {
           setRejectingId(null);
           setRejectReason('');
         }}
+        canApprove={hasConfirmedOrganizerContact(item.contacts)}
         onApprove={() => void handleApprove(item.id)}
         onReject={() => void handleReject(item.id)}
         onBan={() => handleBan(item.author_id, item.author?.display_name ?? 'author')}
@@ -491,6 +502,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Hanken Grotesk',
     fontSize: 13,
   },
+  warningHint: {
+    color: C.warning,
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 12,
+    marginTop: 4,
+  },
   previewLink: {
     color: '#5E70B8',
     fontFamily: 'Hanken Grotesk',
@@ -510,6 +527,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(91,224,166,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(91,224,166,0.25)',
+  },
+  approveActionDisabled: {
+    opacity: 0.45,
   },
   approveActionText: {
     color: C.success,

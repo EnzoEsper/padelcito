@@ -10,6 +10,18 @@ import { Pressable, View, Text, TextInput } from '@/tw';
 import { LocationField } from '@/features/location/location-field';
 import { SectionLabel } from '@/features/matches/create-match/components/section-label';
 import { SegmentedControl } from '@/features/matches/create-match/components/segmented-control';
+import { PostEventEssentials } from '@/features/community/create-post/post-event-essentials';
+import { PostEventDetailsFields } from '@/features/community/create-post/post-event-details-fields';
+import { PostEventRulesFields } from '@/features/community/create-post/post-event-rules-fields';
+import { PostContactFields } from '@/features/community/create-post/post-contact-fields';
+import { CollapsibleFormSection } from '@/features/community/create-post/components/collapsible-form-section';
+import {
+  mapPublishValidationToPanel,
+  summarizeEventDetailsPanel,
+  summarizeFormatRulesPanel,
+  summarizeOrganizersPanel,
+} from '@/features/community/create-post/create-post-form-summaries';
+import { scoringAllowedForType } from '@/features/community/post-display';
 import { getErrorMessage } from '@/lib/error-message';
 import { logger } from '@/lib/logger';
 import {
@@ -54,6 +66,7 @@ function formatTimeLabel(date: Date): string {
 }
 
 export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
+  const contactGate = useProfileContactGate();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showEndDatePicker, setShowEndDatePicker] = useState(false);
@@ -124,23 +137,41 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
     form.setEndTimePart(date);
   }
 
+  const allowsScoring = scoringAllowedForType(form.type);
+  const authorOnlyOrganizer =
+    form.contacts.length === 1 && form.contacts[0]?.isAuthorSlot === true;
+  const detailsSummary = summarizeEventDetailsPanel({
+    description: form.description,
+    divisionsCount: form.divisions.length,
+    entryFeeText: form.entryFeeText,
+    feeUnit: form.feeUnit,
+    hasRegistrationDeadline: form.hasRegistrationDeadline,
+    tags: form.tags,
+    scoringFormat: form.scoringFormat,
+    type: form.type,
+    rulesNote: form.rulesNote,
+  });
+  const rulesSummary = summarizeFormatRulesPanel({
+    description: form.description,
+    divisionsCount: form.divisions.length,
+    entryFeeText: form.entryFeeText,
+    feeUnit: form.feeUnit,
+    hasRegistrationDeadline: form.hasRegistrationDeadline,
+    tags: form.tags,
+    scoringFormat: form.scoringFormat,
+    type: form.type,
+    rulesNote: form.rulesNote,
+  });
+  const organizersSummary = summarizeOrganizersPanel(form.contacts, authorOnlyOrganizer);
+
   return (
     <>
       <View className="gap-6">
         <View>
-          <SectionLabel>Type</SectionLabel>
-          <SegmentedControl
-            options={[
-              { value: 'tournament' as const, label: 'Tournament' },
-              { value: 'training' as const, label: 'Training' },
-            ]}
-            value={form.type}
-            onChange={form.setType}
-          />
-        </View>
-
-        <View>
-          <SectionLabel>Flyer image</SectionLabel>
+          <SectionLabel>Flyer</SectionLabel>
+          <Text className="font-grotesk text-sm text-neutral/55 mb-2">
+            Optional — most events put the key info on the image.
+          </Text>
           {form.imageUri !== null ? (
             <View className="gap-3">
               <PostFlyerImage
@@ -172,7 +203,7 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
             >
               <View style={styles.imagePlaceholder}>
                 <Ionicons name="image-outline" size={28} color="rgba(228,228,228,0.38)" />
-                <Text className="font-grotesk text-sm text-neutral/55 mt-2">Upload post image</Text>
+                <Text className="font-grotesk text-sm text-neutral/55 mt-2">Add flyer</Text>
               </View>
             </Pressable>
           )}
@@ -196,19 +227,6 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
           />
         </View>
 
-        <View>
-          <SectionLabel>Description</SectionLabel>
-          <TextInput
-            value={form.description}
-            onChangeText={form.setDescription}
-            placeholder="Categories, prizes, schedule, or anything players should know."
-            placeholderTextColor={PLACEHOLDER_COLOR}
-            multiline
-            textAlignVertical="top"
-            className="min-h-[120px] rounded-xl bg-surface-1 border border-neutral/10 px-4 py-3 font-grotesk text-base text-neutral"
-          />
-        </View>
-
         <LocationField
           venueName={form.venueName}
           onVenueNameChange={form.setVenueName}
@@ -221,7 +239,7 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
         />
 
         <View>
-          <SectionLabel>Event date</SectionLabel>
+          <SectionLabel>When</SectionLabel>
           <SegmentedControl
             options={[
               { value: 'yes' as const, label: 'Set date' },
@@ -253,18 +271,6 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
               </Pressable>
             </View>
 
-            <View>
-              <SectionLabel>End time (optional)</SectionLabel>
-              <SegmentedControl
-                options={[
-                  { value: 'yes' as const, label: 'Add end' },
-                  { value: 'no' as const, label: 'Open-ended' },
-                ]}
-                value={form.hasEventEnd ? 'yes' : 'no'}
-                onChange={(value) => form.setHasEventEnd(value === 'yes')}
-              />
-            </View>
-
             {form.hasEventEnd ? (
               <View className="flex-row gap-3">
                 <Pressable
@@ -272,20 +278,61 @@ export function CreatePostFormBody({ form }: CreatePostFormBodyProps) {
                   className="flex-1 h-14 rounded-xl bg-surface-1 border border-neutral/10 px-4 justify-center"
                 >
                   <Text className="font-grotesk text-base text-neutral">
-                    {formatDateLabel(form.endDatePart)}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setShowEndTimePicker(true)}
-                  className="flex-1 h-14 rounded-xl bg-surface-1 border border-neutral/10 px-4 justify-center"
-                >
-                  <Text className="font-grotesk text-base text-neutral">
-                    {formatTimeLabel(form.endTimePart)}
+                    End {formatDateLabel(form.endDatePart)} · {formatTimeLabel(form.endTimePart)}
                   </Text>
                 </Pressable>
               </View>
-            ) : null}
+            ) : (
+              <Pressable onPress={() => form.setHasEventEnd(true)}>
+                <Text className="font-grotesk text-sm font-semibold text-neutral/55">
+                  Add end time
+                </Text>
+              </Pressable>
+            )}
           </>
+        ) : null}
+
+        <PostEventEssentials form={form} />
+
+        <CollapsibleFormSection
+          sectionLabel="Organizers"
+          title="Organizer contacts"
+          subtitle={organizersSummary}
+          icon="call-outline"
+          expanded={form.organizersExpanded}
+          onToggle={() => form.setOrganizersExpanded(!form.organizersExpanded)}
+        >
+          <PostContactFields
+            embedded
+            contacts={form.contacts}
+            authorPhoneE164={contactGate.data?.whatsappPhone ?? null}
+            authorPhoneVerified={contactGate.data?.whatsappVerified === true}
+            onChange={form.setContacts}
+          />
+        </CollapsibleFormSection>
+
+        <CollapsibleFormSection
+          sectionLabel="Optional"
+          title="Event details"
+          subtitle={detailsSummary}
+          icon="list-outline"
+          expanded={form.detailsExpanded}
+          onToggle={() => form.setDetailsExpanded(!form.detailsExpanded)}
+        >
+          <PostEventDetailsFields form={form} />
+        </CollapsibleFormSection>
+
+        {allowsScoring ? (
+          <CollapsibleFormSection
+            sectionLabel="Optional"
+            title="Format & rules"
+            subtitle={rulesSummary}
+            icon="tennisball-outline"
+            expanded={form.rulesExpanded}
+            onToggle={() => form.setRulesExpanded(!form.rulesExpanded)}
+          >
+            <PostEventRulesFields form={form} />
+          </CollapsibleFormSection>
         ) : null}
       </View>
 
@@ -429,12 +476,16 @@ export function CreatePostPublishFooter({ form }: CreatePostPublishFooterProps) 
     if (isSubmitting) return;
 
     const phone = contactGate.data?.whatsappPhone ?? '';
-    if (phone.length === 0) {
+    if (phone.length === 0 || contactGate.data?.whatsappVerified !== true) {
       return;
     }
 
-    const result = form.buildSubmitInput(phone);
+    const result = form.buildSubmitInput();
     if (!result.ok) {
+      const panel = mapPublishValidationToPanel(result.message);
+      if (panel !== null) {
+        form.expandPanel(panel);
+      }
       appAlert('Cannot publish', result.message);
       return;
     }
@@ -448,6 +499,17 @@ export function CreatePostPublishFooter({ form }: CreatePostPublishFooterProps) 
     try {
       const postId = await createPost.mutateAsync({
         type: result.input.type,
+        subtype: result.input.subtype,
+        tags: result.input.tags,
+        scoringFormat: result.input.scoringFormat,
+        goldenPoint: result.input.goldenPoint,
+        guaranteedMatches: result.input.guaranteedMatches,
+        rulesNote: result.input.rulesNote,
+        rulesImages: result.input.rulesImages,
+        entryFee: result.input.entryFee,
+        feeUnit: result.input.feeUnit,
+        registrationDeadline: result.input.registrationDeadline,
+        divisions: result.input.divisions,
         title: result.input.title,
         description: result.input.description,
         imagePath: null,
@@ -456,7 +518,7 @@ export function CreatePostPublishFooter({ form }: CreatePostPublishFooterProps) 
         coords: result.input.coords,
         eventStart: result.input.eventStart,
         eventEnd: result.input.eventEnd,
-        contactPhone: phone,
+        contacts: result.input.contacts,
       });
 
       if (form.imageBase64 !== null && form.imageMimeType !== null) {
@@ -533,7 +595,7 @@ export function CreatePostPublishFooter({ form }: CreatePostPublishFooterProps) 
 
 const styles = StyleSheet.create({
   imagePlaceholder: {
-    height: 180,
+    height: 220,
     alignItems: 'center',
     justifyContent: 'center',
   },

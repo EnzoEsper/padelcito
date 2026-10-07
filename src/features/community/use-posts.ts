@@ -8,27 +8,58 @@ import {
 } from '@/lib/padel-sport';
 import { roundCoordsForKey, type Coords } from '@/lib/location';
 import { supabase } from '@/lib/supabase';
-import { POST_DISCOVERY_RADIUS_M } from '@/features/community/post-display';
-import type { Database } from '@/types/database';
+import {
+  POST_DISCOVERY_RADIUS_M,
+  type CommunityPostContactInput,
+  type CommunityPostContactRow,
+  type CommunityPostDivisionInput,
+  type CommunityPostDivisionRow,
+} from '@/features/community/post-display';
+import type { Database, Json } from '@/types/database';
+import { uploadPostImage } from '@/lib/post-storage';
 
 type CommunityPostRow = Database['public']['Tables']['community_posts']['Row'];
 type CommunityPostInsert = Database['public']['Tables']['community_posts']['Insert'];
 type CommunityPostType = Database['public']['Enums']['community_post_type'];
+type CommunityPostSubtype = Database['public']['Enums']['community_post_subtype'];
+type CommunityPostTag = Database['public']['Enums']['community_post_tag'];
+type CommunityPostScoringFormat = Database['public']['Enums']['community_post_scoring_format'];
+type CommunityPostFeeUnit = Database['public']['Enums']['community_post_fee_unit'];
 type CommunityPostStatus = Database['public']['Enums']['community_post_status'];
 type CommunityPostReportReason = Database['public']['Enums']['community_post_report_reason'];
 type PublicProfileRow = Database['public']['Views']['public_profiles']['Row'];
 type SportRow = Database['public']['Tables']['sports']['Row'];
 
+export type PostEventDetails = {
+  subtype: CommunityPostSubtype | null;
+  tags: CommunityPostTag[];
+  scoringFormat: CommunityPostScoringFormat | null;
+  goldenPoint: boolean | null;
+  guaranteedMatches: number | null;
+  rulesNote: string | null;
+  entryFee: number | null;
+  feeUnit: CommunityPostFeeUnit | null;
+  registrationDeadline: string | null;
+  divisions: CommunityPostDivisionInput[];
+};
+
 export type PostSummary = CommunityPostRow & {
   author: PublicProfileRow | null;
   sport: SportRow | null;
   distanceM?: number;
+  divisions: CommunityPostDivisionRow[];
+  contacts: CommunityPostContactRow[];
 };
 
 export type PostDetail = PostSummary & {
   currentUserId: string;
   isAuthor: boolean;
   isModerator: boolean;
+};
+
+export type RulesImageUpload = {
+  base64: string;
+  mimeType: string;
 };
 
 export type CreatePostInput = {
@@ -41,7 +72,18 @@ export type CreatePostInput = {
   coords: Coords;
   eventStart: string | null;
   eventEnd: string | null;
-  contactPhone: string;
+  contacts: CommunityPostContactInput[];
+  subtype: CommunityPostSubtype | null;
+  tags: CommunityPostTag[];
+  scoringFormat: CommunityPostScoringFormat | null;
+  goldenPoint: boolean | null;
+  guaranteedMatches: number | null;
+  rulesNote: string | null;
+  rulesImages: RulesImageUpload[];
+  entryFee: number | null;
+  feeUnit: CommunityPostFeeUnit | null;
+  registrationDeadline: string | null;
+  divisions: CommunityPostDivisionInput[];
 };
 
 export type UpdatePostInput = {
@@ -56,6 +98,19 @@ export type UpdatePostInput = {
   eventStart: string | null;
   eventEnd: string | null;
   resubmit?: boolean;
+  subtype: CommunityPostSubtype | null;
+  tags: CommunityPostTag[];
+  scoringFormat: CommunityPostScoringFormat | null;
+  goldenPoint: boolean | null;
+  guaranteedMatches: number | null;
+  rulesNote: string | null;
+  rulesImages: RulesImageUpload[];
+  existingRulesImagePaths: string[];
+  entryFee: number | null;
+  feeUnit: CommunityPostFeeUnit | null;
+  registrationDeadline: string | null;
+  divisions: CommunityPostDivisionInput[];
+  contacts: CommunityPostContactInput[];
 };
 
 export type ModeratePostInput = {
@@ -170,15 +225,131 @@ function isModeratorRole(role: Database['public']['Enums']['user_role']): boolea
   return role === 'moderator' || role === 'admin';
 }
 
+async function fetchContactsByPostIds(
+  postIds: string[],
+): Promise<Map<string, CommunityPostContactRow[]>> {
+  const uniqueIds = unique(postIds);
+  const map = new Map<string, CommunityPostContactRow[]>();
+  if (uniqueIds.length === 0) return map;
+
+  const { data, error } = await supabase
+    .from('community_post_contacts')
+    .select('*')
+    .in('post_id', uniqueIds)
+    .order('position', { ascending: true });
+
+  if (error !== null) throw error;
+
+  for (const row of data ?? []) {
+    const list = map.get(row.post_id) ?? [];
+    list.push(row);
+    map.set(row.post_id, list);
+  }
+  return map;
+}
+
+async function fetchDivisionsByPostIds(
+  postIds: string[],
+): Promise<Map<string, CommunityPostDivisionRow[]>> {
+  const uniqueIds = unique(postIds);
+  const map = new Map<string, CommunityPostDivisionRow[]>();
+  if (uniqueIds.length === 0) return map;
+
+  const { data, error } = await supabase
+    .from('community_post_divisions')
+    .select('*')
+    .in('post_id', uniqueIds)
+    .order('position', { ascending: true });
+
+  if (error !== null) throw error;
+
+  for (const row of data ?? []) {
+    const list = map.get(row.post_id) ?? [];
+    list.push(row);
+    map.set(row.post_id, list);
+  }
+  return map;
+}
+
+function divisionsToRpcPayload(divisions: CommunityPostDivisionInput[]): Json {
+  return divisions.map((division) => ({
+    gender: division.gender,
+    category_min: division.category_min,
+    category_max: division.category_max,
+    category_sum: division.category_sum,
+    age_min: division.age_min,
+    age_max: division.age_max,
+    label: division.label,
+  })) as Json;
+}
+
+function contactsToRpcPayload(contacts: CommunityPostContactInput[]): Json {
+  return contacts.map((contact) => ({
+    phone: contact.phone,
+    label: contact.label,
+  })) as Json;
+}
+
+function buildEventPatch(input: PostEventDetails): Partial<CommunityPostInsert> {
+  return {
+    subtype: input.subtype,
+    tags: input.tags,
+    scoring_format: input.scoringFormat,
+    golden_point: input.goldenPoint,
+    guaranteed_matches: input.guaranteedMatches,
+    rules_note: input.rulesNote?.trim() || null,
+    entry_fee: input.entryFee,
+    fee_unit: input.feeUnit,
+    registration_deadline: input.registrationDeadline,
+  };
+}
+
+async function uploadRulesImages(
+  userId: string,
+  uploads: RulesImageUpload[],
+): Promise<string[]> {
+  const paths: string[] = [];
+  for (const upload of uploads) {
+    const path = await uploadPostImage(userId, upload.base64, upload.mimeType);
+    paths.push(path);
+  }
+  return paths;
+}
+
+async function syncPostDivisions(
+  postId: string,
+  divisions: CommunityPostDivisionInput[],
+): Promise<void> {
+  const { error } = await supabase.rpc('set_community_post_divisions', {
+    p_post_id: postId,
+    p_divisions: divisionsToRpcPayload(divisions),
+  });
+  if (error !== null) throw error;
+}
+
+async function syncPostContacts(
+  postId: string,
+  contacts: CommunityPostContactInput[],
+): Promise<void> {
+  const { error } = await supabase.rpc('set_community_post_contacts', {
+    p_post_id: postId,
+    p_contacts: contactsToRpcPayload(contacts),
+  });
+  if (error !== null) throw error;
+}
+
 async function hydratePostSummaries(
   rows: CommunityPostRow[],
   distanceById?: Map<string, number>,
 ): Promise<PostSummary[]> {
   const authorIds = rows.map((row) => row.author_id);
   const sportIds = rows.map((row) => row.sport_id);
-  const [authors, sports] = await Promise.all([
+  const postIds = rows.map((row) => row.id);
+  const [authors, sports, divisionsByPost, contactsByPost] = await Promise.all([
     fetchPublicProfilesByIds(authorIds),
     fetchSportsByIds(sportIds),
+    fetchDivisionsByPostIds(postIds),
+    fetchContactsByPostIds(postIds),
   ]);
 
   return rows.map((row) => ({
@@ -186,6 +357,8 @@ async function hydratePostSummaries(
     author: authors.get(row.author_id) ?? null,
     sport: sports.get(row.sport_id) ?? null,
     distanceM: distanceById?.get(row.id),
+    divisions: divisionsByPost.get(row.id) ?? [],
+    contacts: contactsByPost.get(row.id) ?? [],
   }));
 }
 
@@ -423,6 +596,11 @@ export function useCreatePost() {
         ensurePadelSport(queryClient),
       ]);
 
+      const rulesPaths =
+        input.rulesImages.length > 0
+          ? await uploadRulesImages(userId, input.rulesImages)
+          : [];
+
       const insert: CommunityPostInsert = {
         author_id: userId,
         sport_id: padelSport.id,
@@ -435,8 +613,9 @@ export function useCreatePost() {
         location: geographyPoint(input.coords),
         event_start: input.eventStart,
         event_end: input.eventEnd,
-        contact_phone: input.contactPhone,
         status: 'pending_review',
+        rules_image_paths: rulesPaths,
+        ...buildEventPatch(input),
       };
 
       const { data, error } = await supabase
@@ -446,6 +625,11 @@ export function useCreatePost() {
         .single();
 
       if (error !== null) throw error;
+
+      await Promise.all([
+        syncPostDivisions(data.id, input.divisions),
+        syncPostContacts(data.id, input.contacts),
+      ]);
       return data.id;
     },
     onSuccess: async () => {
@@ -465,6 +649,13 @@ export function useUpdatePost() {
     mutationFn: async (input: UpdatePostInput) => {
       await ensurePadelSport(queryClient);
 
+      const userId = await getCurrentUserId();
+      const newRulesPaths =
+        input.rulesImages.length > 0
+          ? await uploadRulesImages(userId, input.rulesImages)
+          : [];
+      const rulesImagePaths = [...input.existingRulesImagePaths, ...newRulesPaths].slice(0, 3);
+
       const patch = {
         type: input.type,
         title: input.title.trim(),
@@ -475,6 +666,8 @@ export function useUpdatePost() {
         location: geographyPoint(input.coords),
         event_start: input.eventStart,
         event_end: input.eventEnd,
+        rules_image_paths: rulesImagePaths,
+        ...buildEventPatch(input),
         ...(input.resubmit === true ? { status: 'pending_review' as CommunityPostStatus } : {}),
       };
 
@@ -486,7 +679,34 @@ export function useUpdatePost() {
         .single();
 
       if (error !== null) throw error;
+      await Promise.all([
+        syncPostDivisions(input.postId, input.divisions),
+        syncPostContacts(input.postId, input.contacts),
+      ]);
       return data.id;
+    },
+    onSuccess: async (_id, input) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: postKeys.detail(input.postId) }),
+        queryClient.invalidateQueries({ queryKey: postKeys.all }),
+        queryClient.invalidateQueries({ queryKey: postKeys.mine }),
+        queryClient.invalidateQueries({ queryKey: postKeys.moderation }),
+      ]);
+    },
+  });
+}
+
+export function useSetContactConfirmed() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { contactId: string; confirmed: boolean; postId: string }) => {
+      const { error } = await supabase.rpc('set_community_post_contact_confirmed', {
+        p_contact_id: input.contactId,
+        p_confirmed: input.confirmed,
+      });
+      if (error !== null) throw error;
+      return input;
     },
     onSuccess: async (_id, input) => {
       await Promise.all([

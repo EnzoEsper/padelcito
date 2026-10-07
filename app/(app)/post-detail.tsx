@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,12 +8,12 @@ import { useAppAlert } from '@/components/app-alert-dialog';
 import {
   POST_REPORT_REASON_LABELS,
   POST_STATUS_LABELS,
-  POST_TYPE_LABELS,
   formatPostDistanceKm,
   formatPostEventSchedule,
-  isPostContactVerified,
+  formatPostTypeLine,
 } from '@/features/community/post-display';
-import { buildPostWhatsAppUrl } from '@/features/community/post-whatsapp';
+import { PostEventDetailSections } from '@/features/community/components/post-event-detail-sections';
+import { PostContactsDetailSection } from '@/features/community/components/post-contacts-detail-section';
 import {
   useArchivePost,
   usePostDetail,
@@ -76,12 +76,6 @@ export default function PostDetailScreen() {
 
   const imageUrl = post !== undefined ? buildPostImageUrl(post.image_path) : null;
   const headerTop = insets.top + 16;
-
-  async function openWhatsApp(): Promise<void> {
-    if (post === undefined || post.status !== 'approved') return;
-    const url = buildPostWhatsAppUrl(post.contact_phone, post);
-    await Linking.openURL(url);
-  }
 
   function handleReport(): void {
     if (post === undefined || post.isAuthor) return;
@@ -171,7 +165,7 @@ export default function PostDetailScreen() {
         >
           <View style={styles.headerMetaRow}>
             <Text className="font-mono text-[10.5px] tracking-[1.5px] uppercase text-neutral/38">
-              {POST_TYPE_LABELS[post.type].toUpperCase()}
+              {formatPostTypeLine(post.type, post.subtype).toUpperCase()}
             </Text>
           </View>
 
@@ -225,8 +219,12 @@ export default function PostDetailScreen() {
             </View>
           ) : null}
 
+          <PostEventDetailSections post={post} />
+
+          <PostContactsDetailSection post={post} />
+
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Organizer</Text>
+            <Text style={styles.sectionLabel}>Posted by</Text>
             {post.status === 'approved' && !post.isAuthor ? (
               <Pressable
                 onPress={() =>
@@ -247,25 +245,11 @@ export default function PostDetailScreen() {
                     <Text style={styles.sectionValue}>{post.author?.display_name ?? 'Player'}</Text>
                     <Ionicons name="chevron-forward" size={16} color={C.faint} />
                   </View>
-                  {isPostContactVerified(post.contact_verified_at) ? (
-                    <View style={styles.verifiedRow}>
-                      <Ionicons name="shield-checkmark" size={14} color={C.success} />
-                      <Text style={styles.verifiedText}>Verified contact</Text>
-                    </View>
-                  ) : null}
                 </View>
               </Pressable>
             ) : (
               <View style={styles.organizerRow}>
-                <View style={styles.organizerMeta}>
-                  <Text style={styles.sectionValue}>{post.author?.display_name ?? 'Player'}</Text>
-                  {isPostContactVerified(post.contact_verified_at) ? (
-                    <View style={styles.verifiedRow}>
-                      <Ionicons name="shield-checkmark" size={14} color={C.success} />
-                      <Text style={styles.verifiedText}>Verified contact</Text>
-                    </View>
-                  ) : null}
-                </View>
+                <Text style={styles.sectionValue}>{post.author?.display_name ?? 'Player'}</Text>
               </View>
             )}
           </View>
@@ -277,13 +261,6 @@ export default function PostDetailScreen() {
           {post.status === 'approved' && !post.isAuthor ? (
             <Pressable onPress={handleReport} style={styles.secondaryButton}>
               <Text style={styles.secondaryButtonText}>Report post</Text>
-            </Pressable>
-          ) : null}
-
-          {post.status === 'approved' ? (
-            <Pressable onPress={() => void openWhatsApp()} style={styles.primaryButton}>
-              <Ionicons name="logo-whatsapp" size={18} color={C.mist} />
-              <Text style={styles.primaryButtonText}>Contact on WhatsApp</Text>
             </Pressable>
           ) : null}
 

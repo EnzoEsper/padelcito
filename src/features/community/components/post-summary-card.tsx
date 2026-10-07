@@ -6,10 +6,13 @@ import { CachedRemoteImage } from '@/components/cached-remote-image';
 import {
   POST_STATUS_COLORS,
   POST_STATUS_LABELS,
-  POST_TYPE_LABELS,
+  POST_TAG_LABELS,
+  formatDivisions,
   formatPostDistanceKm,
   formatPostEventSchedule,
-  isPostContactVerified,
+  formatPostFee,
+  formatPostTypeLine,
+  hasConfirmedOrganizerContact,
 } from '@/features/community/post-display';
 import { buildPostImageUrl } from '@/lib/post-storage';
 import type { PostSummary } from '@/features/community/use-posts';
@@ -40,8 +43,12 @@ export const PostSummaryCard = memo(function PostSummaryCard({
   const imageUrl = buildPostImageUrl(post.image_path);
   const distanceLabel = formatPostDistanceKm(post.distanceM);
   const scheduleLabel = formatPostEventSchedule(post.event_start, post.event_end);
-  const verified = isPostContactVerified(post.contact_verified_at);
+  const verified = hasConfirmedOrganizerContact(post.contacts);
   const statusColors = POST_STATUS_COLORS[post.status];
+  const typeLine = formatPostTypeLine(post.type, post.subtype);
+  const divisionsLine = formatDivisions(post.divisions, 2);
+  const feeLine = formatPostFee(post.entry_fee, post.fee_unit, post.divisions.length > 0);
+  const highlightTags = post.tags.slice(0, 3);
 
   return (
     <Pressable onPress={onPress} style={styles.card}>
@@ -57,7 +64,9 @@ export const PostSummaryCard = memo(function PostSummaryCard({
         <View style={styles.metaRow}>
           <View style={styles.metaLeft}>
             <View style={styles.typeChip}>
-              <Text style={styles.typeChipText}>{POST_TYPE_LABELS[post.type]}</Text>
+              <Text style={styles.typeChipText} numberOfLines={1}>
+                {typeLine}
+              </Text>
             </View>
             {showStatus ? (
               <View style={[styles.statusChip, { backgroundColor: statusColors.bg }]}>
@@ -84,6 +93,24 @@ export const PostSummaryCard = memo(function PostSummaryCard({
           {post.venue_name ?? post.formatted_address ?? 'Location on post'}
         </Text>
 
+        {divisionsLine !== null ? (
+          <Text style={styles.metaLine} numberOfLines={2}>
+            {divisionsLine}
+          </Text>
+        ) : null}
+
+        {feeLine !== null ? (
+          <Text style={styles.metaLine} numberOfLines={1}>
+            {feeLine}
+          </Text>
+        ) : null}
+
+        {highlightTags.length > 0 ? (
+          <Text style={styles.metaLine} numberOfLines={1}>
+            {highlightTags.map((tag) => POST_TAG_LABELS[tag]).join(' · ')}
+          </Text>
+        ) : null}
+
         <View style={styles.footerRow}>
           <Text style={styles.author} numberOfLines={1}>
             {post.author?.display_name ?? 'Organizer'}
@@ -91,7 +118,7 @@ export const PostSummaryCard = memo(function PostSummaryCard({
           {verified ? (
             <View style={styles.verifiedChip}>
               <Ionicons name="shield-checkmark" size={12} color={C.success} />
-              <Text style={styles.verifiedText}>Verified contact</Text>
+              <Text style={styles.verifiedText}>Verified organizer</Text>
             </View>
           ) : null}
         </View>
@@ -184,6 +211,12 @@ const styles = StyleSheet.create({
     color: C.faint,
     fontFamily: 'Hanken Grotesk',
     fontSize: 13,
+  },
+  metaLine: {
+    color: C.dim,
+    fontFamily: 'Hanken Grotesk',
+    fontSize: 12,
+    lineHeight: 17,
   },
   footerRow: {
     marginTop: 4,

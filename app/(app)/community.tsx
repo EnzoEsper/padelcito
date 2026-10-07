@@ -195,7 +195,7 @@ export default function CommunityScreen() {
         <Text style={styles.emptyText}>
           {feedMode === 'nearby'
             ? 'No approved posts nearby. Try All events or publish the first one.'
-            : 'No approved posts yet. Be the first to publish a tournament or training session.'}
+            : 'No approved posts yet. Be the first to publish an event.'}
         </Text>
       </View>
     );

@@ -183,14 +183,17 @@ Empty host cancels, solo auto-`finished`, and early withdraw/remove do **not** i
 
 ### Domain model
 
-- **Table:** `community_posts` (not `listings`, not generic `posts`). Types: `community_post_type` (`tournament` | `training`); statuses: `pending_review` | `approved` | `rejected` | `archived`.
+- **Table:** `community_posts` (not `listings`, not generic `posts`). Types: `community_post_type` (`tournament` | `social` | `league` | `training` | `special_event`); optional `subtype`, `tags[]`, scoring fields (`scoring_format`, `golden_point`, `guaranteed_matches`, `rules_note`, `rules_image_paths`), fee (`entry_fee`, `fee_unit`), `registration_deadline`. Statuses: `pending_review` | `approved` | `rejected` | `archived`.
+- **Divisions:** `community_post_divisions` (0–12 rows per post; `category_max` / `category_min` follow the same band semantics as `matches`). Writes only via RPC `set_community_post_divisions`. Taxonomy reference: `docs/event-types.md`.
+- **Organizer contacts:** `community_post_contacts` (1–3 WhatsApp numbers per post, ordered; optional `label`). Author sets via RPC `set_community_post_contacts` while `pending_review` | `rejected`. Moderators confirm via RPC `set_community_post_contact_confirmed`. Approval trigger requires ≥1 confirmed contact. Public reads see confirmed rows on approved posts only. Legacy column `community_posts.contact_phone` is deprecated (nullable).
 - **Reports:** `community_post_reports` with `community_post_report_reason` enum.
 - **Discovery RPC:** `nearby_community_posts(p_lat, p_lng, p_radius_m, p_sport_id, p_type?)` — always pass padel `p_sport_id` from `fetchPadelSport()`.
 - **Listings schema is dormant:** `listings` / `listing_responses` remain for a future response-inbox classifieds flow; do not wire Community UI to listings.
 
 ### Contact & moderation
 
-- Approved posts expose the author's profile WhatsApp via a public `contact_phone` column on the post row (set at publish time from profile). Client builds `wa.me` links in `src/features/community/post-whatsapp.ts` — same pattern as matches but **no RPC gate** (public approved content).
+- Player contact: prefilled `wa.me` links per **confirmed** organizer in `src/features/community/post-whatsapp.ts` (type-aware player message). Moderator verification uses `buildOrganizerVerificationUrl` from the same module.
+- Publish still requires the author's profile WhatsApp to be verified (`enforce_community_post_limits`), but the author may omit their number from the post if another organizer number is listed.
 - Every new post starts `pending_review`. Moderators (`profiles.role` = `moderator` | `admin`) approve/reject via RLS-scoped UPDATE; authors can archive approved posts.
 - **`profiles.role`** and **`profiles.banned_at`** gate publish; helper RPCs `is_moderator()`, `is_admin()`, `is_banned()` are SECURITY DEFINER — granted to `authenticated`.
 
@@ -211,7 +214,7 @@ Types: `community_post_submitted` (moderators), `community_post_approved`, `comm
 
 ### M5 migrations
 
-`20260711000000_add_user_role`, `20260711010000_create_community_posts`, `20260711020000_create_community_post_reports`, `20260711030000_create_community_posts_bucket`, `20260711040000_community_post_notifications`, `20260711050000_grant_role_helper_functions`, `20260711060000_community_post_submitted_moderator_notifications`, `20260711070000_community_posts_realtime`.
+`20260711000000_add_user_role`, `20260711010000_create_community_posts`, `20260711020000_create_community_post_reports`, `20260711030000_create_community_posts_bucket`, `20260711040000_community_post_notifications`, `20260711050000_grant_role_helper_functions`, `20260711060000_community_post_submitted_moderator_notifications`, `20260711070000_community_posts_realtime`, `20261005230000_community_event_types_enum`, `20261005240000_community_event_attributes`, `20261005250000_community_post_divisions`, `20261005260000_community_division_category_range`, `20261006100000_community_post_contacts`.
 
 ## 11. Canonical References
 

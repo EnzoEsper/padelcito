@@ -68,7 +68,7 @@ export default function CreatePostScreen() {
             Publish post
           </Text>
           <Text className="font-grotesk text-sm text-neutral/60 mt-2 leading-5">
-            Share a tournament or training session. Contact uses your profile WhatsApp and every post is reviewed before going public.
+            Start with your flyer and the basics — add divisions, fees, and rules only if you need them. Every post is reviewed before it goes public.
           </Text>
         </View>
 

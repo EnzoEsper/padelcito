@@ -36,7 +36,7 @@ export default function MyPostsScreen() {
     (postId: string) => {
       router.push(buildPostDetailRoute(postId));
     },
-    [goBack, insets.top],
+    [router],
   );
 
   const renderItem = useCallback(
@@ -73,7 +73,7 @@ export default function MyPostsScreen() {
         </Text>
       </View>
     ),
-    [insets.top, router],
+    [insets.top, goBack],
   );
 
   const listEmpty = useMemo(() => {

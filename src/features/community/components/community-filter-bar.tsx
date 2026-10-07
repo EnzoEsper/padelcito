@@ -35,7 +35,10 @@ const FEED_MODE_OPTIONS: FilterOption<CommunityFeedMode>[] = [
 const TYPE_FILTER_OPTIONS: FilterOption<CommunityTypeFilter>[] = [
   { value: 'all', label: 'All types' },
   { value: 'tournament', label: 'Tournaments' },
+  { value: 'social', label: 'Social' },
+  { value: 'league', label: 'Leagues' },
   { value: 'training', label: 'Training' },
+  { value: 'special_event', label: 'Special' },
 ];
 
 const MAX_INLINE_OPTIONS = 4;
