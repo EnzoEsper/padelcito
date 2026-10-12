@@ -23,24 +23,18 @@ import type { Database } from '@/types/database';
 type Json = Database['public']['Tables']['matches']['Row']['court_configs'];
 type GenderPreference = Database['public']['Enums']['match_gender_preference'];
 type MatchDifficulty = Database['public']['Enums']['match_difficulty'];
-type MatchStatus = Database['public']['Enums']['match_status'];
-type ParticipantStatus = Database['public']['Enums']['participant_status'];
 type PositionPreference = Database['public']['Enums']['match_position_preference'];
 
-export type MatchStatusBadgeTone = 'open' | 'full' | 'live' | 'finished' | 'cancelled';
-
-export type MatchStatusBadgeConfig = {
-  label: string;
-  tone: MatchStatusBadgeTone;
-};
-
-export type ParticipantStatusMembershipTone = 'pending' | 'accepted' | 'inactive';
-
-export type ParticipantStatusDisplay = {
-  label: string;
-  tone: ParticipantStatusMembershipTone;
-  pulse: boolean;
-};
+export type {
+  MatchStatusBadgeConfig,
+  MatchStatusBadgeTone,
+  ParticipantStatusDisplay,
+  ParticipantStatusMembershipTone,
+} from '@/features/matches/match-status-labels';
+export {
+  resolveMatchStatusBadge,
+  resolveParticipantStatusDisplay,
+} from '@/features/matches/match-status-labels';
 
 /** Card accent strength from the match's strongest accepted category (1ª = highest). */
 export type CategoryAccentLevel = 'high' | 'mid' | 'low';
@@ -367,63 +361,3 @@ export function hasHostNote(description: string | null): boolean {
   return description !== null && description.trim().length > 0;
 }
 
-const MATCH_STATUS_LABELS: Record<MatchStatus, string> = {
-  open: 'Open',
-  full: 'Full',
-  in_progress: 'Live',
-  finished: 'Finished',
-  cancelled: 'Cancelled',
-};
-
-export function resolveMatchStatusBadge(status: MatchStatus): MatchStatusBadgeConfig {
-  switch (status) {
-    case 'open':
-      return { label: MATCH_STATUS_LABELS.open, tone: 'open' };
-    case 'full':
-      return { label: MATCH_STATUS_LABELS.full, tone: 'full' };
-    case 'in_progress':
-      return { label: MATCH_STATUS_LABELS.in_progress, tone: 'live' };
-    case 'finished':
-      return { label: MATCH_STATUS_LABELS.finished, tone: 'finished' };
-    case 'cancelled':
-      return { label: MATCH_STATUS_LABELS.cancelled, tone: 'cancelled' };
-  }
-}
-
-const PARTICIPANT_STATUS_LABELS: Record<ParticipantStatus, string> = {
-  pending: 'Pending',
-  accepted: 'Accepted',
-  rejected: 'Rejected',
-  withdrawn: 'Withdrawn',
-  removed: 'Removed',
-  cancelled: 'Cancelled',
-};
-
-/** Card/footer label for match_participants.status — mirrors participant_status enum. */
-export function resolveParticipantStatusDisplay(
-  status: ParticipantStatus,
-): ParticipantStatusDisplay {
-  switch (status) {
-    case 'pending':
-      return {
-        label: PARTICIPANT_STATUS_LABELS.pending,
-        tone: 'pending',
-        pulse: true,
-      };
-    case 'accepted':
-      return {
-        label: PARTICIPANT_STATUS_LABELS.accepted,
-        tone: 'accepted',
-        pulse: true,
-      };
-    case 'rejected':
-    case 'withdrawn':
-    case 'removed':
-    case 'cancelled':
-      return {
-        label: PARTICIPANT_STATUS_LABELS[status],
-        tone: 'inactive',
-        pulse: false,
-      };
-  }
-}

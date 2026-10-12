@@ -2,10 +2,59 @@ import type { Database } from '@/types/database';
 
 type ParticipantRow = Database['public']['Tables']['match_participants']['Row'];
 
+type MatchStatus = Database['public']['Enums']['match_status'];
+
 export type MatchScheduleFields = {
   starts_at: string;
-  status: Database['public']['Enums']['match_status'];
+  status: MatchStatus;
 };
+
+export type MatchLifecycleFields = MatchScheduleFields & {
+  duration_minutes: number;
+};
+
+export function matchEndsAtMs(match: MatchScheduleFields & { duration_minutes: number }): number {
+  return new Date(match.starts_at).getTime() + match.duration_minutes * 60 * 1000;
+}
+
+/**
+ * Display-only lifecycle aligned with `sync_match_lifecycle` — does not write to the database.
+ */
+export function resolveEffectiveMatchStatus(
+  match: MatchLifecycleFields,
+  nowMs: number = Date.now(),
+): MatchStatus {
+  if (match.status === 'cancelled') {
+    return 'cancelled';
+  }
+
+  const startMs = new Date(match.starts_at).getTime();
+  const endsAtMs = matchEndsAtMs(match);
+
+  if (match.status === 'open' || match.status === 'full') {
+    if (endsAtMs <= nowMs) {
+      return 'finished';
+    }
+    if (startMs <= nowMs) {
+      return 'in_progress';
+    }
+    return match.status;
+  }
+
+  if (match.status === 'in_progress' && endsAtMs <= nowMs) {
+    return 'finished';
+  }
+
+  return match.status;
+}
+
+export function isEffectiveMatchPreStart(
+  match: MatchLifecycleFields,
+  nowMs: number = Date.now(),
+): boolean {
+  const effective = resolveEffectiveMatchStatus(match, nowMs);
+  return effective === 'open' || effective === 'full';
+}
 
 export type MatchHostRosterFields = MatchScheduleFields & {
   isHost: boolean;

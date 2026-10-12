@@ -1,12 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { Text } from '@/tw';
-import {
-  resolveMatchStatusBadge,
-  resolveParticipantStatusDisplay,
-  type MatchStatusBadgeTone,
-  type ParticipantStatusMembershipTone,
-} from '@/features/matches/match-display';
+import { resolveMatchCardState } from '@/features/matches/match-card-state';
+import type { MatchStatusBadgeTone, ParticipantStatusMembershipTone } from '@/features/matches/match-display';
 import type { MatchSummary } from '@/features/matches/use-matches';
 
 type MembershipChip = {
@@ -139,18 +135,14 @@ function TextPill({
   );
 }
 
+/** @deprecated Use resolveMatchCardState(match).viewerStatus instead. */
 export function resolveParticipantMembership(match: MatchSummary): MembershipChip | null {
-  if (match.status === 'finished') return null;
-  if (match.isHostedByCurrentUser) return null;
-
-  const status = match.currentUserParticipant?.status;
-  if (status === undefined) return null;
-
-  const display = resolveParticipantStatusDisplay(status);
+  const { viewerStatus } = resolveMatchCardState(match);
+  if (viewerStatus === null) return null;
   return {
-    label: display.label,
-    tone: display.tone,
-    pulse: display.pulse,
+    label: viewerStatus.label,
+    tone: viewerStatus.tone,
+    pulse: viewerStatus.pulse,
   };
 }
 
@@ -159,31 +151,29 @@ export function resolveParticipantMembership(match: MatchSummary): MembershipChi
  * When hosting, a neutral Host pill sits immediately to its left.
  */
 export function MatchCalendarHeaderBadge({ match }: { match: MatchSummary }) {
-  const lifecycle = resolveMatchStatusBadge(match.status);
+  const { lifecycle, showHostPill } = resolveMatchCardState(match);
   const statusStyle = LIFECYCLE_PILL[lifecycle.tone];
 
   return (
     <View style={styles.headerRow}>
-      {match.isHostedByCurrentUser ? (
-        <TextPill label="Host" {...NEUTRAL_PILL} />
-      ) : null}
+      {showHostPill ? <TextPill label="Host" {...NEUTRAL_PILL} /> : null}
       <TextPill label={lifecycle.label} {...statusStyle} />
     </View>
   );
 }
 
-/** Footer — participant status as dot + label (not shown for hosts). */
+/** Footer — viewer relationship (host pending inbox or player membership). */
 export function MatchCalendarMembershipLabel({ match }: { match: MatchSummary }) {
-  const membership = resolveParticipantMembership(match);
-  if (membership === null) return null;
+  const { viewerStatus } = resolveMatchCardState(match);
+  if (viewerStatus === null) return null;
 
-  const colors = MEMBERSHIP_TEXT[membership.tone];
+  const colors = MEMBERSHIP_TEXT[viewerStatus.tone];
 
   return (
     <View style={styles.membershipRow}>
-      <RadarStatusDot color={colors.dotColor} pulse={membership.pulse} />
+      <RadarStatusDot color={colors.dotColor} pulse={viewerStatus.pulse} />
       <Text style={[styles.membershipLabel, { color: colors.textColor }]}>
-        {membership.label}
+        {viewerStatus.label}
       </Text>
     </View>
   );

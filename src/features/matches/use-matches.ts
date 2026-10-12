@@ -8,6 +8,7 @@ import { parseGeographyPoint, roundCoordsForKey, type Coords } from '@/lib/locat
 import type { CourtConfig } from '@/lib/padel-court';
 import { supabase } from '@/lib/supabase';
 import { computeMatchRosterStats } from '@/features/matches/match-roster';
+import { resolveEffectiveMatchStatus } from '@/features/matches/match-lifecycle';
 import type { Database } from '@/types/database';
 
 type MatchRow = Database['public']['Tables']['matches']['Row'];
@@ -50,6 +51,29 @@ export type CreateMatchInput = {
   difficulty: Database['public']['Enums']['match_difficulty'];
 };
 
+export type MatchRosterPreviewEntry = {
+  id: string;
+  name: string;
+};
+
+/** Safe roster for cards when cache predates `rosterPreview` or hydration omitted it. */
+export function rosterPreviewForCard(
+  match: Pick<MatchSummary, 'host' | 'host_id'> & {
+    rosterPreview?: MatchRosterPreviewEntry[];
+  },
+): MatchRosterPreviewEntry[] {
+  const preview = match.rosterPreview;
+  if (preview !== undefined && preview.length > 0) {
+    return preview;
+  }
+  return [
+    {
+      id: match.host_id,
+      name: match.host?.display_name ?? 'Host',
+    },
+  ];
+}
+
 export type MatchSummary = MatchRow & {
   sport: SportRow | null;
   host: PublicProfileRow | null;
@@ -61,6 +85,8 @@ export type MatchSummary = MatchRow & {
   totalFilled: number;
   isJoinFull: boolean;
   isHostedByCurrentUser: boolean;
+  rosterPreview: MatchRosterPreviewEntry[];
+  pendingRequestCount: number;
   distanceM?: number;
   coords?: Coords | null;
 };
@@ -94,20 +120,28 @@ function isFutureMatch(match: MatchSummary, now: number): boolean {
   return new Date(match.starts_at).getTime() >= now;
 }
 
-function isUpcomingListMatch(match: MatchSummary, now: number): boolean {
-  return (
-    match.status !== 'cancelled' &&
-    (match.status === 'open' || match.status === 'full') &&
-    isFutureMatch(match, now) &&
-    isConfirmedParticipation(match)
+function effectiveStatusForList(match: MatchSummary, now: number) {
+  return resolveEffectiveMatchStatus(
+    {
+      starts_at: match.starts_at,
+      duration_minutes: match.duration_minutes,
+      status: match.status,
+    },
+    now,
   );
+}
+
+function isUpcomingListMatch(match: MatchSummary, now: number): boolean {
+  if (!isConfirmedParticipation(match)) return false;
+  const effective = effectiveStatusForList(match, now);
+  if (effective === 'cancelled' || effective === 'finished') return false;
+  return effective === 'open' || effective === 'full' || effective === 'in_progress';
 }
 
 function isHistoryListMatch(match: MatchSummary, now: number): boolean {
   if (!isConfirmedParticipation(match)) return false;
-  if (match.status === 'cancelled') return true;
-  if (match.status === 'in_progress' || match.status === 'finished') return true;
-  return !isFutureMatch(match, now);
+  const effective = effectiveStatusForList(match, now);
+  return effective === 'cancelled' || effective === 'finished';
 }
 
 export {
@@ -120,10 +154,11 @@ export {
 
 export const matchKeys = {
   all: ['matches'] as const,
-  discoverPrefix: ['matches', 'discover', PADEL_SPORT_SLUG] as const,
+  discoverPrefix: ['matches', 'discover', PADEL_SPORT_SLUG, '2'] as const,
   discover: (coords: Coords, radiusKm: number) =>
     [...matchKeys.discoverPrefix, roundCoordsForKey(coords), radiusKm] as const,
-  mine: ['matches', 'mine', PADEL_SPORT_SLUG] as const,
+  /** Bumped when MatchSummary shape changes (e.g. rosterPreview) to drop stale cache. */
+  mine: ['matches', 'mine', PADEL_SPORT_SLUG, '2'] as const,
   detail: (matchId: string) => ['matches', matchId] as const,
   contacts: (matchId: string) => ['matches', matchId, 'contacts'] as const,
 };
@@ -193,6 +228,35 @@ async function fetchVisibleParticipants(matchIds: string[]): Promise<Participant
   return data ?? [];
 }
 
+function buildRosterPreview(
+  match: MatchRow,
+  host: PublicProfileRow | null,
+  participants: ParticipantRow[],
+  profilesById: Map<string, PublicProfileRow>,
+): MatchRosterPreviewEntry[] {
+  const preview: MatchRosterPreviewEntry[] = [
+    {
+      id: match.host_id,
+      name: host?.display_name ?? 'Host',
+    },
+  ];
+
+  const accepted = participants
+    .filter((participant) => participant.status === 'accepted')
+    .sort((left, right) => left.requested_at.localeCompare(right.requested_at));
+
+  for (const participant of accepted) {
+    if (participant.profile_id === match.host_id) continue;
+    const profile = profilesById.get(participant.profile_id);
+    preview.push({
+      id: participant.profile_id,
+      name: profile?.display_name ?? 'Player',
+    });
+  }
+
+  return preview;
+}
+
 function summarizeMatch(
   match: MatchRow,
   sportsById: Map<string, SportRow>,
@@ -202,11 +266,12 @@ function summarizeMatch(
 ): MatchSummary {
   const participants = visibleParticipants.filter((participant) => participant.match_id === match.id);
   const roster = computeMatchRosterStats(match.capacity, match.open_spots, participants);
+  const host = profilesById.get(match.host_id) ?? null;
 
   return {
     ...match,
     sport: sportsById.get(match.sport_id) ?? null,
-    host: profilesById.get(match.host_id) ?? null,
+    host,
     currentUserParticipant:
       participants.find((participant) => participant.profile_id === userId) ?? null,
     acceptedVisibleCount: 1 + roster.appAcceptedCount,
@@ -216,6 +281,8 @@ function summarizeMatch(
     totalFilled: roster.totalFilled,
     isJoinFull: roster.isJoinFull,
     isHostedByCurrentUser: match.host_id === userId,
+    rosterPreview: buildRosterPreview(match, host, participants, profilesById),
+    pendingRequestCount: participants.filter((participant) => participant.status === 'pending').length,
   };
 }
 
@@ -226,9 +293,17 @@ async function hydrateSummaries(
   if (matches.length === 0) return [];
 
   const needsSports = matches.some((match) => match.sport === undefined);
-  const needsProfiles = matches.some((match) => match.host === undefined);
 
-  const [sportsById, participants, profilesById] = await Promise.all([
+  const participants = await fetchVisibleParticipants(matches.map((match) => match.id));
+
+  const profileIdsForRoster = unique([
+    ...matches.map((match) => match.host_id),
+    ...participants
+      .filter((participant) => participant.status === 'accepted')
+      .map((participant) => participant.profile_id),
+  ]);
+
+  const [sportsById, profilesById] = await Promise.all([
     needsSports
       ? fetchSportsByIds(matches.map((match) => match.sport_id))
       : Promise.resolve(
@@ -239,21 +314,15 @@ async function hydrateSummaries(
               .map((sport) => [sport.id, sport]),
           ),
         ),
-    fetchVisibleParticipants(matches.map((match) => match.id)),
-    needsProfiles
-      ? fetchPublicProfilesByIds(matches.map((match) => match.host_id))
-      : Promise.resolve(
-          new Map(
-            matches
-              .map((match) => match.host)
-              .filter(
-                (profile): profile is PublicProfileRow & { id: string } =>
-                  profile !== undefined && profile !== null && profile.id !== null,
-              )
-              .map((profile) => [profile.id, profile]),
-          ),
-        ),
+    fetchPublicProfilesByIds(profileIdsForRoster),
   ]);
+
+  for (const match of matches) {
+    const host = match.host;
+    if (host !== undefined && host !== null && host.id !== null) {
+      profilesById.set(host.id, host);
+    }
+  }
 
   return matches.map((match) =>
     summarizeMatch(match, sportsById, profilesById, participants, userId),
@@ -443,10 +512,12 @@ export function useMyMatches() {
       return {
         userId,
         upcoming: summaries.filter((match) => isUpcomingListMatch(match, now)),
-        history: summaries.filter((match) => isHistoryListMatch(match, now)),
+        history: summaries
+          .filter((match) => isHistoryListMatch(match, now))
+          .sort((left, right) => right.starts_at.localeCompare(left.starts_at)),
         pendingOutgoing: summaries.filter(
           (match) =>
-            match.status !== 'cancelled' &&
+            effectiveStatusForList(match, now) !== 'cancelled' &&
             isFutureMatch(match, now) &&
             !match.isHostedByCurrentUser &&
             match.currentUserParticipant?.status === 'pending',
@@ -455,7 +526,7 @@ export function useMyMatches() {
           .map((participant) => {
             const match = summariesById.get(participant.match_id);
             if (match === undefined) return null;
-            if (match.status === 'cancelled') return null;
+            if (effectiveStatusForList(match, now) === 'cancelled') return null;
             if (!isFutureMatch(match, now)) return null;
             return {
               participant,

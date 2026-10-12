@@ -16,10 +16,10 @@ import {
 } from "@/features/matches/use-matches";
 import { useMyMatchesRealtime } from "@/features/matches/use-match-realtime";
 import { MatchSummaryCard } from "@/features/matches/components/match-summary-card";
+import { resolveMatchCardState } from "@/features/matches/match-card-state";
 import {
   MatchCalendarHeaderBadge,
   MatchCalendarMembershipLabel,
-  resolveParticipantMembership,
 } from "@/features/matches/components/match-status-badge";
 import { buildRateMatchRoute } from "@/features/ratings/rating-display";
 import { usePendingRatingCount } from "@/features/ratings/use-ratings";
@@ -42,27 +42,24 @@ const C = {
 
 function MyMatchCard({
   match,
-  tab,
   onPress,
   needsRating,
   onRate,
 }: {
   match: MatchSummary;
-  tab: MatchesTab;
   onPress: () => void;
   needsRating?: boolean;
   onRate?: () => void;
 }) {
-  const membership = resolveParticipantMembership(match);
+  const { viewerStatus } = resolveMatchCardState(match);
 
   return (
     <MatchSummaryCard
       match={match}
       onPress={onPress}
-      muted={tab === "history"}
       headerBadge={<MatchCalendarHeaderBadge match={match} />}
       footerMembership={
-        membership !== null ? (
+        viewerStatus !== null ? (
           <MatchCalendarMembershipLabel match={match} />
         ) : undefined
       }
@@ -287,7 +284,6 @@ export default function MatchesScreen() {
       return (
         <MyMatchCard
           match={item.match}
-          tab={item.tab}
           onPress={() => openMatch(item.match.id)}
           needsRating={
             item.tab === "history" &&

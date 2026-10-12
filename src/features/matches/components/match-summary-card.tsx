@@ -13,7 +13,10 @@ import {
   formatMatchDurationHours,
   type CategoryAccentLevel,
 } from '@/features/matches/match-display';
-import type { MatchSummary } from '@/features/matches/use-matches';
+import { resolveMatchCardState } from '@/features/matches/match-card-state';
+import { rosterPreviewForCard, type MatchSummary } from '@/features/matches/use-matches';
+
+const MAX_ROSTER_AVATARS = 3;
 
 const C = {
   surface1: '#141417',
@@ -80,6 +83,22 @@ function EmptySpot({ index }: { index: number }) {
   );
 }
 
+function OverflowBubble({ count, index }: { count: number; index: number }) {
+  return (
+    <View
+      style={[
+        styles.avatarBubble,
+        {
+          backgroundColor: C.surface3,
+          marginLeft: index === 0 ? 0 : -10,
+        },
+      ]}
+    >
+      <Text style={[styles.avatarText, { color: C.dim }]}>+{count}</Text>
+    </View>
+  );
+}
+
 function MatchMetaChip({
   label,
   variant,
@@ -121,6 +140,8 @@ export type MatchSummaryCardProps = {
   /** Footer membership label left of player count (matches calendar tabs). */
   footerMembership?: ReactNode;
   rateAction?: { onPress: () => void };
+  /** When set, overrides card-state muted styling (e.g. tests). */
+  forceMuted?: boolean;
 };
 
 export const MatchSummaryCard = memo(function MatchSummaryCard({
@@ -131,21 +152,24 @@ export const MatchSummaryCard = memo(function MatchSummaryCard({
   headerBadge,
   footerMembership,
   rateAction,
+  forceMuted,
 }: MatchSummaryCardProps) {
-  const hostName = match.host?.display_name ?? 'Player';
+  const cardState = resolveMatchCardState(match);
+  const isMuted = forceMuted ?? (muted || cardState.muted);
   const { day } = formatDiscoverMatchWhen(match.starts_at);
   const timeRange = formatMatchTimeRange(match.starts_at, match.duration_minutes);
   const durationLabel = formatMatchDurationHours(match.duration_minutes);
   const categoryLabel = formatCategoryCompact(match.category_max, match.category_min);
   const filled = match.totalFilled;
   const openSpots = match.joinSpotsRemaining;
-  const accentLevel = categoryAccentLevel(match.category_max);
-  const full = match.isJoinFull || match.status === 'full';
-  const avatarNames = [hostName, match.sport?.name ?? 'Player', match.venue_name ?? 'Match'];
+  const accentLevel = cardState.accentNeutral ? 'low' : categoryAccentLevel(match.category_max);
+  const visibleAvatars = rosterPreviewForCard(match).slice(0, MAX_ROSTER_AVATARS);
+  const overflowCount = Math.max(0, filled - visibleAvatars.length);
+  const emptySpotCount = cardState.rosterJoinable ? Math.min(openSpots, 2) : 0;
   const showDistance = distanceM !== undefined;
 
   return (
-    <Pressable onPress={onPress} style={[styles.card, muted && styles.cardMuted]}>
+    <Pressable onPress={onPress} style={[styles.card, isMuted && styles.cardMuted]}>
       <LinearGradient
         colors={accentColorsForLevel(accentLevel)}
         start={{ x: 0, y: 0 }}
@@ -191,19 +215,28 @@ export const MatchSummaryCard = memo(function MatchSummaryCard({
       <View style={styles.cardFooter}>
         <View style={styles.playersWrap}>
           <View style={styles.avatarStack}>
-            {avatarNames.slice(0, Math.min(filled, 3)).map((name, index) => (
-              <AvatarBubble key={`${match.id}-${name}-${index}`} name={name} index={index} />
+            {visibleAvatars.map((entry, index) => (
+              <AvatarBubble key={`${match.id}-${entry.id}`} name={entry.name} index={index} />
             ))}
-            {Array.from({ length: Math.min(openSpots, 2) }).map((_, index) => (
-              <EmptySpot key={`${match.id}-empty-${index}`} index={filled + index} />
+            {overflowCount > 0 ? (
+              <OverflowBubble
+                count={overflowCount}
+                index={visibleAvatars.length}
+              />
+            ) : null}
+            {Array.from({ length: emptySpotCount }).map((_, index) => (
+              <EmptySpot
+                key={`${match.id}-empty-${index}`}
+                index={visibleAvatars.length + (overflowCount > 0 ? 1 : 0) + index}
+              />
             ))}
           </View>
           <View>
-            <Text style={[styles.playerCount, full && styles.playerCountFull]}>
+            <Text style={styles.playerCount}>
               {filled}
               <Text style={styles.playerTotal}>/{match.capacity}</Text>
             </Text>
-            <Text style={styles.playerLabel}>{full ? 'Full' : 'Players'}</Text>
+            <Text style={styles.playerLabel}>Players</Text>
           </View>
           {footerMembership !== undefined ? (
             <View style={styles.footerMembership}>{footerMembership}</View>
